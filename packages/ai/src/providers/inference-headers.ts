@@ -53,6 +53,8 @@ export function resolveOpenCodeGoCacheAffinity(
 
 /** Set a header unless the map already contains that field under any casing. */
 export function setHeaderIfAbsent(headers: Record<string, string>, name: string, value: string): void {
+	// Empty value = omit the header entirely (identity overrides use it to drop attribution).
+	if (!value) return;
 	const normalizedName = name.toLowerCase();
 	for (const existingName in headers) {
 		if (existingName.toLowerCase() === normalizedName) return;

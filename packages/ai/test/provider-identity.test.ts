@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { getProviderIdentity, setProviderIdentity, USER_AGENT } from "@oh-my-pi/pi-utils";
+import {
+	getProviderIdentity,
+	PROVIDER_APP_NAME,
+	PROVIDER_APP_URL,
+	setProviderIdentity,
+	USER_AGENT,
+} from "@oh-my-pi/pi-utils";
 import { getOpenRouterHeaders } from "../src/utils/openrouter-headers";
 
 afterEach(() => setProviderIdentity());
@@ -23,10 +29,28 @@ describe("provider identity", () => {
 		expect(headers["User-Agent"]).toBe("acme-cli/2.1 (linux; bun/1.4.2; x64)");
 		expect(headers["X-OpenRouter-Title"]).toBe("Acme");
 		expect(headers["HTTP-Referer"]).toBe("https://acme.example/");
-		expect(USER_AGENT).toBe("acme-cli/2.1 (linux; bun/1.4.2; x64)");
 	});
 
-	it("falls back to omp per field when a field is blank", () => {
+	it("covers every header from the User-Agent alone", () => {
+		// One setting, no omp attribution left on the wire: app name derived from the
+		// product token, homepage omitted instead of falling back to omp.sh.
+		setProviderIdentity({ userAgent: "acme-cli/2.1 (linux; bun/1.4.2; x64)" });
+		const headers = getOpenRouterHeaders();
+		expect(headers["User-Agent"]).toBe("acme-cli/2.1 (linux; bun/1.4.2; x64)");
+		expect(headers["X-OpenRouter-Title"]).toBe("acme-cli");
+		expect(headers["HTTP-Referer"]).toBeUndefined();
+		expect(PROVIDER_APP_NAME).toBe("acme-cli");
+		expect(PROVIDER_APP_URL).toBe("");
+	});
+
+	it("lets explicit app name and homepage win over the derivation", () => {
+		setProviderIdentity({ userAgent: "acme-cli/2.1", appName: "Acme CLI", appUrl: "https://acme.example/" });
+		const headers = getOpenRouterHeaders();
+		expect(headers["X-OpenRouter-Title"]).toBe("Acme CLI");
+		expect(headers["HTTP-Referer"]).toBe("https://acme.example/");
+	});
+
+	it("falls back per field when a field is blank", () => {
 		setProviderIdentity({ userAgent: "   ", appName: "", appUrl: "https://acme.example/" });
 		const headers = getOpenRouterHeaders();
 		expect(headers["User-Agent"]).toMatch(/^omp\//);
@@ -36,8 +60,11 @@ describe("provider identity", () => {
 	});
 
 	it("restores omp's identity when reset", () => {
-		setProviderIdentity({ appName: "Acme" });
+		setProviderIdentity({ userAgent: "acme-cli/2.1" });
 		setProviderIdentity();
-		expect(getOpenRouterHeaders()["X-OpenRouter-Title"]).toBe("omp");
+		const headers = getOpenRouterHeaders();
+		expect(headers["User-Agent"]).toBe(USER_AGENT);
+		expect(headers["X-OpenRouter-Title"]).toBe("omp");
+		expect(headers["HTTP-Referer"]).toBe("https://omp.sh/");
 	});
 });
