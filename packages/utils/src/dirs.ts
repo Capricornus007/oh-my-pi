@@ -34,67 +34,54 @@ export const MAIN_CONFIG_FILENAMES = ["config.yml", "config.yaml"] as const;
 /** Version (e.g. "1.0.0") */
 export const VERSION: string = version;
 
-/** Provider-facing identity mode: `pi` presents omp as pi on the wire, `omp` presents omp itself. */
-export type ProviderIdentity = "pi" | "omp";
-
 /**
- * Identity presented to model providers. Every wire-visible field (User-Agent,
- * attribution headers) is derived from this; the local product identity
- * (`APP_NAME`, CLI surface, config directories) always stays omp.
+ * Wire-visible client identity presented to model providers: the `User-Agent` and the attribution
+ * headers that inference gateways read. Every field is free text; an absent or blank field falls
+ * back to omp's own value. The local product identity (`APP_NAME`, CLI surface, config directories)
+ * is never affected.
  */
-let providerIdentityMode: ProviderIdentity =
-	((typeof process !== "undefined" && (process.env.OMP_PROVIDER_IDENTITY ?? process.env.PI_PROVIDER_IDENTITY)) as
-		| ProviderIdentity
-		| undefined) === "omp"
-		? "omp"
-		: "pi";
+export interface ProviderIdentity {
+	/** `User-Agent` string; blank falls back to `omp/<version>`. */
+	userAgent?: string;
+	/** App name for attribution headers (OpenRouter `X-OpenRouter-Title`, gateway `x-title`). */
+	appName?: string;
+	/** Homepage for attribution headers (OpenRouter `HTTP-Referer`, gateway `http-referer`). */
+	appUrl?: string;
+}
 
-/** Current provider-facing identity mode. */
+function defaultUserAgent(): string {
+	return `${APP_NAME}/${VERSION}`;
+}
+
+let providerIdentity: ProviderIdentity = {};
+
+/** Client identity currently presented to model providers; unset fields mean omp's own values. */
 export function getProviderIdentity(): ProviderIdentity {
-	return providerIdentityMode;
-}
-
-function providerIdentityName(mode: ProviderIdentity): string {
-	return mode === "pi" ? "pi" : "omp";
-}
-
-function providerIdentityUrl(mode: ProviderIdentity): string {
-	return mode === "pi" ? "https://pi.dev/" : "https://omp.sh/";
-}
-
-function providerUserAgent(mode: ProviderIdentity): string {
-	const product = `${providerIdentityName(mode)}/${VERSION}`;
-	if (typeof process === "undefined") return `${product} (browser)`;
-	const versions = process.versions;
-	const runtime = versions?.bun ? `bun/${versions.bun}` : versions?.node ? `node/${process.version}` : undefined;
-	return runtime ? `${product} (${process.platform}; ${runtime}; ${process.arch})` : `${product} (browser)`;
+	return { ...providerIdentity };
 }
 
 /**
- * Switch the provider-facing identity at runtime. `import` bindings are live,
- * so every module reading {@link USER_AGENT} / {@link PROVIDER_APP_NAME} /
- * {@link PROVIDER_APP_URL} observes the new values immediately.
+ * Override the client identity sent to model providers. `import` bindings are live, so every module
+ * reading {@link USER_AGENT} / {@link PROVIDER_APP_NAME} / {@link PROVIDER_APP_URL} observes the new
+ * values immediately. Values are sent verbatim; providers apply their terms of service to whatever
+ * identity a client claims, so only set an identity that describes the client honestly. Passing no
+ * argument (or blank fields) restores omp's own values.
  */
-export function setProviderIdentity(mode: ProviderIdentity): void {
-	providerIdentityMode = mode === "omp" ? "omp" : "pi";
-	USER_AGENT = providerUserAgent(providerIdentityMode);
-	PROVIDER_APP_NAME = providerIdentityName(providerIdentityMode);
-	PROVIDER_APP_URL = providerIdentityUrl(providerIdentityMode);
+export function setProviderIdentity(identity: ProviderIdentity = {}): void {
+	providerIdentity = { ...identity };
+	USER_AGENT = identity.userAgent?.trim() || defaultUserAgent();
+	PROVIDER_APP_NAME = identity.appName?.trim() || APP_NAME;
+	PROVIDER_APP_URL = identity.appUrl?.trim() || APP_URL;
 }
 
-/**
- * User-Agent presented to model providers, in pi's detailed format:
- * `pi/<version> (<platform>; <runtime>; <arch>)` (or `pi/<version> (browser)`
- * outside Node.js and Bun). Controlled by {@link setProviderIdentity} and the
- * `providerIdentity` setting / `OMP_PROVIDER_IDENTITY` environment variable.
- */
-export let USER_AGENT: string = providerUserAgent(providerIdentityMode);
+/** `User-Agent` presented to model providers (e.g. "omp/18.4.3"); see {@link setProviderIdentity}. */
+export let USER_AGENT: string = defaultUserAgent();
 
 /** Attribution app name presented to model providers (OpenRouter `X-Title` et al). */
-export let PROVIDER_APP_NAME: string = providerIdentityName(providerIdentityMode);
+export let PROVIDER_APP_NAME: string = APP_NAME;
 
 /** Attribution homepage presented to model providers (OpenRouter `HTTP-Referer` et al). */
-export let PROVIDER_APP_URL: string = providerIdentityUrl(providerIdentityMode);
+export let PROVIDER_APP_URL: string = APP_URL;
 
 /** Minimum Bun version */
 export const MIN_BUN_VERSION: string = engines.bun.replace(/[^0-9.]/g, "");

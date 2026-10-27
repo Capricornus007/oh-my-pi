@@ -125,14 +125,14 @@ describe("resolveOpenAIRequestSetup User-Agent", () => {
 });
 
 describe("xAI stream User-Agent", () => {
-	test("xAI Responses POST sends pi User-Agent", async () => {
+	test("xAI Responses POST sends omp User-Agent", async () => {
 		const captured = await captureStreamHeaders(
 			fetch => streamOpenAIResponses(xaiResponsesModel(), context, { apiKey: "sk-test", fetch }),
 			createResponsesSse(),
 		);
 		expect(captured.url).toBe("https://api.x.ai/v1/responses");
 		expect(captured.userAgent).toBe(USER_AGENT);
-		expect(captured.userAgent).toMatch(/^pi\/\d+\.\d+\.\d+ \(/);
+		expect(captured.userAgent).toMatch(/^omp\/\d+\.\d+\.\d+$/);
 	});
 
 	test("xAI OAuth Responses POST sends omp User-Agent", async () => {
