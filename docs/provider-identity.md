@@ -1,7 +1,7 @@
 # Provider identity (User-Agent and attribution headers)
 
-omp sends a `User-Agent` and, on gateways that read them, app-attribution headers on every request
-to a model provider. This page covers what is sent by default and how to change it.
+omp sends a `User-Agent` on every request to a model provider, plus app-attribution headers on the
+gateways that read them. This page covers the defaults and how to change them.
 
 ## What is sent
 
@@ -12,48 +12,62 @@ to a model provider. This page covers what is sent by default and how to change 
 | Homepage | OpenRouter `HTTP-Referer`, Vercel AI Gateway `http-referer` | `https://omp.sh/` |
 
 Attribution headers are only applied where the gateway documents them, and never overwrite a header
-the caller (a provider entry in `models.yml`, a per-model `headers:` block, or a request-level
-override) already set.
+the caller already set (a provider entry in `models.yml`, a per-model `headers:` block, or a
+request-level override).
 
-## Changing it
+## The one-word form
 
-Three settings, all free text, all defaulting to the values above when blank:
-
-| Setting | Environment variable |
-|---|---|
-| `provider.userAgent` | `OMP_PROVIDER_USER_AGENT` |
-| `provider.appName` | `OMP_PROVIDER_APP_NAME` |
-| `provider.appUrl` | `OMP_PROVIDER_APP_URL` |
+`provider.identity` takes a product token. That single word replaces every wire-visible field:
 
 ```yaml
 # ~/.omp/agent/config.yml
 provider:
-  userAgent: acme-cli/2.1 (linux; bun/1.4.2; x64)
-  appName: Acme
-  appUrl: https://acme.example/
+  identity: mycli
 ```
 
-Or from the settings panel (`/config` → Providers → Identity), from the CLI
-(`omp config set provider.appName Acme`), or per-invocation with the environment variables. Changes
-apply immediately: `USER_AGENT`, `PROVIDER_APP_NAME` and `PROVIDER_APP_URL` from
-`@oh-my-pi/pi-utils` are live bindings, so already-imported modules observe the new values.
+```sh
+omp config set provider.identity mycli     # same thing from the CLI
+OMP_PROVIDER_IDENTITY=mycli omp            # or just for one invocation
+```
 
-Values are sent verbatim, whitespace-trimmed. A blank field falls back to omp's own value for that
-field only. Local surfaces — the `omp` binary name, `~/.omp` config directory, CLI help, branding —
-are not affected by these settings.
+A token expands to:
 
-## What to put there
+- User-Agent — `<token>/<version> (<platform>; <runtime>; <arch>)`, e.g. `mycli/18.13.1 (linux; bun/1.4.2; x64)`
+- attribution app name — `<token>`
+- attribution homepage — omitted (no `omp.sh` left on the wire), unless the token is `omp` itself
 
-Set an identity that describes this client truthfully — normally your own app or tool name, so the
-gateway's dashboard and rate-limit accounting show the real caller. Provider terms of service apply
-to whatever identity a client claims; claiming to be a different product can breach them and is
-outside what this setting is for. If you are packaging or wrapping omp, name your build, not the
-project you wrapped.
+Everything blank → omp's own identity, exactly as before.
+
+## Full control
+
+Three overrides, each used verbatim and each winning over the token:
+
+| Setting | Environment variable | Blank means |
+|---|---|---|
+| `provider.userAgent` | `OMP_PROVIDER_USER_AGENT` | use `provider.identity`, else `omp/<version>` |
+| `provider.appName` | `OMP_PROVIDER_APP_NAME` | use the token, else `omp` |
+| `provider.appUrl` | `OMP_PROVIDER_APP_URL` | omit the header (token set) / `https://omp.sh/` (nothing set) |
+
+All four are also in the settings panel (`/config` → Providers → Identity). Changes apply
+immediately: `USER_AGENT`, `PROVIDER_APP_NAME` and `PROVIDER_APP_URL` from `@oh-my-pi/pi-utils` are
+live bindings, so already-imported modules observe the new values.
+
+Local surfaces — the `omp` binary name, `~/.omp` config directory, CLI help, branding — are not
+affected by any of these settings.
+
+## Which name to use
+
+Use a token that describes this client truthfully: your own tool's name, or `omp`. Provider terms of
+service apply to whatever identity a client claims, and a provider that trusts a name it did not
+issue takes the risk on its side; claiming to be another product can breach those terms and is
+outside what this setting is for. Packaging or wrapping omp? Name your build.
 
 ## Implementation
 
-- `packages/utils/src/dirs.ts` — `ProviderIdentity`, `getProviderIdentity()`, `setProviderIdentity()`,
-  and the live `USER_AGENT` / `PROVIDER_APP_NAME` / `PROVIDER_APP_URL` bindings.
-- `packages/coding-agent/src/config/provider-identity-settings.ts` — the three settings and the
+- `packages/utils/src/dirs.ts` — `ProviderIdentity` (`identity`, `userAgent`, `appName`, `appUrl`),
+  `getProviderIdentity()`, `setProviderIdentity()`, the token expansion, and the live
+  `USER_AGENT` / `PROVIDER_APP_NAME` / `PROVIDER_APP_URL` bindings.
+- `packages/coding-agent/src/config/provider-identity-settings.ts` — the four settings and the
   `effect` that pushes the combined value into `setProviderIdentity()`.
-- `packages/utils/src/dirs.ts` defaults stay omp's; nothing is hard-coded per provider.
+- Empty values omit the header: `setHeaderIfAbsent()` skips blanks and `getOpenRouterHeaders()`
+  adds the attribution headers conditionally.

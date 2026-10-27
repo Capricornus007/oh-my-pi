@@ -31,6 +31,36 @@ describe("provider identity", () => {
 		expect(headers["HTTP-Referer"]).toBe("https://acme.example/");
 	});
 
+	it("expands a product token to the detailed UA and the same app name", () => {
+		// The one-word form: `provider.identity: acme-cli`.
+		setProviderIdentity({ identity: "acme-cli" });
+		const headers = getOpenRouterHeaders();
+		expect(headers["User-Agent"]).toMatch(/^acme-cli\/\d+\.\d+\.\d+ \(/);
+		expect(headers["X-OpenRouter-Title"]).toBe("acme-cli");
+		expect(headers["HTTP-Referer"]).toBeUndefined();
+	});
+
+	it("keeps omp's homepage only when the token is omp itself", () => {
+		setProviderIdentity({ identity: "omp" });
+		const headers = getOpenRouterHeaders();
+		expect(headers["User-Agent"]).toMatch(/^omp\/\d+\.\d+\.\d+ \(/);
+		expect(headers["X-OpenRouter-Title"]).toBe("omp");
+		expect(headers["HTTP-Referer"]).toBe("https://omp.sh/");
+	});
+
+	it("lets the explicit overrides win over the token", () => {
+		setProviderIdentity({
+			identity: "acme-cli",
+			userAgent: "acme/1.0",
+			appName: "Acme",
+			appUrl: "https://acme.example/",
+		});
+		const headers = getOpenRouterHeaders();
+		expect(headers["User-Agent"]).toBe("acme/1.0");
+		expect(headers["X-OpenRouter-Title"]).toBe("Acme");
+		expect(headers["HTTP-Referer"]).toBe("https://acme.example/");
+	});
+
 	it("covers every header from the User-Agent alone", () => {
 		// One setting, no omp attribution left on the wire: app name derived from the
 		// product token, homepage omitted instead of falling back to omp.sh.

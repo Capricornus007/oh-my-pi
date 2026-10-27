@@ -36,24 +36,36 @@ export const VERSION: string = version;
 
 /**
  * Wire-visible client identity presented to model providers: the `User-Agent` and the attribution
- * headers that inference gateways read. Every field is free text; an absent or blank field falls
- * back to omp's own value (or is derived, see {@link setProviderIdentity}). The local product
- * identity (`APP_NAME`, CLI surface, config directories) is never affected.
+ * headers that inference gateways read. Set {@link ProviderIdentity.identity} to a product token for
+ * the one-word form; the remaining fields are explicit overrides. The local product identity
+ * (`APP_NAME`, CLI surface, config directories) is never affected.
  */
 export interface ProviderIdentity {
-	/** `User-Agent` string; blank falls back to `omp/<version>`. */
-	userAgent?: string;
 	/**
-	 * App name for attribution headers (OpenRouter `X-OpenRouter-Title`, gateway `x-title`). Blank
-	 * derives it from {@link userAgent}'s product token, so one field covers every header.
+	 * Product token for the wire identity, e.g. `omp` or `mycli`. Expands to the detailed
+	 * `User-Agent` (`<token>/<version> (<platform>; <runtime>; <arch>)`) plus `<token>` as the
+	 * attribution app name. Blank leaves omp's own identity.
 	 */
+	identity?: string;
+	/** `User-Agent` string, used verbatim; overrides the {@link identity} expansion. */
+	userAgent?: string;
+	/** App name for attribution headers, used verbatim; overrides the derived value. */
 	appName?: string;
-	/** Attribution homepage (OpenRouter `HTTP-Referer`, gateway `http-referer`). Blank derives it from {@link appName}. */
+	/** Attribution homepage, used verbatim; blank omits the header instead of falling back. */
 	appUrl?: string;
 }
 
-function defaultUserAgent(): string {
+function plainUserAgent(): string {
 	return `${APP_NAME}/${VERSION}`;
+}
+
+/** `<token>/<version> (<platform>; <runtime>; <arch>)`, the detailed form most CLIs send. */
+function detailedUserAgent(token: string): string {
+	const product = `${token}/${VERSION}`;
+	if (typeof process === "undefined") return `${product} (browser)`;
+	const versions = process.versions;
+	const runtime = versions?.bun ? `bun/${versions.bun}` : versions?.node ? `node/${process.version}` : undefined;
+	return runtime ? `${product} (${process.platform}; ${runtime}; ${process.arch})` : `${product} (browser)`;
 }
 
 /** Product token of a `User-Agent` (`acme-cli/2.1 (linux)` → `acme-cli`), or undefined. */
@@ -74,26 +86,28 @@ export function getProviderIdentity(): ProviderIdentity {
  * reading {@link USER_AGENT} / {@link PROVIDER_APP_NAME} / {@link PROVIDER_APP_URL} observes the new
  * values immediately.
  *
- * One field is enough: setting only {@link ProviderIdentity.userAgent} derives the attribution app
- * name from its product token and drops the attribution homepage, so no omp attribution is left on
- * the wire. Explicit `appName` / `appUrl` override the derivation.
+ * Resolution, first match wins per field: explicit `userAgent` / `appName` / `appUrl`, then the
+ * `identity` token expansion, then omp's own values. Whichever form is used, nothing branded omp is
+ * left on the wire: a set identity never falls back to omp's attribution homepage.
  *
  * Values are sent verbatim; providers apply their terms of service to whatever identity a client
- * claims, so only set an identity that describes this client honestly. Passing no argument (or all
- * blank fields) restores omp's own values.
+ * claims, so use a token that describes this client honestly. Passing no argument (or all blank
+ * fields) restores omp's own values.
  */
 export function setProviderIdentity(identity: ProviderIdentity = {}): void {
 	providerIdentity = { ...identity };
+	const token = identity.identity?.trim().replace(/\/+$/, "");
 	const userAgent = identity.userAgent?.trim();
 	const appName = identity.appName?.trim();
 	const appUrl = identity.appUrl?.trim();
-	USER_AGENT = userAgent || defaultUserAgent();
-	PROVIDER_APP_NAME = appName || (userAgent ? (userAgentProductToken(userAgent) ?? APP_NAME) : APP_NAME);
-	PROVIDER_APP_URL = appUrl ?? (userAgent ? "" : APP_URL);
+
+	USER_AGENT = userAgent || (token ? detailedUserAgent(token) : plainUserAgent());
+	PROVIDER_APP_NAME = appName || token || (userAgent ? (userAgentProductToken(userAgent) ?? APP_NAME) : APP_NAME);
+	PROVIDER_APP_URL = appUrl ?? (token || userAgent ? (token === APP_NAME ? APP_URL : "") : APP_URL);
 }
 
 /** `User-Agent` presented to model providers (e.g. "omp/18.4.3"); see {@link setProviderIdentity}. */
-export let USER_AGENT: string = defaultUserAgent();
+export let USER_AGENT: string = plainUserAgent();
 
 /** Attribution app name presented to model providers (OpenRouter `X-Title` et al). */
 export let PROVIDER_APP_NAME: string = APP_NAME;
