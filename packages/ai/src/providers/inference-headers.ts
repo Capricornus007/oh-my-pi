@@ -2,7 +2,7 @@
 
 import { resolveCatalogPolicy } from "@oh-my-pi/pi-catalog/compat/catalog-policy";
 import type { CatalogPolicyInputs } from "@oh-my-pi/pi-catalog/types";
-import { APP_NAME, APP_URL, USER_AGENT } from "@oh-my-pi/pi-utils";
+import { PROVIDER_APP_NAME, PROVIDER_APP_URL, USER_AGENT } from "@oh-my-pi/pi-utils";
 
 /** Options controlling provider and protocol inference headers. */
 export interface InferenceHeaderOptions {
@@ -100,8 +100,8 @@ export function applyInferenceHeaders(headers: Record<string, string>, options: 
 	const backend = options.providerType ?? options.provider;
 	if (backend === "vercel-ai-gateway") {
 		// Vercel AI Gateway app attribution; caller/config headers take precedence.
-		setHeaderIfAbsent(headers, "http-referer", APP_URL);
-		setHeaderIfAbsent(headers, "x-title", APP_NAME);
+		setHeaderIfAbsent(headers, "http-referer", PROVIDER_APP_URL);
+		setHeaderIfAbsent(headers, "x-title", PROVIDER_APP_NAME);
 	}
 
 	const isOpenCode = backend === "opencode-go" || backend === "opencode-zen";
