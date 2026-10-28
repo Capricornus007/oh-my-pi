@@ -8,6 +8,7 @@
  * - omp://<file>.md - Reads a specific documentation file
  */
 import * as path from "node:path";
+import { APP_NAME, PROVIDER_APP_NAME } from "@oh-my-pi/pi-utils";
 import { resolveContainedPath, resolveContainedPathSync } from "../discovery/contained-path";
 import ompDoc from "../prompts/internal-urls/omp.md" with { type: "text" };
 import { getDocFilenames, getDocsDiskRoot, getEmbeddedDoc } from "./docs-index";
@@ -51,9 +52,13 @@ export class OmpProtocolHandler implements ProtocolHandler {
 	readonly scheme = "omp";
 	readonly spec: SchemeSpec = { backing: "virtual", selectors: "lines", immutable: true, linkable: true };
 
-	/** Always advertised: harness docs are embedded in every build. */
-	promptDoc(): string {
-		return ompDoc.trim();
+	/**
+	 * Advertised while the client presents its own identity. Suppressed once
+	 * `provider.identity` names another client, so the system prompt carries no omp
+	 * self-reference on the wire; the `omp://` scheme itself keeps working either way.
+	 */
+	promptDoc(): string | undefined {
+		return PROVIDER_APP_NAME === APP_NAME ? ompDoc.trim() : undefined;
 	}
 
 	async resolve(url: InternalUrl): Promise<InternalResource> {
