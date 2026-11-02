@@ -1824,7 +1824,8 @@ export class ModelRegistry {
 			// /models 探索——上游清單與快取不同就更新、一樣就不動（沿用既有 refresh/cache 語義）。
 			// 沒寫 discovery 的，synthesize 一個 openai-models-list；設 optional 讓抓不到時
 			// 靜默退回（不影響既有明確 discovery 條目的行為與報錯）。
-			const autoDiscover = !providerConfig.discovery && !!providerConfig.baseUrl;
+			// `noDiscovery: true` 是這條預設的反向開關：清單由 models.yml 手寫、不許線上覆蓋。
+			const autoDiscover = !providerConfig.discovery && !!providerConfig.baseUrl && !providerConfig.noDiscovery;
 			if (
 				autoDiscover ||
 				(providerConfig.discovery && (providerConfig.api || providerConfig.discovery.type === "proxy"))

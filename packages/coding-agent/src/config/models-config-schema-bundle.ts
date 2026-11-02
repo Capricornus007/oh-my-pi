@@ -383,6 +383,16 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"authHeader?": "boolean",
 		"auth?": ProviderAuthSchema,
 		"discovery?": ProviderDiscoverySchema,
+		/**
+		 * Opt out of the `baseUrl`-implied `/v1/models` auto-discovery: the models
+		 * listed under `models` are the whole roster, nothing refreshes it. Set for
+		 * gateways whose `/models` lists far more rows than the key may actually
+		 * call — a live refresh replaces a hand-picked roster with endpoints that
+		 * answer 403, so the static list is the useful one.
+		 * Named against `discovery` (not `staticModels`, which already means the
+		 * model array passed to `createModelManager`).
+		 */
+		"noDiscovery?": "boolean",
 		"models?": ModelDefinitionSchema.array(),
 		"modelOverrides?": { "[string]": ModelOverrideSchema },
 		"disableStrictTools?": "boolean",
