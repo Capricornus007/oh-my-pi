@@ -277,11 +277,13 @@ export const streamDevin: StreamFunction<"devin-agent"> = (
 			const compress = reqBytes.byteLength >= MIN_COMPRESSED_BODY_BYTES;
 			const chatBody = compress ? await gzipAsync(reqBytes) : reqBytes;
 			const compressedBytes = compress ? chatBody.byteLength : undefined;
+			const requestCompression = compress ? "gzip" : "identity";
 			logger.debug("devin: sending chat request", {
 				model: model.id,
 				tools: context.tools?.length ?? 0,
 				requestBytes: reqBytes.byteLength,
 				compressedBytes,
+				requestCompression,
 			});
 			const frame = frameConnectMessage(chatBody, compress ? CONNECT_COMPRESSED_FLAG : 0);
 
@@ -345,6 +347,8 @@ export const streamDevin: StreamFunction<"devin-agent"> = (
 								rawTrailer: trailerError.raw,
 								requestBytes: reqBytes.byteLength,
 								compressedBytes,
+								requestCompression,
+								trailerCompression: flag & CONNECT_COMPRESSED_FLAG ? "gzip" : "identity",
 								tools: context.tools?.length ?? 0,
 								messages: context.messages.length,
 								hadOutput: firstTokenTime !== undefined,
@@ -390,6 +394,7 @@ export const streamDevin: StreamFunction<"devin-agent"> = (
 										historyBytes,
 										requestBytes: reqBytes.byteLength,
 										compressedBytes,
+										requestCompression,
 									});
 								}
 							}

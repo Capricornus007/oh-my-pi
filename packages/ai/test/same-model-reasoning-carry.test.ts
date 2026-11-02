@@ -24,6 +24,7 @@ import {
 	GetUserJwtResponseSchema,
 } from "@oh-my-pi/pi-catalog/discovery/devin-proto";
 import { create, fromBinary, toBinary } from "@oh-my-pi/pi-catalog/discovery/protobuf";
+import { CONNECT_COMPRESSED_FLAG } from "../src/providers/connect-frame";
 
 const TRACE = "Earlier reasoning: read foo.ts, then patch bar().";
 const THINK = `<think>\n${TRACE}\n</think>`;
@@ -139,8 +140,10 @@ async function devinRequest(model: Model<"devin-agent">, messages: Message[]) {
 	await streamDevin(model, { messages }, { apiKey: "token", fetch: fetchImpl }).result();
 	if (!requestPayload) throw new Error("Devin chat request was not captured");
 	const view = new DataView(requestPayload.buffer, requestPayload.byteOffset, requestPayload.byteLength);
-	const compressed = requestPayload.subarray(5, 5 + view.getUint32(1, false));
-	return fromBinary(GetChatMessageRequestSchema, gunzipSync(compressed));
+	const flags = view.getUint8(0);
+	const framePayload = requestPayload.subarray(5, 5 + view.getUint32(1, false));
+	const protobuf = flags & CONNECT_COMPRESSED_FLAG ? gunzipSync(framePayload) : framePayload;
+	return fromBinary(GetChatMessageRequestSchema, protobuf);
 }
 
 const moonshotK3 = () => target("openai-completions", "moonshot", "kimi-k3");

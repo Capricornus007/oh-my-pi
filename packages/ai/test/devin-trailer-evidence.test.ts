@@ -115,11 +115,13 @@ describe("streamDevin trailer evidence", () => {
 			code: "invalid_argument",
 			message: "Error",
 			requestBytes: expect.any(Number),
-			compressedBytes: expect.any(Number),
+			requestCompression: "identity",
+			trailerCompression: "identity",
 			tools: 0,
 			messages: 1,
 			hadOutput: false,
 		});
+		expect(warning?.compressedBytes).toBeUndefined();
 		expect(warning?.detail).toHaveLength(2001);
 		expect(warning?.rawTrailer).toHaveLength(2001);
 		expect(warning?.detail).toEndWith("…");
