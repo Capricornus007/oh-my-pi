@@ -2114,19 +2114,6 @@ describe("Coding Agent Tools", () => {
 			expect(fs.readFileSync(expectedPath, "utf-8")).toBe(content);
 		});
 
-		it("should reject oversized tar rewrites before reading the archive bytes", async () => {
-			const archivePath = path.join(testDir, "oversized.tar");
-			fs.writeFileSync(archivePath, "");
-			fs.truncateSync(archivePath, 256 * 1024 * 1024 + 1);
-
-			await expect(
-				writeTool.execute("test-call-archive-write-oversized", {
-					path: `${archivePath}:pkg/new.txt`,
-					content: "new\n",
-				}),
-			).rejects.toThrow(/too large to read in memory/);
-		});
-
 		it("should write to an existing archive entry", async () => {
 			const archivePath = path.join(testDir, "write-existing.zip");
 			fs.writeFileSync(

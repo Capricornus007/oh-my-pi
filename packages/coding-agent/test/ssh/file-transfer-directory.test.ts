@@ -57,7 +57,8 @@ describe.skipIf(process.platform === "win32")("SSH structured directory transpor
 	});
 
 	it("reports missing directory and transport failures without an empty-success fallback", async () => {
-		await expect(listRemoteDir(target, `${fixture}/missing`)).rejects.toThrow(/No such file|can't cd|cannot cd/i);
+		const missing = `${fixture}/missing`;
+		await expect(listRemoteDir(target, missing)).rejects.toThrow(missing);
 		vi.spyOn(connectionManager, "buildRemoteCommand").mockResolvedValue([
 			"--fixture",
 			"printf 'SSH transport disconnected' >&2; exit 255",

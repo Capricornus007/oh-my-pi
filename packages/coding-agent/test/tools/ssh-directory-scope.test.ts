@@ -99,9 +99,8 @@ describe.skipIf(process.platform === "win32")("grep ssh:// directory scopes", ()
 	});
 
 	it("surfaces missing and unreadable remote directory errors instead of searching a local path", async () => {
-		await expect(tool.execute("remote-missing", { pattern: "NEEDLE", path: `${root}/missing` })).rejects.toThrow(
-			/No such file|not found/i,
-		);
+		const missing = `${root}/missing`;
+		await expect(tool.execute("remote-missing", { pattern: "NEEDLE", path: missing })).rejects.toThrow(missing);
 		vi.spyOn(fileTransfer, "listRemoteDir").mockRejectedValue(new Error("remote directory: Permission denied"));
 		await expect(tool.execute("remote-unreadable", { pattern: "NEEDLE", path: root })).rejects.toThrow(
 			/Permission denied|PermissionDenied|Input\/output error|I\/O error/i,
