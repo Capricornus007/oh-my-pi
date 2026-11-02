@@ -152,7 +152,8 @@ describe("Codex Security cloud client", () => {
 		const repositoryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-cloud-security-repo-"));
 		const stateRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-cloud-security-state-"));
 		await $`git init --initial-branch=main`.cwd(repositoryRoot).quiet();
-		await $`git remote add origin https://github.com/example/repository.git`.cwd(repositoryRoot).quiet();
+		// GitHub's documented SSH-over-443 endpoint is the same repository identity as the HTTPS URL below.
+		await $`git remote add origin ssh://git@ssh.github.com:443/example/repository.git`.cwd(repositoryRoot).quiet();
 		const store = await SecurityStore.open(repositoryRoot, { stateRoot });
 		const fetchMock: CodexSecurityCloudFetch = async input => {
 			const url = new URL(String(input));

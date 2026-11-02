@@ -570,11 +570,13 @@ function repositoryIdentity(value: string): string {
 		.trim()
 		.replace(/\/+$/, "")
 		.replace(/\.git$/, "");
-	const scpStyle = trimmed.match(/^[^@]+@([^:]+):(.+)$/);
+	const scpStyle = trimmed.includes("://") ? null : trimmed.match(/^[^@]+@([^:]+):(.+)$/);
 	if (scpStyle) return `${scpStyle[1]!.toLowerCase()}/${scpStyle[2]!.replace(/^\/+/, "").toLowerCase()}`;
 	try {
 		const parsed = new URL(trimmed);
-		return `${parsed.hostname.toLowerCase()}/${parsed.pathname.replace(/^\/+/, "").toLowerCase()}`;
+		const hostname =
+			parsed.hostname.toLowerCase() === "ssh.github.com" ? "github.com" : parsed.hostname.toLowerCase();
+		return `${hostname}/${parsed.pathname.replace(/^\/+/, "").toLowerCase()}`;
 	} catch {
 		return trimmed.toLowerCase();
 	}
