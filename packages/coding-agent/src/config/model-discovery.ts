@@ -1121,7 +1121,7 @@ export async function discoverOpenAIModelsList(
 		providerConfig.discovery.type === "lm-studio"
 			? discoveryProbeTimeoutMs(baseUrl, 250, providerConfig.discovery.timeoutMs)
 			: (providerConfig.discovery.timeoutMs ?? REMOTE_DISCOVERY_TIMEOUT_MS);
-	const attempt = async (h: Record<string, string>) => {
+	const attempt = async (url: string, h: Record<string, string>) => {
 		const nativeMetadataPromise =
 			providerConfig.discovery.type === "lm-studio"
 				? withTimeoutSignal(timeoutMs, signal =>
@@ -1130,12 +1130,12 @@ export async function discoverOpenAIModelsList(
 				: Promise.resolve(null);
 		const [payload, nativeMetadata] = await Promise.all([
 			withTimeoutSignal(timeoutMs, async signal => {
-				const res = await ctx.fetch(modelsUrl, {
+				const res = await ctx.fetch(url, {
 					headers: h,
 					signal,
 				});
 				if (!res.ok) {
-					throw new DiscoveryHttpError(res.status, modelsUrl);
+					throw new DiscoveryHttpError(res.status, url);
 				}
 				return (await res.json()) as {
 					data?: Array<{
@@ -1165,9 +1165,39 @@ export async function discoverOpenAIModelsList(
 		return [payload, nativeMetadata] as const;
 	};
 	const apiKey = await ctx.getBearerApiKeyResolver(providerConfig.provider);
-	const [payload, nativeMetadata] = apiKey
-		? await withAuth(apiKey, key => attempt({ ...baseHeaders, Authorization: `Bearer ${key}` }))
-		: await attempt(baseHeaders);
+	// 換請求重試：各家 OpenAI 相容端點的模型清單根路徑不一（/v1/models vs /models）。
+	// 首選路徑回 4xx（「請求不對」，非 auth）時，改用另一種 injectV1 變體重試；
+	// 401/403 交由 withAuth 處理、5xx/timeout 換路徑無意義，故不重試。
+	const altBaseUrl = injectV1
+		? normalizeBareDiscoveryBaseUrl(providerConfig.baseUrl)
+		: normalizeOpenAIModelsListBaseUrl(providerConfig.baseUrl);
+	const candidateUrls = [...new Set([modelsUrl, appendModelsPath(altBaseUrl)])];
+	const runOne = (url: string) =>
+		apiKey
+			? withAuth(apiKey, key => attempt(url, { ...baseHeaders, Authorization: `Bearer ${key}` }))
+			: attempt(url, baseHeaders);
+	const result = await (async () => {
+		for (const url of candidateUrls) {
+			try {
+				return await runOne(url);
+			} catch (error) {
+				// 4xx（非 auth）＝請求路徑／格式不對 → 換下一個 injectV1 變體重試。
+				const requestError =
+					error instanceof DiscoveryHttpError &&
+					error.status >= 400 &&
+					error.status < 500 &&
+					error.status !== 401 &&
+					error.status !== 403;
+				// 5xx／timeout／auth 失敗＝暫時或憑證問題，不是「找不到」→ 拋出，
+				// 讓上層保留既有清單（不因網路抖動誤清空）。
+				if (!requestError) throw error;
+			}
+		}
+		// 所有路徑變體都回 4xx＝那個 provider 沒有可用的 /models 端點（用戶要的「找不到」）。
+		return null;
+	})();
+	if (result === null) return [];
+	const [payload, nativeMetadata] = result;
 	const models = payload.data ?? [];
 	const references = getBundledModelReferenceIndex();
 	const specs: ModelSpec<Api>[] = [];
