@@ -1820,7 +1820,15 @@ export class ModelRegistry {
 				keylessProviders.add(providerName);
 			}
 
-			if (providerConfig.discovery && (providerConfig.api || providerConfig.discovery.type === "proxy")) {
+			// 用戶需求（2026-11-02）：models.yml 下每個有 baseUrl 的 provider 都預設做線上
+			// /models 探索——上游清單與快取不同就更新、一樣就不動（沿用既有 refresh/cache 語義）。
+			// 沒寫 discovery 的，synthesize 一個 openai-models-list；設 optional 讓抓不到時
+			// 靜默退回（不影響既有明確 discovery 條目的行為與報錯）。
+			const autoDiscover = !providerConfig.discovery && !!providerConfig.baseUrl;
+			if (
+				autoDiscover ||
+				(providerConfig.discovery && (providerConfig.api || providerConfig.discovery.type === "proxy"))
+			) {
 				const disableStrictCompat = providerConfig.disableStrictTools ? { disableStrictTools: true } : undefined;
 				discoverableProviders.push({
 					provider: providerName,
@@ -1832,7 +1840,10 @@ export class ModelRegistry {
 					headers: providerConfig.headers,
 					compat: mergeCompat(providerConfig.compat, disableStrictCompat),
 					remoteCompaction: providerConfig.remoteCompaction,
-					discovery: providerConfig.discovery,
+					discovery: providerConfig.discovery ?? ({ type: "openai-models-list" } as const),
+					// 與明確寫了 discovery 的 provider 同處理：以 /models 為權威來源，
+					// 抓回空清單即清空該 provider（source==="provider" → replaceRuntimeModels）；
+					// 抓失敗（404／timeout）保留舊清單並標 unavailable，不因一次抖動清空。
 					optional: false,
 				});
 			}
