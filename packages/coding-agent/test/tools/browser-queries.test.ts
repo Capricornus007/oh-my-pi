@@ -115,7 +115,6 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser semantic selectors and queries", (
 		["hidden text is left out", "button", "Save"],
 		["block children are separated", "button", "Next step"],
 		["a child's aria-label replaces its text", "button", "Close dialog"],
-		["a submit input has no value", "button", "Submit"],
 		["a textbox is named by its placeholder", "textbox", "Email"],
 		["a textbox is named by its aria-placeholder", "textbox", "Search records"],
 		["visibility: hidden text is left out", "button", "Keep"],
@@ -140,6 +139,21 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser semantic selectors and queries", (
 			return observed && await tab.count(\`role/${role}[name="\${observed.name}" exact]\`);`,
 		})) as { details?: { value?: number } };
 		expect(result.details?.value).toBe(1);
+	});
+
+	it("matches the localized default name observe() gives a submit input with no value", async () => {
+		const result = (await invoke({
+			action: "run",
+			name: namesTab,
+			code: `const observation = await tab.observe();
+			let observed;
+			for (const entry of observation.elements.filter(candidate => candidate.role === "button")) {
+				if (await (await tab.id(entry.id)).attr("type") === "submit") { observed = entry; break; }
+			}
+			return observed && { name: observed.name, count: await tab.count(\`role/button[name="\${observed.name}" exact]\`) };`,
+		})) as { details?: { value?: { name?: string; count?: number } } };
+		expect(result.details?.value?.name).toBeTruthy();
+		expect(result.details?.value?.count).toBe(1);
 	});
 
 	it("matches role/ exact names to every name the Tern page kit's observe() shows", async () => {

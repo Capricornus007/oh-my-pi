@@ -1424,6 +1424,25 @@ async function collectObservationEntries(
 			inViewport = (await handle?.isIntersectingViewport().catch(() => false)) ?? false;
 		}
 		if (inViewport) {
+			let name = node.name;
+			if (node.role === "button" && (node.children?.length ?? 0) === 0) {
+				handle ??= await resolveObservedElement(observed);
+				const stableDefaultName = await handle
+					?.evaluate(element => {
+						const input = element as unknown as {
+							tagName: string;
+							type?: string;
+							hasAttribute(name: string): boolean;
+						};
+						if (input.tagName.toLowerCase() !== "input" || input.hasAttribute("value")) return undefined;
+						const type = (input.type ?? "").toLowerCase();
+						return type === "submit" ? "Submit" : type === "reset" ? "Reset" : undefined;
+					})
+					.catch(() => undefined);
+				// Chromium localizes a valueless submit/reset AX name, while the DOM role query has no locale API.
+				// Expose the HTML fallback label so an observed name remains a reusable `role/… exact` selector.
+				if (stableDefaultName) name = stableDefaultName;
+			}
 			const id = core.observeElement(observed, handle ?? undefined);
 			const states: string[] = [];
 			if (node.disabled) states.push("disabled");
@@ -1440,7 +1459,7 @@ async function collectObservationEntries(
 			entries.push({
 				id,
 				role: node.role,
-				name: node.name,
+				name,
 				value: node.value,
 				description: node.description,
 				keyshortcuts: node.keyshortcuts,
