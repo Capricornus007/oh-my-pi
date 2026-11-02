@@ -198,6 +198,7 @@ interface CustomModelsResult {
 	keylessProviders?: Set<string>;
 	discoverableProviders?: DiscoveryProviderConfig[];
 	configuredProviders?: Set<string>;
+	noDiscoveryProviders?: Set<string>;
 	error?: ConfigError;
 	found: boolean;
 }
@@ -327,6 +328,8 @@ export class ModelRegistry {
 	#commandConfigsByProvider: Map<string, Set<string>> = new Map();
 	#keylessProviders: Set<string> = new Set();
 	#discoverableProviders: DiscoveryProviderConfig[] = [];
+	/** Configured providers whose explicit models are the entire static roster. */
+	#noDiscoveryProviders: Set<string> = new Set();
 	/**
 	 * Local providers registered without a models.yml entry (ollama, llama.cpp,
 	 * lm-studio, apple). Their models sort after every other provider's, so a
@@ -974,6 +977,7 @@ export class ModelRegistry {
 				}
 			}
 		}
+		for (const providerId of this.#noDiscoveryProviders) preservedProviderIds.delete(providerId);
 		this.#runtimeDiscoveredModels = preservedRuntimeState.models.filter(model =>
 			preservedProviderIds.has(model.provider),
 		);
@@ -1013,11 +1017,13 @@ export class ModelRegistry {
 			keylessProviders = new Set<string>(),
 			discoverableProviders = [],
 			configuredProviders = new Set<string>(),
+			noDiscoveryProviders = new Set<string>(),
 			error: configError,
 		} = logger.time("modelRegistry:loadCustomModels", () => this.#loadCustomModels());
 		this.#configError = configError;
 		this.#keylessProviders = keylessProviders;
 		this.#discoverableProviders = discoverableProviders;
+		this.#noDiscoveryProviders = noDiscoveryProviders;
 		this.#customModelOverlays = customModels;
 		this.#providerOverrides = overrides;
 		this.#modelOverrides = modelOverrides;
@@ -1027,7 +1033,9 @@ export class ModelRegistry {
 		this.#pendingStandardCacheProviders = new Set(
 			STARTUP_MODEL_CACHE_PROVIDER_IDS.filter(
 				providerId =>
-					!configuredDiscoveryProviders.has(providerId) && !isCredentialScopedModelCacheProvider(providerId),
+					!configuredDiscoveryProviders.has(providerId) &&
+					!this.#noDiscoveryProviders.has(providerId) &&
+					!isCredentialScopedModelCacheProvider(providerId),
 			),
 		);
 		this.#cachedDiscoverableModels = logger.time("modelRegistry:loadDiscoverableModels", () =>
@@ -1249,6 +1257,7 @@ export class ModelRegistry {
 	#loadBuiltInModels(overrides: Map<string, ProviderOverride>, providerFilter?: ReadonlySet<string>): Model<Api>[] {
 		return getBundledProviders().flatMap(provider => {
 			if (providerFilter && !providerFilter.has(provider)) return [];
+			if (this.#noDiscoveryProviders.has(provider)) return [];
 			const models = getBundledModels(provider as Parameters<typeof getBundledModels>[0]) as Model<Api>[];
 			const providerOverride = overrides.get(provider);
 
@@ -1759,9 +1768,11 @@ export class ModelRegistry {
 		const allModelOverrides = new Map<string, Map<string, ModelOverride>>();
 		const keylessProviders = new Set<string>();
 		const discoverableProviders: DiscoveryProviderConfig[] = [];
+		const noDiscoveryProviders = new Set<string>();
 		const providerEntries = Object.entries(value.providers ?? {});
 		const configuredProviders = new Set(Object.keys(value.providers ?? {}));
 		for (const [providerName, providerConfig] of providerEntries) {
+			if (providerConfig.noDiscovery) noDiscoveryProviders.add(providerName);
 			const commandConfigs = new Set<string>();
 			this.#collectCommandConfigValues(commandConfigs, providerConfig.apiKey, providerConfig.headers);
 			for (const modelDef of providerConfig.models ?? []) {
@@ -1820,15 +1831,17 @@ export class ModelRegistry {
 				keylessProviders.add(providerName);
 			}
 
-			// 用戶需求（2026-11-02）：models.yml 下每個有 baseUrl 的 provider 都預設做線上
-			// /models 探索——上游清單與快取不同就更新、一樣就不動（沿用既有 refresh/cache 語義）。
-			// 沒寫 discovery 的，synthesize 一個 openai-models-list；設 optional 讓抓不到時
-			// 靜默退回（不影響既有明確 discovery 條目的行為與報錯）。
-			// `noDiscovery: true` 是這條預設的反向開關：清單由 models.yml 手寫、不許線上覆蓋。
-			const autoDiscover = !providerConfig.discovery && !!providerConfig.baseUrl && !providerConfig.noDiscovery;
+			// Only custom providers infer OpenAI-compatible discovery from baseUrl.
+			// Built-in managers retain their native routes and credential isolation.
+			// noDiscovery wins over both implicit and explicit discovery.
+			const autoDiscover =
+				!providerConfig.discovery &&
+				!!providerConfig.baseUrl &&
+				BUILT_IN_MODEL_MANAGER_PROVIDER_IDS[providerName] !== true;
 			if (
-				autoDiscover ||
-				(providerConfig.discovery && (providerConfig.api || providerConfig.discovery.type === "proxy"))
+				!providerConfig.noDiscovery &&
+				(autoDiscover ||
+					(providerConfig.discovery && (providerConfig.api || providerConfig.discovery.type === "proxy")))
 			) {
 				const disableStrictCompat = providerConfig.disableStrictTools ? { disableStrictTools: true } : undefined;
 				discoverableProviders.push({
@@ -1878,6 +1891,7 @@ export class ModelRegistry {
 			keylessProviders,
 			discoverableProviders,
 			configuredProviders,
+			noDiscoveryProviders,
 			found: true,
 		};
 	}
@@ -2079,6 +2093,9 @@ export class ModelRegistry {
 		const requiresAuth = !this.#keylessProviders.has(providerConfig.provider);
 		if (requiresAuth && willFetch) {
 			const apiKey = await this.#peekApiKeyForProvider(providerConfig.provider);
+			if (this.#noDiscoveryProviders.has(providerConfig.provider)) {
+				return { models: [], replaceRuntimeModels: false };
+			}
 			if (!isAuthenticated(apiKey)) {
 				this.#providerDiscoveryStates.set(providerConfig.provider, {
 					provider: providerConfig.provider,
@@ -2102,6 +2119,7 @@ export class ModelRegistry {
 		const fetchDynamicModels = async (): Promise<readonly ModelSpec<Api>[] | null> => {
 			try {
 				const resolvedHeaders = await resolveConfigHeaders(providerConfig.headers);
+				if (this.#noDiscoveryProviders.has(providerId)) return null;
 				const requestConfig = { ...providerConfig, headers: resolvedHeaders };
 				const models = this.#applyProviderModelOverrides(
 					providerId,
@@ -2137,6 +2155,7 @@ export class ModelRegistry {
 			fetchDynamicModels,
 		});
 		const result = await manager.refresh(effectiveStrategy);
+		if (this.#noDiscoveryProviders.has(providerId)) return { models: [], replaceRuntimeModels: false };
 		const status = discoveryError
 			? result.models.length > 0
 				? "cached"
@@ -2224,8 +2243,10 @@ export class ModelRegistry {
 		strategy: ModelRefreshStrategy,
 		providerFilter?: ReadonlySet<string>,
 	): Promise<BuiltInDiscoveryResult> {
-		// Skip providers already handled by configured discovery (e.g. user-configured ollama with discovery.type)
-		const configuredDiscoveryProviders = new Set(this.#discoverableProviders.map(p => p.provider));
+		// Configured discovery owns its providers; static opt-outs must also skip
+		// every built-in, shared-catalog, and extension discovery manager.
+		const configuredDiscoveryProviders = new Set(this.#noDiscoveryProviders);
+		for (const provider of this.#discoverableProviders) configuredDiscoveryProviders.add(provider.provider);
 		const managerOptions = await this.#collectBuiltInModelManagerOptions(
 			strategy,
 			providerFilter,
@@ -2538,11 +2559,17 @@ export class ModelRegistry {
 		options: ModelManagerOptions<Api>,
 		strategy: ModelRefreshStrategy,
 	): Promise<BuiltInDiscoveryResult> {
+		if (this.#noDiscoveryProviders.has(options.providerId)) {
+			return { models: [], authoritativeProviders: new Set(), replaceRuntimeProviders: new Set() };
+		}
 		try {
 			const manager = createModelManager({ ...options, cacheDbPath: this.#cacheDbPath });
 			const result = await withModelDiscoveryTimeout(RUNTIME_DYNAMIC_MODEL_FETCH_TIMEOUT_MS, () =>
 				manager.refresh(strategy),
 			);
+			if (this.#noDiscoveryProviders.has(options.providerId)) {
+				return { models: [], authoritativeProviders: new Set(), replaceRuntimeProviders: new Set() };
+			}
 			const models = result.models.map(model =>
 				model.provider === options.providerId ? model : { ...model, provider: options.providerId },
 			);
@@ -2575,6 +2602,9 @@ export class ModelRegistry {
 			}
 			return { models, authoritativeProviders, replaceRuntimeProviders };
 		} catch (error) {
+			if (this.#noDiscoveryProviders.has(options.providerId)) {
+				return { models: [], authoritativeProviders: new Set(), replaceRuntimeProviders: new Set() };
+			}
 			const message = error instanceof Error ? error.message : String(error);
 			const previous = this.#providerDiscoveryStates.get(options.providerId);
 			// Same auth-rejection surfacing as the configured-discovery path: a

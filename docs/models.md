@@ -211,6 +211,7 @@ Loading models.yml checks a `modelOverrides` `kind` only against an api the file
 
 - `auth`: `apiKey` (default), `none`, or `oauth`. `none` and `oauth` waive the custom-provider `apiKey` requirement, but `oauth` does not create credentials or register a login flow. It forces OAuth-style request shaping; a usable credential must come from stored auth, environment, or a configured key. Custom `anthropic-messages` models also use OAuth-style shaping when `auth` is omitted; set `auth: apiKey` for plain API-key shaping.
 - `discovery.type`: `ollama`, `llama.cpp`, `lm-studio`, `openai-models-list`, `proxy`, `litellm`, or `apple-foundation-models`. Apple's transport is registered implicitly on supported Macs; `apple-foundation-models` is not an allowed `api` value in this YAML schema.
+- `noDiscovery`: optional boolean, default `false`. Set `true` for a static provider roster containing only its explicit `models`; omitted or empty `models` means no models. This skips bundled and cached catalogs as well as automatic, explicit, built-in, and extension-backed discovery for that provider. It takes precedence over `discovery`, so listing or refreshing never requests that provider's model catalog. Other providers keep their normal discovery and cache behavior.
 - `discovery.injectV1`: optional boolean, default `true`, for `openai-models-list`. Set `false` to fetch the model list from `{baseUrl}/models` without injecting `/v1` — for gateways that root their OpenAI-compatible surface at a versioned path (e.g. `https://api.opper.ai/v3/compat`) where the forced `/v1/models` returns a different, smaller model list. Query strings in `baseUrl` are ignored, matching the default mode.
 - `discovery.advertisedReasoning`: optional boolean, default `true`, for `openai-models-list`, `lm-studio`, and `proxy`. Discovery reads what a `/v1/models` row states about its own reasoning surface (`supported_reasoning_levels` / `default_reasoning_level` / `reasoning`, top-level or under `metadata`) and lets it outrank the bundled-reference guess, so a gateway that dispatches with its own catalog offers exactly the tiers its route accepts. A row that lists `none` gets `reasoningDisableMode: none-effort`, so a thinking-off request sends the off-switch instead of being clamped to the lowest tier. An advertised ladder also pins `defaultLevel` inside itself, so catalog policy cannot inject a tier the row omits. A row reporting `reasoning: false` overrides a reasoning-enabled reference for that id. Set the flag to `false` when an endpoint advertises levels its route rejects: discovery then builds each model's thinking surface from the bundled reference alone. A row that says nothing about reasoning is unaffected either way. Explicit `modelOverrides.<id>.thinking` and `compat.supportsReasoningEffort` still win over both. `litellm` does not accept the flag: its authoritative reasoning metadata comes from `/model_group/info`, so the setting would only apply to its `/v1/models` fallback.
 - `transport`: `pi-native` only. When set, every model under that provider is sent to an `omp auth-gateway` compatible `baseUrl` via `POST /v1/pi/stream`; `apiKey` is the gateway bearer.
@@ -246,9 +247,10 @@ Must define at least one of:
 
 ### Discovery
 
+- A custom provider's `baseUrl` automatically enables `openai-models-list` discovery when `discovery` is omitted. Providers with built-in model managers keep their native discovery routes, credentials, cache namespaces, and hard refresh deadline instead; a `baseUrl` override does not silently convert them into generic model-list discovery. In particular, stored ChatGPT OAuth credentials discover Codex models only on the official endpoint, while a configured gateway key can use that gateway's native Codex route. Set `noDiscovery: true` to keep a hand-picked static roster instead; an explicit `discovery` does not override that opt-out.
 - `discovery.timeoutMs` overrides that provider's runtime HTTP probe timeout in milliseconds. It must be a positive finite number.
 - Without an override, Ollama and llama.cpp loopback probes use short endpoint-specific budgets (150–250 ms); remote/LAN probes use 10 s. Generic model-list and proxy probes default to 10 s.
-- `discovery` requires provider-level `api`, except `discovery.type: proxy` (per-model wire auto-detected).
+- Enabled explicit `discovery` requires provider-level `api`, except `discovery.type: proxy` (per-model wire auto-detected). With `noDiscovery: true`, discovery is ignored and the static models may specify their APIs individually.
 
 ### Remote compaction
 
@@ -301,8 +303,8 @@ Successful command outputs are cached for the process lifetime, and concurrent r
 ModelRegistry composition order:
 
 1. Load `models.yml` / `models.yaml` to establish provider overrides, custom models, model overrides, and discovery configuration.
-2. Load built-in models from `@oh-my-pi/pi-catalog` (`getBundledProviders` / `getBundledModels`), applying provider overrides and context policies.
-3. Merge cached and runtime-discovered rows. Authoritative provider catalogs can replace their bundled chat roster.
+2. Load built-in models from `@oh-my-pi/pi-catalog` (`getBundledProviders` / `getBundledModels`), applying provider overrides and context policies, except for providers with `noDiscovery: true`.
+3. Merge cached and runtime-discovered rows for providers that have not opted out. Authoritative provider catalogs can replace their bundled chat roster.
 4. Merge configured custom `models`, then extension-registered models:
    - a matching `provider + id` replaces transport metadata and patches defined model fields
    - otherwise append a model, filling omitted metadata from a bundled reference or local defaults
@@ -325,6 +327,8 @@ headers remain unresolved, `resolveProviderModels` can skip the full merge. Addi
 caches still reapply static rows, and returned models pass through variant collapsing.
 The model-manager default cache TTL is two hours (individual providers can override it);
 non-authoritative snapshots use a five-minute retry interval.
+
+`noDiscovery: true` bypasses every discovery-cache namespace for that provider, including rows saved before the opt-out. Existing cache rows remain on disk but cannot enter its static roster or override its configured metadata. Config reloads drop prior runtime discoveries, and an already-running discovery result cannot restore them after the provider opts out. Removing the flag restores the usual discovery/cache policy.
 
 ### Shared catalog refresh
 

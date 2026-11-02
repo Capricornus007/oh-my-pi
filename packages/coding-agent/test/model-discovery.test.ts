@@ -10,7 +10,7 @@ import { resolveOpenAIRequestSetup } from "@oh-my-pi/pi-ai/providers/openai-shar
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
+import { readModelCache, writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { fingerprintStaticModels } from "@oh-my-pi/pi-catalog/model-manager";
 import { getBundledModel, getBundledModels } from "@oh-my-pi/pi-catalog/models";
 import {
@@ -27,7 +27,7 @@ import {
 	discoveryProbeTimeoutMs,
 } from "@oh-my-pi/pi-coding-agent/config/model-discovery";
 import { RUNTIME_DYNAMIC_MODEL_FETCH_TIMEOUT_MS } from "@oh-my-pi/pi-coding-agent/config/model-provider-discovery";
-import { kNoAuth, ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
+import { kNoAuth, ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { resolveCliModel } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
 import { ProviderDiscoverySchema } from "@oh-my-pi/pi-coding-agent/config/models-config-schema";
 import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -235,6 +235,253 @@ describe("ModelRegistry runtime discovery", () => {
 			throw new Error(`Unexpected URL: ${url}`);
 		};
 	}
+
+	test.each(["automatic", "explicit"] as const)(
+		"noDiscovery excludes a 52-model cache while other providers still discover (%s discovery)",
+		async mode => {
+			const modelsPath = path.join(tempDir, "models.yml");
+			const selectedIds = ["selected-1", "selected-2", "selected-3"];
+			fs.writeFileSync(
+				modelsPath,
+				[
+					"providers:",
+					"  mzsjai:",
+					"    baseUrl: http://127.0.0.1:9992/v1",
+					"    auth: none",
+					"    noDiscovery: true",
+					...(mode === "explicit" ? ["    discovery:", "      type: openai-models-list"] : []),
+					"    models:",
+					...selectedIds.flatMap(id => [
+						`      - id: ${id}`,
+						"        api: openai-completions",
+						"        contextWindow: 65536",
+						"        maxTokens: 8192",
+					]),
+					"  live-gateway:",
+					"    baseUrl: http://127.0.0.1:9991/v1",
+					"    api: openai-completions",
+					"    auth: none",
+					...(mode === "explicit" ? ["    noDiscovery: false"] : []),
+				].join("\n"),
+			);
+			const cachedModels = Array.from({ length: 52 }, (_, index) =>
+				buildModel({
+					id: selectedIds[index] ?? `cached-${index}`,
+					name: `Cached model ${index}`,
+					provider: "mzsjai",
+					api: "openai-completions",
+					baseUrl: "http://127.0.0.1:9992/v1",
+					reasoning: false,
+					input: ["text"],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 262_144,
+					maxTokens: 32_768,
+				}),
+			);
+			const staticCacheId = "mzsjai:openai-models-list-context-v5";
+			writeModelCache(staticCacheId, Date.now(), cachedModels, true, "", cacheDbPath);
+			writeModelCache(
+				"live-gateway:openai-models-list-context-v5",
+				Date.now(),
+				[{ ...cachedModels[0], id: "cached-live", provider: "live-gateway" }],
+				true,
+				"",
+				cacheDbPath,
+			);
+			const calls: string[] = [];
+			const registry = new ModelRegistry(authStorage, modelsPath, {
+				fetch: async input => {
+					const url = String(input);
+					calls.push(url);
+					return url === "http://127.0.0.1:9991/v1/models"
+						? Response.json({ data: [{ id: "refreshed-live" }] })
+						: new Response("", { status: 404 });
+				},
+			});
+
+			// Exercise lazy lookup before the full selector snapshot is materialized.
+			expect(registry.getAvailableForProviders(new Set(["mzsjai"])).map(model => model.id)).toEqual(selectedIds);
+			expect(registry.find("mzsjai", "cached-51")).toBeUndefined();
+			expect(registry.find("mzsjai", "selected-1")).toMatchObject({ contextWindow: 65_536, maxTokens: 8_192 });
+			expect(registry.find("live-gateway", "cached-live")).toBeDefined();
+			expect(registry.getDiscoverableProviders()).not.toContain("mzsjai");
+
+			await registry.refresh("offline");
+			expect(getModelsForProvider(registry, "mzsjai").map(model => model.id)).toEqual(selectedIds);
+			expect(registry.find("live-gateway", "cached-live")).toBeDefined();
+			expect(calls).toEqual([]);
+
+			await registry.refresh("online");
+			expect(getModelsForProvider(registry, "mzsjai").map(model => model.id)).toEqual(selectedIds);
+			expect(registry.find("live-gateway", "refreshed-live")).toBeDefined();
+			expect(registry.find("live-gateway", "cached-live")).toBeUndefined();
+			expect(calls).toContain("http://127.0.0.1:9991/v1/models");
+			expect(calls).not.toContain("http://127.0.0.1:9992/v1/models");
+			expect(registry.getProviderDiscoveryState("mzsjai")).toBeUndefined();
+			expect(readModelCache(staticCacheId, 24 * 60 * 60 * 1000, Date.now, cacheDbPath)?.models).toHaveLength(52);
+		},
+	);
+
+	test.each(["openai", "openai-codex"] as const)(
+		"noDiscovery excludes bundled and built-in cached models for %s, including an empty static roster",
+		async provider => {
+			const providerConfig = {
+				baseUrl: "http://127.0.0.1:9992/v1",
+				api: "openai-completions",
+				apiKey: "static-test-key",
+				noDiscovery: true,
+				models: [{ id: "selected-model", contextWindow: 65_536, maxTokens: 8_192 }],
+			};
+			writeRawModelsJson({ [provider]: providerConfig });
+			const cachedModel = buildModel({
+				id: "cache-only-model",
+				name: "Cache-only model",
+				provider,
+				api: "openai-completions",
+				baseUrl: providerConfig.baseUrl,
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 65_536,
+				maxTokens: 8_192,
+			});
+			writeModelCache(
+				resolveModelCacheProviderId(provider, { baseUrl: providerConfig.baseUrl }),
+				Date.now(),
+				[cachedModel],
+				true,
+				"",
+				cacheDbPath,
+			);
+			const fetchMock = vi.fn(async () => new Response("", { status: 404 }));
+			const registry = new ModelRegistry(authStorage, modelsJsonPath, { fetch: fetchMock });
+
+			expect(registry.getAvailableForProviders(new Set([provider])).map(model => model.id)).toEqual([
+				"selected-model",
+			]);
+			expect(getModelsForProvider(registry, provider).map(model => model.id)).toEqual(["selected-model"]);
+			await registry.refreshProvider(provider, "offline");
+			await registry.refreshProvider(provider, "online");
+			expect(getModelsForProvider(registry, provider).map(model => model.id)).toEqual(["selected-model"]);
+
+			const previousMtime = fs.statSync(modelsJsonPath).mtimeMs;
+			writeRawModelsJson({ [provider]: { ...providerConfig, models: [] } });
+			const changedTime = new Date(previousMtime + 1_000);
+			fs.utimesSync(modelsJsonPath, changedTime, changedTime);
+			await registry.refreshProvider(provider, "online");
+			expect(getModelsForProvider(registry, provider)).toEqual([]);
+			expect(registry.getProviderDiscoveryState(provider)).toBeUndefined();
+			expect(fetchMock).not.toHaveBeenCalled();
+		},
+	);
+
+	test("noDiscovery config reload rejects an in-flight catalog and removing the opt-out restores discovery", async () => {
+		const providerConfig = {
+			baseUrl: "http://127.0.0.1:9992/v1",
+			api: "openai-completions",
+			auth: "none",
+			discovery: { type: "openai-models-list" },
+			models: [{ id: "selected-model" }],
+		};
+		writeRawModelsJson({ gateway: providerConfig });
+		const response = Promise.withResolvers<Response>();
+		const started = Promise.withResolvers<void>();
+		let modelListCalls = 0;
+		const registry = new ModelRegistry(authStorage, modelsJsonPath, {
+			fetch: async input => {
+				if (String(input) !== "http://127.0.0.1:9992/v1/models") return new Response("", { status: 404 });
+				modelListCalls++;
+				if (modelListCalls === 1) {
+					started.resolve();
+					return response.promise;
+				}
+				return Response.json({ data: [{ id: "restored-live-model" }] });
+			},
+		});
+		const discovery = registry.refreshDiscoverableProviders(["gateway"], "online");
+		await started.promise;
+
+		const previousMtime = fs.statSync(modelsJsonPath).mtimeMs;
+		writeRawModelsJson({ gateway: { ...providerConfig, noDiscovery: true } });
+		const staticTime = new Date(previousMtime + 1_000);
+		fs.utimesSync(modelsJsonPath, staticTime, staticTime);
+		await registry.refreshProvider("gateway", "offline");
+		response.resolve(Response.json({ data: [{ id: "late-discovered-model" }] }));
+		await discovery;
+		await registry.refreshProvider("gateway", "online");
+
+		expect(getModelsForProvider(registry, "gateway").map(model => model.id)).toEqual(["selected-model"]);
+		expect(registry.getProviderDiscoveryState("gateway")).toBeUndefined();
+		expect(modelListCalls).toBe(1);
+
+		writeRawModelsJson({ gateway: { ...providerConfig, noDiscovery: false } });
+		const discoveryTime = new Date(previousMtime + 2_000);
+		fs.utimesSync(modelsJsonPath, discoveryTime, discoveryTime);
+		await registry.refreshProvider("gateway", "online-if-uncached");
+		expect(registry.find("gateway", "restored-live-model")).toBeDefined();
+		expect(registry.find("gateway", "late-discovered-model")).toBeUndefined();
+		expect(modelListCalls).toBe(2);
+	});
+
+	test("noDiscovery config reload drops extension discovery results and skips its later refreshes", async () => {
+		writeRawModelsJson({});
+		const registry = new ModelRegistry(authStorage, modelsJsonPath);
+		const response = Promise.withResolvers<NonNullable<ProviderConfigInput["models"]>>();
+		const started = Promise.withResolvers<void>();
+		let discoveryCalls = 0;
+		registry.registerProvider(
+			"runtime-gateway",
+			{
+				baseUrl: "http://127.0.0.1:9992/v1",
+				api: "openai-completions",
+				apiKey: "runtime-test-key",
+				fetchDynamicModels: async () => {
+					discoveryCalls++;
+					started.resolve();
+					return response.promise;
+				},
+			},
+			"ext://static-opt-out",
+		);
+		try {
+			const discovery = registry.refreshRuntimeProviders("online");
+			await started.promise;
+			const previousMtime = fs.statSync(modelsJsonPath).mtimeMs;
+			writeRawModelsJson({
+				"runtime-gateway": {
+					baseUrl: "http://127.0.0.1:9992/v1",
+					api: "openai-completions",
+					auth: "none",
+					noDiscovery: true,
+					models: [{ id: "selected-model" }],
+				},
+			});
+			const changedTime = new Date(previousMtime + 1_000);
+			fs.utimesSync(modelsJsonPath, changedTime, changedTime);
+			await registry.refreshProvider("runtime-gateway", "offline");
+			response.resolve([
+				{
+					id: "late-runtime-model",
+					name: "Late runtime model",
+					provider: "runtime-gateway",
+					api: "openai-completions",
+					baseUrl: "http://127.0.0.1:9992/v1",
+					reasoning: false,
+					input: ["text"],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 65_536,
+					maxTokens: 8_192,
+				},
+			]);
+			await discovery;
+			await registry.refreshRuntimeProviders("online");
+			expect(getModelsForProvider(registry, "runtime-gateway").map(model => model.id)).toEqual(["selected-model"]);
+			expect(registry.getProviderDiscoveryState("runtime-gateway")).toBeUndefined();
+			expect(discoveryCalls).toBe(1);
+		} finally {
+			registry.clearSourceRegistrations("ext://static-opt-out");
+		}
+	});
 
 	test("scoped discovery coalesces with an in-flight background refresh", async () => {
 		writeRawModelsJson({
@@ -4184,6 +4431,7 @@ describe("ModelRegistry runtime discovery", () => {
 	});
 
 	test("built-in litellm discovery timeout settles pending state", async () => {
+		const started = Promise.withResolvers<void>();
 		vi.useFakeTimers();
 		try {
 			writeRawModelsJson({
@@ -4194,13 +4442,16 @@ describe("ModelRegistry runtime discovery", () => {
 				},
 			});
 			const registry = new ModelRegistry(authStorage, modelsJsonPath, {
-				fetch: () => Promise.withResolvers<Response>().promise,
+				fetch: () => {
+					started.resolve();
+					return Promise.withResolvers<Response>().promise;
+				},
 			});
 			expect(registry.find("litellm", "not-yet-discovered")).toBeUndefined();
 			expect(registry.isProviderDiscoveryPending("litellm")).toBe(true);
 
 			const refresh = registry.refreshProvider("litellm", "online");
-			for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+			await started.promise;
 			vi.advanceTimersByTime(RUNTIME_DYNAMIC_MODEL_FETCH_TIMEOUT_MS);
 			await refresh;
 
@@ -4208,7 +4459,6 @@ describe("ModelRegistry runtime discovery", () => {
 				status: "unavailable",
 				stale: true,
 				models: [],
-				error: `model discovery timed out after ${RUNTIME_DYNAMIC_MODEL_FETCH_TIMEOUT_MS}ms`,
 			});
 			expect(registry.isProviderDiscoveryPending("litellm")).toBe(false);
 		} finally {

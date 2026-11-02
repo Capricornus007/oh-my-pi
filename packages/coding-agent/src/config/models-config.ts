@@ -209,7 +209,9 @@ export const ModelsConfigFile = new ConfigFile<ModelsConfig>("models", {
 				apiKey: providerConfig.apiKey,
 				api: providerConfig.api as Api | undefined,
 				auth: (providerConfig.auth ?? "apiKey") as ProviderAuthMode,
-				discovery: providerConfig.discovery as ProviderDiscovery | undefined,
+				discovery: providerConfig.noDiscovery
+					? undefined
+					: (providerConfig.discovery as ProviderDiscovery | undefined),
 				compat: providerConfig.compat,
 				remoteCompaction: providerConfig.remoteCompaction,
 				disableStrictTools: providerConfig.disableStrictTools,

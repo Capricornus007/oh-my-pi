@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Fixed `noDiscovery: true` providers loading old discovered or bundled catalogs: only their explicit model roster is used, the flag wins over explicit `discovery`, and cached or in-flight refresh results cannot repopulate the static list; other providers retain normal discovery and caching.
+- Fixed `baseUrl`-implied generic discovery overriding built-in model managers: native discovery routes and hard timeouts are preserved, and stored ChatGPT OAuth credentials are not sent to a configured Codex relay; custom providers still auto-discover by default.
 - Fixed `:auto` on a retry fallback entry being ignored: a fixed-effort session now switches to auto thinking on that fallback instead of inheriting the failing turn's effort, and advisor fallbacks keep following the primary's effort without enabling unverified thinking ([#17100](https://github.com/can1357/oh-my-pi/pull/17100) by [@shgew](https://github.com/shgew))
 - Fixed `ssh://` home-relative paths resolving against literal `/~` instead of the remote account's home ([#17182](https://github.com/can1357/oh-my-pi/pull/17182) by [@alphastorm](https://github.com/alphastorm))
 - Fixed searches of `ssh://` directories failing with unsupported directory scans ([#17182](https://github.com/can1357/oh-my-pi/pull/17182) by [@alphastorm](https://github.com/alphastorm))
