@@ -27,7 +27,7 @@ class Runtime {
 	gate: Promise<void> | undefined;
 	absent = false;
 
-	readonly attach: FollowAttach<Count> = async (observer) => {
+	readonly attach: FollowAttach<Count> = async observer => {
 		this.observers.add(observer);
 		this.attachments++;
 		await this.gate;
@@ -60,7 +60,7 @@ const View = local("app.view", { version: 1, params: {}, members: { a: obj({ n: 
 /** Serves `View`, following `a` and `b`, its `sum` a derive over both (its computes counted). */
 async function served(a = new Runtime(), b = new Runtime()) {
 	let computes = 0;
-	const { host, errors } = await loaded((h) =>
+	const { host, errors } = await loaded(h =>
 		h.serve(View, (_, self) => {
 			const left = self.follow(a.attach);
 			const right = self.follow(b.attach);
@@ -135,9 +135,9 @@ describe("types", () => {
 		const runtime = new Runtime();
 		// A runtime's own observe, as Durable's `observeConversation` is: typed by its value, not by Chord's observer.
 		const observe = (observer: FollowObserver<Count>) => runtime.attach(observer, context);
-		await loaded((h) =>
+		await loaded(h =>
 			h.serve(View, (_, self) => {
-				const a = self.follow((observer) => observe(observer));
+				const a = self.follow(observer => observe(observer));
 				expectTypeOf(a).toEqualTypeOf<Watchable<Count>>();
 				return { a, sum: self.derive([a], ([x]) => x.n) };
 			}),
@@ -150,11 +150,11 @@ describe("activation", () => {
 		const a = new Runtime();
 		const b = new Runtime();
 		b.absent = true;
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(View, (_, self) => ({ a: self.follow(a.attach), sum: self.derive([self.follow(b.attach)], () => 0) })),
 		);
 		await expect(host.get(View, {}, context, { readyTimeout: 50 })).rejects.toThrow("followed address is absent");
-		expect(errors.find((error) => error.kind === "activation_failed")).toMatchObject({
+		expect(errors.find(error => error.kind === "activation_failed")).toMatchObject({
 			failure: { kind: "transient" },
 		});
 		await delivered();
@@ -170,7 +170,7 @@ describe("ends (R4)", () => {
 		b.end({ kind: "failed", error: new ChordError({ code: "unavailable", message: "session failed" }) });
 		expect(view.state.value).toMatchObject({ kind: "failed", cause: { kind: "transient" } });
 		expect((view.state.value as { retryAt?: number }).retryAt).toBeGreaterThan(0);
-		expect(errors.filter((error) => error.kind === "object_failed")).toHaveLength(1);
+		expect(errors.filter(error => error.kind === "object_failed")).toHaveLength(1);
 		expect(view.a.value).toEqual({ n: 0 });
 		await delivered();
 		view.retry();
@@ -205,7 +205,7 @@ describe("ends (R4)", () => {
 describe("ends during activation and in one batch (review regressions)", () => {
 	it("an end before the attachment resolved keeps the attachment's value on the source", async () => {
 		const source = new FollowSource(
-			async (observer) => {
+			async observer => {
 				observer.end({ kind: "ended" });
 				return { value: { n: 7 }, detach() {} };
 			},
@@ -224,7 +224,7 @@ describe("ends during activation and in one batch (review regressions)", () => {
 		const gate = Promise.withResolvers<void>();
 		a.gate = gate.promise;
 		// Loading activates the object (local, empty params): its follow attaches meanwhile.
-		const loading = loaded((h) =>
+		const loading = loaded(h =>
 			h.serve(View, (_, self) => {
 				const left = self.follow(a.attach);
 				return { a: left, sum: self.derive([left], ([x]) => x.n) };
@@ -235,7 +235,7 @@ describe("ends during activation and in one batch (review regressions)", () => {
 		gate.resolve();
 		const { host, errors } = await loading;
 		await delivered();
-		expect(errors.find((error) => error.kind === "activation_failed")).toMatchObject({
+		expect(errors.find(error => error.kind === "activation_failed")).toMatchObject({
 			failure: { kind: "transient" },
 		});
 		await host.close(context);
@@ -245,7 +245,7 @@ describe("ends during activation and in one batch (review regressions)", () => {
 	it("an end while the object activates (after its sources attached) fails the activation transient", async () => {
 		const a = new Runtime();
 		let ended = false;
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(View, (_, self) => {
 				const left = self.follow(a.attach);
 				// The activation computes the derives after the follows attached: the runtime ends then.
@@ -261,7 +261,7 @@ describe("ends during activation and in one batch (review regressions)", () => {
 		);
 		await expect(host.get(View, {}, context, { readyTimeout: 50 })).rejects.toThrow();
 		expect(ended).toBe(true);
-		expect(errors.find((error) => error.kind === "activation_failed")).toMatchObject({
+		expect(errors.find(error => error.kind === "activation_failed")).toMatchObject({
 			failure: { kind: "transient" },
 		});
 		await host.close(context);
@@ -271,7 +271,7 @@ describe("ends during activation and in one batch (review regressions)", () => {
 		const batch = new Batch(() => {}, undefined);
 		let observer: FollowObserver<unknown> | undefined;
 		const source = new FollowSource(
-			async (attached) => {
+			async attached => {
 				observer = attached;
 				return { value: { n: 7 }, detach() {} };
 			},
@@ -292,7 +292,7 @@ describe("ends during activation and in one batch (review regressions)", () => {
 	it("a call and an end outside a batch with nothing watching: a later watch opens at the value and ends", async () => {
 		let observer: FollowObserver<unknown> | undefined;
 		const source = new FollowSource(
-			async (attached) => {
+			async attached => {
 				observer = attached;
 				return { value: { n: 0 }, detach() {} };
 			},

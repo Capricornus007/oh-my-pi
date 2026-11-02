@@ -57,16 +57,16 @@ let root = await harness.root(context, {
 });
 const lastResult = async () => {
 	const page = await root.entries({}, 10, undefined, context);
-	const result = page.items.find((entry) => ToolResultEntry.is(entry))?.model?.[0] as ToolResultMessage;
-	return result.content.map((part) => (part.type === "text" ? part.text : "")).join("");
+	const result = page.items.find(entry => ToolResultEntry.is(entry))?.model?.[0] as ToolResultMessage;
+	return result.content.map(part => (part.type === "text" ? part.text : "")).join("");
 };
 
 // The file changes while a call runs: the running call finishes on v1, the next call uses v2.
 let release = (): void => {};
-gate = new Promise((resolve) => {
+gate = new Promise(resolve => {
 	release = resolve;
 });
-const running = new Promise<void>((resolve) => {
+const running = new Promise<void>(resolve => {
 	started = resolve;
 });
 const submission = await root.submit({ type: "input", content: "Which version?" }, context);
@@ -83,7 +83,7 @@ await harness.close(context);
 registry = createRegistry();
 harness = await open(registry);
 root = await harness.root(context);
-const tools = async () => (await root.agent(context)).tools.map((tool) => tool.name);
+const tools = async () => (await root.agent(context)).tools.map(tool => tool.name);
 console.log("after restart, before install:", await tools());
 registry.install(loadVersioned("v3"));
 console.log("after install:", await tools());

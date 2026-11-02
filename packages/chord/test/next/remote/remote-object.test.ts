@@ -55,7 +55,7 @@ forEachCodec(() => {
 				hostAddress: () => Server(),
 				variants: { v: { state: { n: int() } } },
 			});
-			const { client } = await linked((h) =>
+			const { client } = await linked(h =>
 				h.serve(Broken, () => {
 					throw new Error("factory threw");
 				}),
@@ -207,13 +207,13 @@ forEachCodec(() => {
 				variants: { v: { state: { n: int() } } },
 			});
 			const opens: string[] = [];
-			const { client } = await linked((h) =>
+			const { client } = await linked(h =>
 				h.serve(Flaky, ({ id }, _principal, self) => {
 					self.open(
-						async (ctx) => {
+						async ctx => {
 							opens.push(`open ${opens.length + 1}`);
 							if (opens.length === 1) throw new Error("offline");
-							await new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", resolve));
+							await new Promise(resolve => ctx.abortSignal?.addEventListener("abort", resolve));
 							opens.push("aborted");
 						},
 						() => {},
@@ -239,7 +239,7 @@ forEachCodec(() => {
 
 	describe("GC of a released remote reference", () => {
 		it("a released reference retained by the test keeps no hold, replica or object", async () => {
-			const { server, client } = await linked((h) => void serveNotes(h));
+			const { server, client } = await linked(h => void serveNotes(h));
 			const { notes, refs } = await (async () => {
 				const made = remoteObjects.length;
 				const notes = await client.get(Notes, { session: "S1" }, context);
@@ -260,7 +260,7 @@ forEachCodec(() => {
 				hostAddress: () => Server(),
 				variants: { v: { state: { half: int() }, methods: { set: method(int()) } } },
 			});
-			const { server, client } = await linked((h) =>
+			const { server, client } = await linked(h =>
 				h.serve(Halves, (_, _principal, self) => {
 					const doc = self.state(Counter);
 					return {
@@ -272,7 +272,7 @@ forEachCodec(() => {
 								return n / 2;
 							}),
 							set: async (value, ctx) => {
-								await doc.change((draft) => {
+								await doc.change(draft => {
 									draft.n = value;
 								}, ctx);
 								return null;
@@ -287,7 +287,7 @@ forEachCodec(() => {
 				const halves = await client.get(Halves, {}, context);
 				if (halves.variant !== "v") throw new Error("expected variant v");
 				const refs: WeakRef<object>[] = [new WeakRef(resolveWatchable(halves.half)!), ...remoteObjects.slice(made)];
-				(await halves.half.watch(context)).start(async (call) => {
+				(await halves.half.watch(context)).start(async call => {
 					if (call.kind === "failed") kept.push(call.error);
 				});
 				await halves.set(2, context);
@@ -306,12 +306,12 @@ forEachCodec(() => {
 		it("a failed hold parks the dependent failed { waiting }: no new attempt or hold; bound wakes it", async () => {
 			const View = local("app.view", { version: 1, params: {}, members: { count: int() } });
 			const errors: HostError[] = [];
-			const client = createHost({ onError: (error) => errors.push(error) });
+			const client = createHost({ onError: error => errors.push(error) });
 			const [a, b] = memoryLinkPair();
 			client.connect(a, { principal: { kind: "server" }, codec: testCodec() }, context);
 			const peer = new RawPeer(b);
 			let factories = 0;
-			const facet = defineFacet((h) =>
+			const facet = defineFacet(h =>
 				h.serve(View, (_, self) => {
 					factories++;
 					return { count: self.get(Notes, { session: "S1" }).count };
@@ -337,7 +337,7 @@ forEachCodec(() => {
 			await transported();
 			expect(view.state.value).toEqual({ kind: "live" });
 			expect(view.count.value).toBe(1);
-			expect([factories, peer.kinds().filter((kind) => kind === "hold" || kind === "release")]).toEqual([1, []]);
+			expect([factories, peer.kinds().filter(kind => kind === "hold" || kind === "release")]).toEqual([1, []]);
 		});
 	});
 
@@ -345,11 +345,11 @@ forEachCodec(() => {
 		it("a loading notice while loading changes nothing: the dependent goes on waiting and goes live when bound", async () => {
 			const View = local("app.view", { version: 1, params: {}, members: { count: int() } });
 			const errors: HostError[] = [];
-			const client = createHost({ onError: (error) => errors.push(error) });
+			const client = createHost({ onError: error => errors.push(error) });
 			const [a, b] = memoryLinkPair();
 			client.connect(a, { principal: { kind: "server" }, codec: testCodec() }, context);
 			const peer = new RawPeer(b);
-			const facet = defineFacet((h) =>
+			const facet = defineFacet(h =>
 				h.serve(View, (_, self) => ({ count: self.get(Notes, { session: "S1" }).count })),
 			);
 			const loading = client.load([{ name: "@test/view", facet }], context);
@@ -377,7 +377,7 @@ forEachCodec(() => {
 				variants: { v: { state: { n: int() } } },
 			});
 			const View = local("app.view", { version: 1, params: {}, members: { n: int() } });
-			const { server, client: first } = await linked((h) =>
+			const { server, client: first } = await linked(h =>
 				h.serve(Flaky, (_, _principal, self) => {
 					self.open(
 						async () => {
@@ -392,11 +392,11 @@ forEachCodec(() => {
 			const failing = first.get(Flaky, {}, context).catch(() => {});
 			await transported();
 			const errors: HostError[] = [];
-			const second = createHost({ onError: (error) => errors.push(error) });
+			const second = createHost({ onError: error => errors.push(error) });
 			const [a, b] = memoryLinkPair();
 			server.accept(a, { principal: { kind: "owner" }, codec: testCodec() }, context);
 			second.connect(b, { principal: { kind: "server" }, codec: testCodec() }, context);
-			const facet = defineFacet((h) => h.serve(View, (_, self) => ({ n: self.get(Flaky, {}).n })));
+			const facet = defineFacet(h => h.serve(View, (_, self) => ({ n: self.get(Flaky, {}).n })));
 			await second.load([{ name: "@test/view", facet }], context);
 			await transported();
 			expect(errors).toEqual([]);
@@ -425,10 +425,10 @@ const Shifting = remote("app.shifting", {
 async function shifting() {
 	const View = local("app.view", { version: 1, params: {}, members: { sum: int(), label: str() } });
 	const errors: HostError[] = [];
-	const client = createHost<TestPrincipal>({ onError: (error) => errors.push(error) });
+	const client = createHost<TestPrincipal>({ onError: error => errors.push(error) });
 	const peer = await rawParent(client);
 	let held: Reference<typeof Shifting> | undefined;
-	const facet = defineFacet<TestPrincipal>((h) =>
+	const facet = defineFacet<TestPrincipal>(h =>
 		h.serve(View, (_, self) => {
 			const ref = self.get(Shifting, {});
 			held = ref;
@@ -457,7 +457,7 @@ forEachCodec(() => {
 	describe("re-holds after a drop", () => {
 		it("hold every reference not released again on the next link, with that link's fresh ids, in order", async () => {
 			const { client, peer } = await rawProvider();
-			const refs = ["S1", "S2", "S3"].map((session) => client.hold(Notes, { session }, context));
+			const refs = ["S1", "S2", "S3"].map(session => client.hold(Notes, { session }, context));
 			for (let i = 0; i < 3; i++) await bindNext(peer);
 			refs[1]!.release();
 			peer.close();
@@ -605,13 +605,13 @@ forEachCodec(() => {
 				hostAddress: () => Server(),
 				variants: { editor: { state: { count: int() } } },
 			});
-			const { server, client, links } = await linked((h) => void serveNotes(h));
+			const { server, client, links } = await linked(h => void serveNotes(h));
 			const upgraded = createHost<TestPrincipal>({
 				address: Server(),
 				principal: { kind: "server" },
 				onError: () => {},
 			});
-			const facet = defineFacet<TestPrincipal>((h) =>
+			const facet = defineFacet<TestPrincipal>(h =>
 				h.serve(NotesV2, () => ({ variant: "editor", members: { count: constant(0) } })),
 			);
 			await upgraded.load([{ name: "@test/app", facet }], context);
@@ -663,7 +663,7 @@ forEachCodec(() => {
 				variants: { only: { state: {}, methods: { ping: method() } } },
 			});
 			let factories = 0;
-			const { client } = await linked((h) =>
+			const { client } = await linked(h =>
 				h.serve(Flaky, () => {
 					if (++factories === 1) throw new Error("bad factory");
 					return { variant: "only", members: { ping: async () => null } };
@@ -675,14 +675,14 @@ forEachCodec(() => {
 			const states: string[] = [];
 			const watch = await one.state.watch(context);
 			states.push(watch.value.kind);
-			watch.start(async (call) => {
+			watch.start(async call => {
 				if (call.kind === "value") states.push(call.value.kind);
 			});
 			one.retry();
 			// A call made while it loads again waits for the binding; none sees the old failure.
 			let called: Promise<string> | undefined;
 			const unwatch = await one.state.watch(context);
-			unwatch.start(async (call) => {
+			unwatch.start(async call => {
 				if (call.kind === "value" && call.value.kind === "loading" && called === undefined) {
 					called = one.ping(context).then(
 						() => "ok",
@@ -772,13 +772,13 @@ forEachCodec(() => {
 		fakeTimers();
 
 		const View = local("app.view", { version: 1, params: {}, members: { count: int() } });
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, self) => ({ count: self.get(Notes, { session: "S1" }).count })),
 		);
 
 		it("stays loading through the drop, no failure reported, and goes live when the next link binds it", async () => {
 			const errors: HostError[] = [];
-			const client = createHost<TestPrincipal>({ onError: (error) => errors.push(error) });
+			const client = createHost<TestPrincipal>({ onError: error => errors.push(error) });
 			const peer = await rawParent(client);
 			const loading = client.load([{ name: "@test/view", facet }], context);
 			await peer.next("hold");
@@ -796,7 +796,7 @@ forEachCodec(() => {
 
 		it("dropped and never bound again, stays parked loading: nothing fails, one parked_long (audit A11)", async () => {
 			const errors: HostError[] = [];
-			const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: (error) => errors.push(error) });
+			const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: error => errors.push(error) });
 			const peer = await rawParent(client);
 			const loading = client.load([{ name: "@test/view", facet }], context);
 			await peer.next("hold");
@@ -814,14 +814,14 @@ forEachCodec(() => {
 
 		it("without any link stays loading past its readyTimeout and goes live when the first link binds its one hold", async () => {
 			const errors: HostError[] = [];
-			const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: (error) => errors.push(error) });
+			const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: error => errors.push(error) });
 			await client.load([{ name: "@test/view", facet }], context);
 			await vi.advanceTimersByTimeAsync(500);
 			expect(failures(errors)).toEqual([]);
 			const next = await rawParent(client);
 			expect(await bindNext(next, [{ text: "a" }])).toBe(0);
 			expect((await client.get(View, {}, context, { readyTimeout: 1 })).count.value).toBe(1);
-			expect(next.kinds().filter((kind) => kind === "hold" || kind === "release")).toEqual([]);
+			expect(next.kinds().filter(kind => kind === "hold" || kind === "release")).toEqual([]);
 		});
 	});
 

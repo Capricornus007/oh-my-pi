@@ -97,7 +97,7 @@ function sources() {
 			"../src/delta/revision-validator.ts",
 			"../src/delta/apply-immutable-trusted.ts",
 			"./delta-traversal.bench.ts",
-		].map((path) => [
+		].map(path => [
 			path,
 			createHash("sha256")
 				.update(readFileSync(new URL(path, import.meta.url)))

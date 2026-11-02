@@ -16,7 +16,7 @@ export const finished: unknown[] = [];
 
 /** The owner's facet over `edits` (the table version this process declares). */
 export function ownerFacet(edits: TableDefinition, behaviour: RunBehaviour) {
-	return defineFacet((host) => {
+	return defineFacet(host => {
 		host.serve(Owner, (_, self) => {
 			const profile = self.state(Profile);
 			const notes = self.state(Notes);
@@ -24,22 +24,22 @@ export function ownerFacet(edits: TableDefinition, behaviour: RunBehaviour) {
 			const editsTable = self.table(edits);
 			const imports = self.job(ImportJob, {
 				run: async ({ path }, ctx) => {
-					await ctx.state.change((draft) => {
+					await ctx.state.change(draft => {
 						draft.done += path.length;
 					}, ctx);
 					if (behaviour === "wait") {
-						await new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", resolve));
+						await new Promise(resolve => ctx.abortSignal?.addEventListener("abort", resolve));
 					}
 					return { count: ctx.state.value.done };
 				},
-				finish: async (outcome) => {
+				finish: async outcome => {
 					finished.push(outcome.kind === "done" ? outcome.result : outcome.kind);
 				},
 			});
 			return {
 				profile,
 				write: async ({ id, body }, ctx) => {
-					await self.tx(async (tx) => {
+					await self.tx(async tx => {
 						(await tx.draft(notes, id)).body = body;
 						const draft = await tx.draft(profile);
 						draft.count += 1;

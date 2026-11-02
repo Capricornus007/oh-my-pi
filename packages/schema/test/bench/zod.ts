@@ -122,7 +122,7 @@ const native: Record<string, z.ZodType> = {
 
 /** The native Zod schema of each speed case's JSON Schema. */
 export const nativeCases: ReadonlyMap<JsonSchema, z.ZodType> = new Map(
-	cases.map((c) => {
+	cases.map(c => {
 		const schema = native[c.name];
 		if (schema === undefined) throw new Error(`No native Zod schema for the case ${c.name}`);
 		return [c.schema, schema];

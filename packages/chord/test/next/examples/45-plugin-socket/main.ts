@@ -17,7 +17,7 @@ const server = createHost<Principal>({ principal: { kind: "server" }, onError: c
 const http = chordHttp.createHttp(server, { listen: { host: "127.0.0.1", port: 0 }, onError: console.error }, context);
 // The app's core facet: who someone is.
 const app = defineFacet<Principal>((_host, self) => {
-	self.contribute(chordHttp.Authenticators, (request) => {
+	self.contribute(chordHttp.Authenticators, request => {
 		const name = request.headers.get("x-user");
 		return name === null ? undefined : { kind: "user", name };
 	});
@@ -46,12 +46,12 @@ console.log(`1. anonymous: refused ${response.statusCode}`);
 // 2. As ada: the plugin's handler greets, then echoes.
 const socket = new WebSocket(`ws://127.0.0.1:${port}/echo/lobby`, { headers: { "x-user": "ada" } });
 const messages: string[] = [];
-socket.on("message", (data) => messages.push(String(data)));
+socket.on("message", data => messages.push(String(data)));
 await once(socket, "open");
 socket.send("hello");
 // The greeting and the echo.
 while (messages.length < 2) {
-	await new Promise((resolve) => setTimeout(resolve, 10));
+	await new Promise(resolve => setTimeout(resolve, 10));
 }
 for (const message of messages) console.log(`2. ${message}`);
 

@@ -81,15 +81,13 @@ export interface Self<P extends Principal = Principal> extends RoutineDeclaratio
 	 */
 	derive<const S extends readonly (Watchable<unknown> | NativeWatchable<unknown>)[], T extends JsonValue>(
 		sources: S,
-		compute: (
-			values: {
-				readonly [I in keyof S]: S[I] extends Watchable<infer V>
+		compute: (values: {
+			readonly [I in keyof S]: S[I] extends Watchable<infer V>
+				? V
+				: S[I] extends NativeWatchable<infer V>
 					? V
-					: S[I] extends NativeWatchable<infer V>
-						? V
-						: never;
-			},
-		) => T,
+					: never;
+		}) => T,
 	): Watchable<T>;
 	/** A reference to another object, live once this object is, released when it ends. */
 	get<C extends Contract>(Type: C, params: ParamsOf<C>): Reference<C>;
@@ -357,15 +355,13 @@ export class Attempt implements StoreSelf, KeyDeclarer, RegistryWaiter {
 
 	derive<const S extends readonly (Watchable<unknown> | NativeWatchable<unknown>)[], T extends JsonValue>(
 		sources: S,
-		compute: (
-			values: {
-				readonly [I in keyof S]: S[I] extends Watchable<infer V>
+		compute: (values: {
+			readonly [I in keyof S]: S[I] extends Watchable<infer V>
+				? V
+				: S[I] extends NativeWatchable<infer V>
 					? V
-					: S[I] extends NativeWatchable<infer V>
-						? V
-						: never;
-			},
-		) => T,
+					: never;
+		}) => T,
 	): Watchable<T> {
 		this.#assertDeclaring("derive");
 		// The values are the sources' values, in order; the result is `T`.
@@ -761,7 +757,7 @@ export class Attempt implements StoreSelf, KeyDeclarer, RegistryWaiter {
 		if (checked.kind === "call" || checked.result === undefined) return settled;
 		// The handler's result is the current version's: its mapping back is the provider's (results are not validated).
 		const back = checked.result;
-		return settled.then((result) => back(result as Value));
+		return settled.then(result => back(result as Value));
 	}
 
 	/** The `invalid/member` error of a method outside the variant. */
@@ -847,7 +843,7 @@ export class Attempt implements StoreSelf, KeyDeclarer, RegistryWaiter {
 					variant: this.#variant,
 					label,
 					batch: host.batch,
-					member: (name) => this.member(name),
+					member: name => this.member(name),
 					report: (member, error) => host.report({ kind: "derive_failed", object: label, member, error }),
 				},
 				version,
@@ -1141,7 +1137,7 @@ export class Attempt implements StoreSelf, KeyDeclarer, RegistryWaiter {
 			if (this.#registryDeclarations !== undefined)
 				this.#registryDeclarations.contributions = this.#resolveContributions(this.#registryDeclarations);
 			const { host, label } = this.#object;
-			attachDerives(this.#derives, members.state, (member) => (error) => {
+			attachDerives(this.#derives, members.state, member => error => {
 				// During activation a throwing derive fails the attempt, which `activation_failed` reports alone.
 				if (!this.#isLive) return;
 				host.report({ kind: "derive_failed", object: label, ...(member === undefined ? {} : { member }), error });

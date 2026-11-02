@@ -94,12 +94,12 @@ type CatalogGroup = { namespace: CodemodeNamespace | undefined; entries: Catalog
  * others continue. Every namespace is represented before any namespace is complete.
  */
 function selectCatalog(groups: readonly CatalogGroup[], budget: number): Set<string> {
-	const queues = groups.map((group) => [...group.entries].sort((a, b) => a.cost - b.cost));
+	const queues = groups.map(group => [...group.entries].sort((a, b) => a.cost - b.cost));
 	const shown = new Set<string>();
 	let remaining = budget;
-	let active = queues.filter((queue) => queue.length > 0);
+	let active = queues.filter(queue => queue.length > 0);
 	while (active.length > 0) {
-		active = active.filter((queue) => {
+		active = active.filter(queue => {
 			const next = queue[0]!;
 			if (next.cost > remaining) return false;
 			remaining -= next.cost;
@@ -138,7 +138,7 @@ export function codemodeSection(
 	const toolSections = ["Tools scripts can call (`await tools.<name>(args)`):"];
 	for (const { namespace, entries } of ordered) {
 		if (entries.length === 0) continue;
-		const visible = entries.filter((entry) => shown.has(entry.name));
+		const visible = entries.filter(entry => shown.has(entry.name));
 		if (namespace) {
 			const listing =
 				visible.length === entries.length

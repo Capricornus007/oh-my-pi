@@ -15,7 +15,7 @@ type Props = Record<string, object>;
 const closed = (properties: Props, optional: string[] = []) => ({
 	type: "object",
 	properties,
-	required: Object.keys(properties).filter((k) => !optional.includes(k)),
+	required: Object.keys(properties).filter(k => !optional.includes(k)),
 	additionalProperties: false,
 });
 const str = (o: object = {}) => ({ type: "string", ...o });

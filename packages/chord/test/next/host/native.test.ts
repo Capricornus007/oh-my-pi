@@ -12,7 +12,7 @@ describe("opening", () => {
 	it("opens one after another in declaration order; a later opener reads an earlier handle", async () => {
 		const events: string[] = [];
 		const first = Promise.withResolvers<string>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Res, (_, self) => {
 				const a = self.open(
 					async () => {
@@ -41,7 +41,7 @@ describe("opening", () => {
 
 	it("opens nothing for an object ended before its first open started", async () => {
 		const opens = vi.fn(async () => null);
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Res, (_, self) => {
 				self.open(opens, () => {});
 				return { n: constant(1) };
@@ -61,7 +61,7 @@ describe("opening", () => {
 				reads.push(isChordError(error) ? error.toJSON() : error);
 			}
 		};
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Res, (_, self) => {
 				const a: Native<string> = self.open(
 					async () => {
@@ -92,7 +92,7 @@ describe("opening", () => {
 
 	it("a partly failed attempt closes what it opened, with reason end", async () => {
 		const closes: string[] = [];
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Res, (_, self) => {
 				self.open(
 					async () => "a",
@@ -118,14 +118,14 @@ describe("opening", () => {
 
 	it.each(["end", "close"])(
 		"aborts the opener's context when the object ends while opening; a late value is closed once (%s)",
-		async (reason) => {
+		async reason => {
 			const opener = Promise.withResolvers<Context>();
 			const late = Promise.withResolvers<string>();
 			const closes: unknown[] = [];
-			const { host } = await loaded((h) =>
+			const { host } = await loaded(h =>
 				h.serve(Res, (_, self) => {
 					self.open(
-						async (ctx) => {
+						async ctx => {
 							opener.resolve(ctx);
 							return late.promise;
 						},
@@ -153,7 +153,7 @@ describe("opening", () => {
 describe("closing", () => {
 	it("closes in reverse, with reason end when the object ends and close when the host closes", async () => {
 		const closes: string[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Res, ({ id }, self) => {
 				for (const name of ["a", "b"]) {
 					self.open(
@@ -174,7 +174,7 @@ describe("closing", () => {
 
 	it("collects every throwing close in host.close; an object ending in the background reports each", async () => {
 		const thrown = (name: string) => new Error(`close ${name} threw`);
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Res, ({ id }, self) => {
 				for (const name of ["a", "b"]) {
 					self.open(
@@ -207,7 +207,7 @@ describe("closing", () => {
 			const events: string[] = [];
 			let slow: Context | undefined;
 			const { host, errors } = await loaded(
-				(h) =>
+				h =>
 					h.serve(Res, (_, self) => {
 						self.open(
 							async () => "a",

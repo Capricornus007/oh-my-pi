@@ -154,7 +154,7 @@ forEachCodec(() => {
 			const relay = await relayed({
 				tab,
 				resolve: rawWorkers(peers),
-				server: (h) => {
+				server: h => {
 					h.serve(Gateway, (_, _principal, self) => {
 						// `self.get` in a remote object: the object's principal, this host's incarnation.
 						const own = self.get(PlacedNotes, { session: "own" });
@@ -351,10 +351,10 @@ async function compressing(options: {
 		address: Server(),
 		principal: { kind: "server" },
 		compression: options.server,
-		onError: (error) => errors.push(error),
+		onError: error => errors.push(error),
 	});
-	await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }], context);
-	const client = createHost<TestPrincipal>({ compression: options.client, onError: (error) => errors.push(error) });
+	await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }], context);
+	const client = createHost<TestPrincipal>({ compression: options.client, onError: error => errors.push(error) });
 	await client.load([], context);
 	const [a, b] = memoryLinkPair();
 	server.accept(a, { principal: { kind: "owner" }, codec: testCodec() }, context);
@@ -387,10 +387,10 @@ forEachCodec(() => {
 			const counts = framesOf(await notes.count.watch(context));
 			// Each commit sends the whole changed list (a derive's diff appends one note): large ones deflated.
 			for (let i = 0; i < 5; i++) await addNote(hosts.server, "S1", i % 2 === 0 ? LARGE : "small");
-			for (let i = 0; i < 100 && notes.count.value < 6; i++) await new Promise((resolve) => setTimeout(resolve, 5));
+			for (let i = 0; i < 100 && notes.count.value < 6; i++) await new Promise(resolve => setTimeout(resolve, 5));
 			expect(notes.count.value).toBe(6);
 			expect(notes.notes.value.map(({ text }) => text.length)).toEqual(
-				[LARGE, LARGE, "small", LARGE, "small", LARGE].map((text) => text.length),
+				[LARGE, LARGE, "small", LARGE, "small", LARGE].map(text => text.length),
 			);
 			await delivered();
 			const seen = counts.map(([count]) => count);
@@ -458,7 +458,7 @@ describe("origins only from relays (decision, slice 10 security audit K1/K2)", (
 
 	for (const [kind, message] of Object.entries(withOrigin)) {
 		it(`closes a child link sending ${kind} with an origin (a protocol error)`, async () => {
-			const { peer, errors } = await rawLinked((h) => void serveNotes(h));
+			const { peer, errors } = await rawLinked(h => void serveNotes(h));
 			peer.send(message);
 			await transported();
 			expect(peer.closed).toBe(true);
@@ -471,7 +471,7 @@ describe("origins only from relays (decision, slice 10 security audit K1/K2)", (
 	it("honours origins on a parent link (a relay's): one window of calls per origin", async () => {
 		let probe!: ReturnType<typeof serveNotes>;
 		const { peer } = await rawLinked(
-			(h) => {
+			h => {
 				probe = serveNotes(h);
 			},
 			{ role: "parent" },
@@ -485,7 +485,7 @@ describe("origins only from relays (decision, slice 10 security audit K1/K2)", (
 	});
 
 	it("keeps no record of an origin that holds nothing: 20,000 fresh origins held and released", async () => {
-		const { peer } = await rawLinked((h) => void serveNotes(h), { role: "parent" });
+		const { peer } = await rawLinked(h => void serveNotes(h), { role: "parent" });
 		const churn = async (from: number, to: number) => {
 			for (let origin = from; origin <= to; origin++) {
 				peer.send({ ...hold, origin } as Message);

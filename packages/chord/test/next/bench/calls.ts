@@ -23,19 +23,19 @@ const Store = local("bench.store", {
 });
 const Item = local("bench.item", { version: 1, params: { id: int() }, members: { n: int() } });
 
-const host = createHost({ onError: (error) => console.log("onError", error.kind) });
+const host = createHost({ onError: error => console.log("onError", error.kind) });
 await host.load(
 	[
 		{
 			name: "@bench/calls",
-			facet: defineFacet((h) => {
+			facet: defineFacet(h => {
 				h.serve(Store, (_, self) => {
 					const counter = self.state(Counter);
 					return {
 						doubled: self.derive([counter], ([c]) => c.n * 2),
 						bump: async () => null,
 						set: async (n, ctx) => {
-							await counter.change((draft) => {
+							await counter.change(draft => {
 								draft.n = n;
 							}, ctx);
 							return null;
@@ -81,10 +81,10 @@ async function measure(runs: number, operation: (i: number) => Promise<unknown>)
 }
 
 console.log("local method call:", await measure(20_000, () => store.bump(context)));
-console.log("commit through a watched derive:", await measure(10_000, (i) => store.set(i + 1, context)));
+console.log("commit through a watched derive:", await measure(10_000, i => store.set(i + 1, context)));
 console.log(
 	"activation churn (get, live, release):",
-	await measure(2_000, async (i) => (await host.get(Item, { id: i }, context)).release()),
+	await measure(2_000, async i => (await host.get(Item, { id: i }, context)).release()),
 );
 await watch.stop();
 await host.close(context);

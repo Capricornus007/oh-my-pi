@@ -72,7 +72,7 @@ function open() {
 }
 
 const bump = (session: SessionImpl) =>
-	session.commit(async (tx) => {
+	session.commit(async tx => {
 		(await tx.doc(CounterDoc)).count++;
 	}, context);
 
@@ -188,7 +188,7 @@ describe("publication after storage", () => {
 			if (added) return;
 			added = true;
 			bare.session.observeCommits({
-				advance: (publication) => {
+				advance: publication => {
 					late.push(publication.seq);
 				},
 				end: () => {},
@@ -246,7 +246,7 @@ describe("publication after storage", () => {
 			storage.order.push("observed");
 		});
 		session.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				storage.order.push("host");
 				stored.push(publication.seq);
 			},
@@ -266,17 +266,17 @@ describe("publication after storage", () => {
 	it("keeps what host listeners get: exactly what was stored, held changes included", async () => {
 		const { storage, session } = open();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(NoteDoc, conversationId);
 		}, context);
 		const observed: ObservedCommit[] = [];
 		const stored: CommitPublication[] = [];
-		session.followCommits((publication) => {
+		session.followCommits(publication => {
 			storage.order.push("observed");
 			observed.push(publication);
 		});
 		session.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				storage.order.push("host");
 				stored.push(publication);
 			},
@@ -284,7 +284,7 @@ describe("publication after storage", () => {
 		});
 		storage.order.length = 0;
 		await session.commit(
-			async (tx) => {
+			async tx => {
 				(await tx.doc(NoteDoc, conversationId)).a = 1;
 			},
 			context,
@@ -292,13 +292,13 @@ describe("publication after storage", () => {
 		);
 		// Held in memory: observed at once, nothing stored.
 		expect(storage.order).toEqual(["observed"]);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(NoteDoc, conversationId)).b = 2;
 		}, context);
 		expect(storage.order).toEqual(["observed", "adopt", "adopted", "resolve", "observed", "host"]);
-		expect(documentValues(observed[1]!).map((change) => change.ops)).toEqual([[["s", ["b"], 2]]]);
+		expect(documentValues(observed[1]!).map(change => change.ops)).toEqual([[["s", ["b"], 2]]]);
 		expect(stored).toHaveLength(1);
-		expect(documentValues(stored[0]!).map((change) => change.ops)).toEqual([
+		expect(documentValues(stored[0]!).map(change => change.ops)).toEqual([
 			[
 				["s", ["a"], 1],
 				["s", ["b"], 2],
@@ -311,7 +311,7 @@ describe("publication after storage", () => {
 	it("publishes a store of held changes to host listeners once Storage resolved", async () => {
 		const { storage, session } = open();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(NoteDoc, conversationId);
 		}, context);
 		session.observeCommits({
@@ -321,7 +321,7 @@ describe("publication after storage", () => {
 			end: () => {},
 		});
 		await session.commit(
-			async (tx) => {
+			async tx => {
 				(await tx.doc(NoteDoc, conversationId)).a = 1;
 			},
 			context,
@@ -349,7 +349,7 @@ describe("publication after storage", () => {
 		}
 		// A base at the second count makes JSONL rewrite the document's sidecar after adopting the commit.
 		const Rebased = defineDoc<{ count: number }>({
-			checkpointWhen: (value) => value.count === 2,
+			checkpointWhen: value => value.count === 2,
 			kind: "adoption.rebased",
 			version: 1,
 			scope: "session",
@@ -359,7 +359,7 @@ describe("publication after storage", () => {
 		const env = new RenameLog({ cwd: directory });
 		const session = new SessionImpl(await JsonlStorage.open(directory, env, context));
 		const count = () =>
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				(await tx.doc(Rebased)).count++;
 			}, context);
 		try {
@@ -382,18 +382,18 @@ describe("publication after storage", () => {
 	it("publishes a store of held changes that Storage rejects after adopting it, then fails the Session", async () => {
 		const { storage, session } = open();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(NoteDoc, conversationId);
 		}, context);
 		const stored: (readonly unknown[])[] = [];
 		session.observeCommits({
-			advance: (publication) => {
-				stored.push(documentValues(publication).map((change) => change.ops));
+			advance: publication => {
+				stored.push(documentValues(publication).map(change => change.ops));
 			},
 			end: () => {},
 		});
 		await session.commit(
-			async (tx) => {
+			async tx => {
 				(await tx.doc(NoteDoc, conversationId)).a = 1;
 			},
 			context,

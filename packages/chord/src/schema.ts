@@ -10,11 +10,11 @@ const asSchema = (schema: unknown): Schema =>
 /** Canonical JSON: sorted object keys, `undefined` members dropped. */
 export function canonicalJson(value: unknown): string {
 	if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-	if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+	if (Array.isArray(value)) return `[${value.map(item => canonicalJson(item)).join(",")}]`;
 	const keys = Object.keys(value)
-		.filter((key) => (value as Record<string, unknown>)[key] !== undefined)
+		.filter(key => (value as Record<string, unknown>)[key] !== undefined)
 		.sort();
-	return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
+	return `{${keys.map(key => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
 }
 
 /** Non-cryptographic 64-bit hash (two FNV-1a lanes). Contracts are trusted, so collisions are not an attack surface. */
@@ -56,7 +56,7 @@ export function assertValid(reason: ChordErrorReason, what: string, schema: Json
 	const validator = validatorOf(schema);
 	if (validator.check(value)) return;
 	const errors: ValidationError[] = validator.errors(value).slice(0, 3);
-	const summary = errors.map((error) => `${error.path || "/"} ${error.message}`).join("; ");
+	const summary = errors.map(error => `${error.path || "/"} ${error.message}`).join("; ");
 	throw invalid(reason, `${what}: ${summary}`, errors);
 }
 
@@ -92,7 +92,7 @@ const isSchemaObject = (value: unknown): value is Schema =>
 
 /** The object an `allOf` of object schemas evaluates to (TypeBox's `Evaluate`), or undefined for any other `allOf`. */
 function mergedAllOf(schema: Schema): Schema | undefined {
-	if (!Array.isArray(schema.allOf) || !schema.allOf.every((branch) => isSchemaObject(branch.properties)))
+	if (!Array.isArray(schema.allOf) || !schema.allOf.every(branch => isSchemaObject(branch.properties)))
 		return undefined;
 	const properties: Record<string, unknown> = {};
 	const required = new Set<string>();
@@ -141,7 +141,7 @@ function cleanFrom(schema: Schema, value: unknown): unknown {
 			for (let index = 0; index < length; index++) value[index] = cleanFrom(asSchema(prefix[index]), value[index]);
 			return value.length > length ? value.slice(0, length) : value;
 		}
-		if (isSchemaObject(schema.items)) return value.map((item) => cleanFrom(schema.items as Schema, item));
+		if (isSchemaObject(schema.items)) return value.map(item => cleanFrom(schema.items as Schema, item));
 		return value;
 	}
 	if (!isPlainObject(value)) return value;
@@ -186,7 +186,7 @@ function withDefaults(schema: Schema, value: unknown): unknown {
 			}
 			return defaulted;
 		}
-		if (isSchemaObject(schema.items)) return defaulted.map((item) => withDefaults(schema.items as Schema, item));
+		if (isSchemaObject(schema.items)) return defaulted.map(item => withDefaults(schema.items as Schema, item));
 		return defaulted;
 	}
 	if (!isPlainObject(defaulted)) return defaulted;
@@ -221,7 +221,7 @@ function stripDefaults(schema: Schema, value: unknown): unknown {
 	if (Array.isArray(value)) {
 		const items = schema.items;
 		if (Array.isArray(items)) return value.map((item, index) => stripDefaults(asSchema(items[index]), item));
-		return value.map((item) => stripDefaults(asSchema(items), item));
+		return value.map(item => stripDefaults(asSchema(items), item));
 	}
 	if (value === null || typeof value !== "object") return value;
 	const properties = asSchema(schema.properties);
@@ -299,20 +299,20 @@ export function fits(subSchema: unknown, supSchema: unknown): boolean {
 	const sup = withoutAnnotations(asSchema(supSchema));
 	if (Object.keys(sup).length === 0) return true;
 	if (deepEqual(sub, sup)) return true;
-	if (Object.keys(sup).some((key) => !KNOWN.has(key))) return false;
+	if (Object.keys(sup).some(key => !KNOWN.has(key))) return false;
 	if (sup.additionalProperties !== undefined && typeof sup.additionalProperties !== "boolean") return false;
-	if (Array.isArray(sub.anyOf)) return sub.anyOf.every((branch) => fits(branch, sup));
-	if (Array.isArray(sup.anyOf)) return sup.anyOf.some((branch) => fits(sub, branch));
+	if (Array.isArray(sub.anyOf)) return sub.anyOf.every(branch => fits(branch, sup));
+	if (Array.isArray(sup.anyOf)) return sup.anyOf.some(branch => fits(sub, branch));
 	if ("const" in sup) return "const" in sub && deepEqual(sub.const, sup.const);
 	if (Array.isArray(sup.enum)) {
 		const values = "const" in sub ? [sub.const] : Array.isArray(sub.enum) ? sub.enum : undefined;
-		return values?.every((item) => (sup.enum as unknown[]).some((allowed) => deepEqual(allowed, item))) ?? false;
+		return values?.every(item => (sup.enum as unknown[]).some(allowed => deepEqual(allowed, item))) ?? false;
 	}
 	for (const key of CONSTRAINTS) if (key in sup && !deepEqual(sub[key], sup[key])) return false;
 	const supTypes = typesOf(sup);
 	const subTypes = typesOf(sub);
 	if (supTypes === undefined || subTypes === undefined) return false;
-	if (!subTypes.every((type) => supTypes.includes(type) || (type === "integer" && supTypes.includes("number")))) {
+	if (!subTypes.every(type => supTypes.includes(type) || (type === "integer" && supTypes.includes("number")))) {
 		return false;
 	}
 	if ("const" in sub || Array.isArray(sub.enum)) return true;
@@ -338,7 +338,7 @@ function objectFits(sub: Schema, sup: Schema): boolean {
 	}
 	if (sup.additionalProperties === false) {
 		if (sub.additionalProperties !== false) return false;
-		if (Object.keys(subProperties).some((key) => !(key in supProperties))) return false;
+		if (Object.keys(subProperties).some(key => !(key in supProperties))) return false;
 	}
 	const supPatterns = asSchema(sup.patternProperties);
 	if (Object.keys(supPatterns).length > 0) {
@@ -368,7 +368,7 @@ function arrayFits(sub: Schema, sup: Schema): boolean {
 		if (!Array.isArray(sub.items) || sub.items.length !== sup.items.length) return false;
 		return sub.items.every((item, index) => fits(item, (sup.items as unknown[])[index]));
 	}
-	if (Array.isArray(sub.items)) return sub.items.every((item) => fits(item, sup.items));
+	if (Array.isArray(sub.items)) return sub.items.every(item => fits(item, sup.items));
 	return fits(sub.items, sup.items);
 }
 

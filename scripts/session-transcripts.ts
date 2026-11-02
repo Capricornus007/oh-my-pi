@@ -29,8 +29,8 @@ function extractTextContent(content: string | Array<{ type: string; text?: strin
 	if (!Array.isArray(content)) return "";
 
 	return content
-		.filter((c) => c.type === "text" && c.text)
-		.map((c) => c.text!)
+		.filter(c => c.type === "text" && c.text)
+		.map(c => c.text!)
 		.join("\n");
 }
 
@@ -76,7 +76,7 @@ interface JsonEvent {
 }
 
 function runSubagent(prompt: string, cwd: string): Promise<{ success: boolean }> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const child = spawn("pi", ["--mode", "json", "--tools", "read,write", "-p", prompt], {
 			cwd,
 			stdio: ["ignore", "pipe", "pipe"],
@@ -86,7 +86,7 @@ function runSubagent(prompt: string, cwd: string): Promise<{ success: boolean }>
 
 		const rl = createInterface({ input: child.stdout });
 
-		rl.on("line", (line) => {
+		rl.on("line", line => {
 			try {
 				const event: JsonEvent = JSON.parse(line);
 
@@ -125,15 +125,15 @@ function runSubagent(prompt: string, cwd: string): Promise<{ success: boolean }>
 			}
 		});
 
-		child.stderr.on("data", (data) => {
+		child.stderr.on("data", data => {
 			process.stderr.write(chalk.red(data.toString()));
 		});
 
-		child.on("close", (code) => {
+		child.on("close", code => {
 			resolve({ success: code === 0 });
 		});
 
-		child.on("error", (err) => {
+		child.on("error", err => {
 			console.error(chalk.red(`  Failed to spawn pi: ${err.message}`));
 			resolve({ success: false });
 		});
@@ -173,7 +173,7 @@ async function main() {
 	}
 
 	const sessionFiles = readdirSync(sessionDir)
-		.filter((f) => f.endsWith(".jsonl"))
+		.filter(f => f.endsWith(".jsonl"))
 		.sort();
 
 	console.log(`Found ${sessionFiles.length} session files in ${sessionDir}`);
@@ -324,7 +324,7 @@ Rules:
 
 	// Collect all created summary files
 	const summaryFiles = readdirSync(outputDir)
-		.filter((f) => f.endsWith(".summary.txt"))
+		.filter(f => f.endsWith(".summary.txt"))
 		.sort();
 
 	console.log(`\n=== Individual Analysis Complete ===`);
@@ -338,7 +338,7 @@ Rules:
 	// Final aggregation step
 	console.log("\nAggregating findings into final summary...");
 
-	const summaryPaths = summaryFiles.map((f) => join(outputDir, f)).join("\n");
+	const summaryPaths = summaryFiles.map(f => join(outputDir, f)).join("\n");
 	const finalSummaryPath = join(outputDir, "FINAL-SUMMARY.txt");
 
 	const aggregationPrompt = `You are aggregating pattern analysis results from multiple summary files.

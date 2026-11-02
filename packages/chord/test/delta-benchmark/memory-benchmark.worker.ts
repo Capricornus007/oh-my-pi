@@ -75,7 +75,7 @@ let acquisitionMs = 0;
 let snapshots: Document[] = [];
 let gcCount = 0;
 let gcMs = 0;
-const observer = new PerformanceObserver((list) => {
+const observer = new PerformanceObserver(list => {
 	for (const entry of list.getEntries()) {
 		gcCount += 1;
 		gcMs += entry.duration;

@@ -8,7 +8,16 @@ import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { ToolExample, TSchema } from "@oh-my-pi/pi-ai";
 import { renderToolInventory } from "@oh-my-pi/pi-ai/dialect";
 import type { DelegationBias } from "@oh-my-pi/pi-catalog/compat/delegation";
-import { $env, getAgentDir, getProjectDir, hasFsCode, isEnoent, logger, prompt, PROVIDER_APP_NAME } from "@oh-my-pi/pi-utils";
+import {
+	$env,
+	getAgentDir,
+	getProjectDir,
+	hasFsCode,
+	isEnoent,
+	logger,
+	prompt,
+	PROVIDER_APP_NAME,
+} from "@oh-my-pi/pi-utils";
 import { contextFileCapability } from "./capability/context-file";
 import { systemPromptCapability } from "./capability/system-prompt";
 import { findConfigFile } from "./config";

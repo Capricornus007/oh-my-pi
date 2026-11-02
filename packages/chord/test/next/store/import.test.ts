@@ -59,12 +59,12 @@ describe("round trips", () => {
 		expect(await store.outbox!.read(store.lastSeq, 10, context)).toEqual([]);
 		expect(await rejection(store.outbox!.read(0, 10, context))).toMatchObject({ code: "invalid" });
 		const record = await store.read(
-			(executor) => findDocument(executor, { namespace: "chord", owner: "app.store", kind: "memo", key: "a" }),
+			executor => findDocument(executor, { namespace: "chord", owner: "app.store", kind: "memo", key: "a" }),
 			context,
 		);
-		const original = parts.find((part) => part.kind === "document.create" && part.record.key === "a");
+		const original = parts.find(part => part.kind === "document.create" && part.record.key === "a");
 		expect(record).toEqual((original as Extract<ArchivePart, { readonly kind: "document.create" }>).record);
-		expect((await store.read((executor) => loadDocument(executor, record!), context)).value).toEqual({ title: "a3" });
+		expect((await store.read(executor => loadDocument(executor, record!), context)).value).toEqual({ title: "a3" });
 	});
 
 	it("a migrating table resumes on the imported store; rows written at version 1 read as the table's", async () => {
@@ -128,13 +128,13 @@ describe("json(...) cells holding null", () => {
 		const staged: StagedWrite[] = [];
 		new TableChanges(old, staged).put({ id: "a", data: null });
 		await source.commit(staged, { admit: () => true, adopt: () => {} }, context);
-		const V2 = evolveTable(V1, (t) =>
-			t.json("data", json(obj({ was: nul() }), { version: 2, migrate: (value) => ({ was: value as null }) })),
+		const V2 = evolveTable(V1, t =>
+			t.json("data", json(obj({ was: nul() }), { version: 2, migrate: value => ({ was: value as null }) })),
 		);
 		const handle = await tableIn(source, V2);
 		expect(await handle.get({ id: "a" }, context)).toEqual({ id: "a", data: { was: null } });
 		const parts = await exported(source);
-		expect(parts.find((part) => (part as ArchivePart).kind === "put")).toMatchObject({
+		expect(parts.find(part => (part as ArchivePart).kind === "put")).toMatchObject({
 			row: { id: "a", data: null },
 			columns: { data: 1 },
 		});
@@ -153,7 +153,7 @@ async function edited(edit: (parts: ArchivePart[]) => unknown[]): Promise<unknow
 /** The index of the first part of `kind` (and table suffix). */
 function first(parts: readonly ArchivePart[], kind: ArchivePart["kind"], table?: string): number {
 	return parts.findIndex(
-		(part) => part.kind === kind && (table === undefined || ("table" in part && part.table.endsWith(table))),
+		part => part.kind === kind && (table === undefined || ("table" in part && part.table.endsWith(table))),
 	);
 }
 
@@ -180,14 +180,14 @@ describe("refusals", () => {
 	it.each<[string, (parts: ArchivePart[]) => unknown[], string]>([
 		[
 			"a part outside the schema",
-			(parts) => [...parts.slice(0, 1), { kind: "put" }, ...parts.slice(1)],
+			parts => [...parts.slice(0, 1), { kind: "put" }, ...parts.slice(1)],
 			"not an archive part",
 		],
-		["no manifest first", (parts) => parts.slice(1), "the manifest comes first"],
-		["a second manifest", (parts) => [parts[0], ...parts], "the manifest comes first, once"],
+		["no manifest first", parts => parts.slice(1), "the manifest comes first"],
+		["a second manifest", parts => [parts[0], ...parts], "the manifest comes first, once"],
 		[
 			"another format",
-			(parts) => {
+			parts => {
 				at(parts, 0).format = 2;
 				return parts;
 			},
@@ -195,7 +195,7 @@ describe("refusals", () => {
 		],
 		[
 			"a newer store schema",
-			(parts) => {
+			parts => {
 				at(parts, 0).schema = 9;
 				return parts;
 			},
@@ -203,7 +203,7 @@ describe("refusals", () => {
 		],
 		[
 			"a lastSeq of 2^53 (a later seq would repeat)",
-			(parts) => {
+			parts => {
 				at(parts, 0).lastSeq = 2 ** 53;
 				return parts;
 			},
@@ -211,18 +211,18 @@ describe("refusals", () => {
 		],
 		[
 			"a document revision beyond 2^53 - 1",
-			(parts) => {
+			parts => {
 				const record = at(parts, first(parts, "document.create")).record as Mutable;
 				record.revision = 2 ** 53;
 				return parts;
 			},
 			"not an archive part",
 		],
-		["a part after the end", (parts) => [...parts, { kind: "end", writes: 0 }], "after the end"],
-		["no end", (parts) => parts.slice(0, -1), "has no end part"],
+		["a part after the end", parts => [...parts, { kind: "end", writes: 0 }], "after the end"],
+		["no end", parts => parts.slice(0, -1), "has no end part"],
 		[
 			"a wrong end count",
-			(parts) => {
+			parts => {
 				at(parts, parts.length - 1).writes = 1;
 				return parts;
 			},
@@ -230,7 +230,7 @@ describe("refusals", () => {
 		],
 		[
 			"a put before its table",
-			(parts) => {
+			parts => {
 				const put = first(parts, "put", ":notes");
 				return [...parts.slice(0, first(parts, "table")), parts[put], ...parts.slice(first(parts, "table"))];
 			},
@@ -238,7 +238,7 @@ describe("refusals", () => {
 		],
 		[
 			"a put after its table's indexes",
-			(parts) => {
+			parts => {
 				const index = first(parts, "index");
 				return [...parts.slice(0, index + 1), parts[index - 1], ...parts.slice(index + 1)];
 			},
@@ -246,7 +246,7 @@ describe("refusals", () => {
 		],
 		[
 			"a table twice",
-			(parts) => {
+			parts => {
 				const table = first(parts, "table", ":notes");
 				return [...parts.slice(0, table), parts[first(parts, "table")], ...parts.slice(table)];
 			},
@@ -254,7 +254,7 @@ describe("refusals", () => {
 		],
 		[
 			"a table after the documents",
-			(parts) => {
+			parts => {
 				const table = first(parts, "table", ":notes");
 				const documents = first(parts, "document.create");
 				return [
@@ -268,7 +268,7 @@ describe("refusals", () => {
 		],
 		[
 			"a table name that is not owner:table",
-			(parts) => {
+			parts => {
 				at(parts, first(parts, "table")).table = "edits";
 				return parts;
 			},
@@ -276,7 +276,7 @@ describe("refusals", () => {
 		],
 		[
 			"a column name breaking the rules",
-			(parts) => {
+			parts => {
 				const table = at(parts, first(parts, "table"));
 				table.columns = { ...(table.columns as Mutable), "bad name": { type: "str", optional: true } };
 				return parts;
@@ -285,7 +285,7 @@ describe("refusals", () => {
 		],
 		[
 			"a row with an unknown column",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "put")).row as Mutable).extra = 1;
 				return parts;
 			},
@@ -293,7 +293,7 @@ describe("refusals", () => {
 		],
 		[
 			"a row without a non-opt column",
-			(parts) => {
+			parts => {
 				delete (at(parts, first(parts, "put")).row as Mutable).path;
 				return parts;
 			},
@@ -301,7 +301,7 @@ describe("refusals", () => {
 		],
 		[
 			"a value of another type",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "put")).row as Mutable).at = "x";
 				return parts;
 			},
@@ -309,7 +309,7 @@ describe("refusals", () => {
 		],
 		[
 			"a json(...) cell newer than its column",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "put")).columns as Mutable).meta = 5;
 				return parts;
 			},
@@ -317,7 +317,7 @@ describe("refusals", () => {
 		],
 		[
 			"a row newer than its table",
-			(parts) => {
+			parts => {
 				at(parts, first(parts, "put")).version = 7;
 				return parts;
 			},
@@ -325,7 +325,7 @@ describe("refusals", () => {
 		],
 		[
 			"an id not below the manifest's next id",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "document.create")).record as Mutable).id = 10_000;
 				return parts;
 			},
@@ -333,7 +333,7 @@ describe("refusals", () => {
 		],
 		[
 			"an id twice",
-			(parts) => {
+			parts => {
 				const [one, two] = all(parts, "document.create");
 				(at(parts, two!).record as Mutable).id = (at(parts, one!).record as Mutable).id!;
 				return parts;
@@ -342,7 +342,7 @@ describe("refusals", () => {
 		],
 		[
 			"a record created after lastSeq",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "document.create")).record as Mutable).createdAt = 10_000;
 				return parts;
 			},
@@ -350,7 +350,7 @@ describe("refusals", () => {
 		],
 		[
 			"a base at another version than its record's",
-			(parts) => {
+			parts => {
 				revisionContent(parts, first(parts, "document.revision")).version = 2;
 				return parts;
 			},
@@ -358,8 +358,8 @@ describe("refusals", () => {
 		],
 		[
 			"a delta without a base at its version",
-			(parts) => {
-				const delta = parts.findIndex((part) => part.kind === "document.revision" && part.content.kind === "delta");
+			parts => {
+				const delta = parts.findIndex(part => part.kind === "document.revision" && part.content.kind === "delta");
 				revisionContent(parts, delta).version = 2;
 				return parts;
 			},
@@ -367,8 +367,8 @@ describe("refusals", () => {
 		],
 		[
 			"a revision out of seq order",
-			(parts) => {
-				const delta = parts.findIndex((part) => part.kind === "document.revision" && part.content.kind === "delta");
+			parts => {
+				const delta = parts.findIndex(part => part.kind === "document.revision" && part.content.kind === "delta");
 				at(parts, delta).seq = 1;
 				return parts;
 			},
@@ -376,7 +376,7 @@ describe("refusals", () => {
 		],
 		[
 			"a revision of another record",
-			(parts) => {
+			parts => {
 				at(parts, first(parts, "document.revision")).id = 9_999;
 				return parts;
 			},
@@ -384,12 +384,12 @@ describe("refusals", () => {
 		],
 		[
 			"a live record without revisions",
-			(parts) => parts.filter((_, index) => index !== first(parts, "document.revision")),
+			parts => parts.filter((_, index) => index !== first(parts, "document.revision")),
 			"has no base at its version",
 		],
 		[
 			"revisions of a retired none record",
-			(parts) => {
+			parts => {
 				const record = at(parts, first(parts, "document.create")).record as Mutable;
 				record.retiredAt = record.createdAt!;
 				return parts;
@@ -398,18 +398,18 @@ describe("refusals", () => {
 		],
 		[
 			"a retired rewindable record without its history",
-			(parts) => {
+			parts => {
 				const record = at(parts, first(parts, "document.create")).record as Mutable;
 				record.history = "rewindable";
 				record.retiredAt = record.createdAt!;
 				const id = record.id;
-				return parts.filter((part) => part.kind !== "document.revision" || part.id !== id);
+				return parts.filter(part => part.kind !== "document.revision" || part.id !== id);
 			},
 			"has no base at its version",
 		],
 		[
 			"two live records at one address",
-			(parts) => {
+			parts => {
 				const [one, two] = all(parts, "document.create");
 				(at(parts, two!).record as Mutable).key = (at(parts, one!).record as Mutable).key!;
 				return parts;
@@ -418,7 +418,7 @@ describe("refusals", () => {
 		],
 		[
 			"a record's meta with a NUL",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "document.create")).record as Mutable).meta = "a\u0000b";
 				return parts;
 			},
@@ -426,7 +426,7 @@ describe("refusals", () => {
 		],
 		[
 			"a record's meta with a lone surrogate",
-			(parts) => {
+			parts => {
 				(at(parts, first(parts, "document.create")).record as Mutable).meta = "a\uD800";
 				return parts;
 			},
@@ -488,7 +488,7 @@ describe("refusals", () => {
 		const { context: cancellable, cancel } = withCancel(context);
 		const backend = sqliteBackend(await openNodeSqliteDatabase(":memory:"));
 		const importing = importStore(backend, stalled, cancellable);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		cancel(new Error("stop"));
 		expect(await rejection(importing)).toMatchObject({ code: "aborted" });
 		expect(closed).toBe(true);

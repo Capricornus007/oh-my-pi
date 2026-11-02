@@ -32,10 +32,10 @@ function storedSpan(row: SpanRow): StoredSpan {
 		endedMs: row.ended_ms,
 		attributes: JSON.parse(row.attributes) as SpanAttributes,
 		events: (JSON.parse(row.events) as { name: string; time_ms: number; attributes: SpanAttributes }[]).map(
-			(event) => ({ name: event.name, timeMs: event.time_ms, attributes: event.attributes }),
+			event => ({ name: event.name, timeMs: event.time_ms, attributes: event.attributes }),
 		),
 		links: (JSON.parse(row.links) as { trace_id: string; span_id: string; attributes?: SpanAttributes }[]).map(
-			(link) => ({
+			link => ({
 				traceId: link.trace_id,
 				spanId: link.span_id,
 				...(link.attributes === undefined ? {} : { attributes: link.attributes }),
@@ -105,7 +105,7 @@ export async function findTraces(
 		conditions.push("(started_ms < ? OR (started_ms = ? AND trace_id > ?))");
 		params.push(cursor[0], cursor[0], cursor[1]);
 	}
-	return db.transaction(async (tx) => {
+	return db.transaction(async tx => {
 		const heads = await tx.all<{ trace_id: string; started_ms: number }>(
 			`WITH heads AS (
 			SELECT trace_id, min(started_ms) started_ms FROM telemetry_spans GROUP BY trace_id
@@ -118,7 +118,7 @@ export async function findTraces(
 		if (!heads.length) return { traces: [] };
 		const rows = await tx.all<SpanRow>(
 			"SELECT * FROM telemetry_spans WHERE trace_id IN (SELECT value FROM json_each(?)) ORDER BY started_ms, id",
-			JSON.stringify(heads.map((head) => head.trace_id)),
+			JSON.stringify(heads.map(head => head.trace_id)),
 		);
 		const grouped = new Map<string, StoredSpan[]>();
 		for (const row of rows) {
@@ -128,7 +128,7 @@ export async function findTraces(
 		}
 		const last = heads.at(-1)!;
 		return {
-			traces: heads.map((head) => ({ traceId: head.trace_id, spans: grouped.get(head.trace_id)! })),
+			traces: heads.map(head => ({ traceId: head.trace_id, spans: grouped.get(head.trace_id)! })),
 			...(more ? { cursor: JSON.stringify([last.started_ms, last.trace_id]) } : {}),
 		};
 	});
@@ -157,7 +157,7 @@ export async function findMetrics(db: SqliteDatabase, query: MetricQuery): Promi
 		min: number;
 		max: number;
 	}>(`SELECT * FROM telemetry_metrics WHERE ${conditions.join(" AND ")} ORDER BY interval_ms, series_key`, ...params);
-	return rows.map((row) => ({
+	return rows.map(row => ({
 		intervalMs: row.interval_ms,
 		name: row.name,
 		kind: row.kind,

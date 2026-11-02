@@ -48,7 +48,7 @@ describe("inputs queued behind a failed run", () => {
 		const { harness, root, second } = await failWithQueuedInput("continue");
 		const settled = await second.wait(context);
 		if (settled.status !== "done" || settled.type !== "input") throw new Error(`Unexpected ${settled.status}`);
-		const answer = await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+		const answer = await root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 		expect(textOf(answer?.model?.[0])).toBe("second answer");
 		await harness.close(context);
 	});

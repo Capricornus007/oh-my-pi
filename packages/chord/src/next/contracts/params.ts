@@ -59,7 +59,7 @@ export function readParams(declared: readonly [string, unknown][], path: string)
 
 /** Joins key parts with `|`, each escaped (`\\` and `|`), so two different part lists never join to one key. */
 export function joinKey(parts: readonly string[]): string {
-	return parts.map((part) => part.replaceAll("\\", "\\\\").replaceAll("|", "\\|")).join("|");
+	return parts.map(part => part.replaceAll("\\", "\\\\").replaceAll("|", "\\|")).join("|");
 }
 
 type SchemaNode = { readonly [keyword: string]: JsonValue };
@@ -70,7 +70,7 @@ function isParamSchema(normal: JsonValue): boolean {
 		return Object.keys(node).length === 1 && Array.isArray(node.anyOf) && node.anyOf.every(isStringLiteral);
 	}
 	const allowed = PARAM_KEYWORDS.get(node.type);
-	return allowed !== undefined && Object.keys(node).every((key) => allowed.has(key));
+	return allowed !== undefined && Object.keys(node).every(key => allowed.has(key));
 }
 
 /** Keywords a params field may use, by type. */

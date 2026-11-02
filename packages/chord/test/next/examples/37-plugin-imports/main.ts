@@ -42,7 +42,7 @@ const plugins = createPlugins(
 		roots: [root],
 		kinds: { server: { platform: "node", hostPackages: Object.keys(modules) } },
 		install: { npmCommand: [process.execPath, fileURLToPath(new URL("./fake-npm.mjs", import.meta.url))] },
-		onError: (error) => console.log("plugins:", error.kind),
+		onError: error => console.log("plugins:", error.kind),
 	},
 	context,
 );

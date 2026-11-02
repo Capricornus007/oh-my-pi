@@ -32,7 +32,7 @@ const Pong = local("example.pong", { version: 1, params: {}, members: { n: int()
 const Broken = local("example.broken", { version: 1, params: { id: int() }, members: { n: int() } });
 const Sloppy = local("example.sloppy", { version: 1, params: { id: int() }, members: { n: int() } });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Echo, ({ id }) => ({ id: constant(id), echo: async ({ text }) => text }));
 	host.serve(Broken, () => {
 		throw new Error("broken: missing configuration");
@@ -41,7 +41,7 @@ const facet = defineFacet((host) => {
 	host.serve(Sloppy, () => ({ n: constant(1), extra: constant(2) }) as never);
 });
 // Ping and Pong are served by a second plugin: types with empty params activate at load.
-const cycle = defineFacet((host) => {
+const cycle = defineFacet(host => {
 	host.serve(Ping, (_, self) => ({ n: self.get(Pong, {}).n }));
 	host.serve(Pong, (_, self) => ({ n: self.get(Ping, {}).n }));
 });

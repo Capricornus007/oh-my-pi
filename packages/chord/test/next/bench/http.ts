@@ -21,7 +21,7 @@ const FILE = 100 * 1024 * 1024;
 /** GETs `path` on `port` over `agent`, reading the whole body; resolves with its length. */
 function get(port: number, path: string, agent: Agent): Promise<number> {
 	return new Promise((resolve, reject) => {
-		const req = request({ host: "127.0.0.1", port, path, agent }, (res) => {
+		const req = request({ host: "127.0.0.1", port, path, agent }, res => {
 			let length = 0;
 			res.on("data", (chunk: Buffer) => {
 				length += chunk.length;
@@ -82,7 +82,7 @@ const plain = createServer((req, res) => {
 	res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Length": String(body.length) });
 	res.end(body);
 });
-await new Promise<void>((resolve) => plain.listen(0, "127.0.0.1", resolve));
+await new Promise<void>(resolve => plain.listen(0, "127.0.0.1", resolve));
 const plainPort = (plain.address() as { port: number }).port;
 
 // The component with Chord's own listener: one plugin with the same route and the file.

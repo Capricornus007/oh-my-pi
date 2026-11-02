@@ -112,14 +112,12 @@ export async function buildFacet(
 			plugins: [rules.plugin],
 		});
 	} catch (error) {
-		return failed(
-			((error as BuildFailure).errors ?? [{ text: String(error) }]).map((each) => describe(plugin, each)),
-		);
+		return failed(((error as BuildFailure).errors ?? [{ text: String(error) }]).map(each => describe(plugin, each)));
 	}
 	// Never written: esbuild hands the outputs back.
 	const files = result.outputFiles!;
-	const script = files.find((file) => file.path.endsWith(".js"))!;
-	const css = files.find((file) => file.path.endsWith(".css"));
+	const script = files.find(file => file.path.endsWith(".js"))!;
+	const css = files.find(file => file.path.endsWith(".css"));
 	const source = script.text;
 	const globals = freeGlobals(source);
 	if (globals.length > 0) return failed(globals);
@@ -133,8 +131,8 @@ export async function buildFacet(
 		copied: rules.copied(),
 		...(css === undefined ? {} : { css: { name: basename(css.path), text: css.text } }),
 		assets: files
-			.filter((file) => file !== script && file !== css)
-			.map((file) => ({ name: relative(plugin.dir, file.path), bytes: file.contents })),
+			.filter(file => file !== script && file !== css)
+			.map(file => ({ name: relative(plugin.dir, file.path), bytes: file.contents })),
 	};
 }
 
@@ -212,13 +210,13 @@ class ImportRules {
 
 	constructor(own: Plugin, options: BuildOptions) {
 		this.#own = own;
-		this.#others = (options.plugins ?? []).filter((each) => each.dir !== own.dir);
+		this.#others = (options.plugins ?? []).filter(each => each.dir !== own.dir);
 		this.#options = options;
 		this.#hostPackages = new Set(options.hostPackages);
 		this.plugin = {
 			name: "chord-plugin-imports",
-			setup: (builder) => {
-				builder.onResolve({ filter: /.*/ }, async (args) => {
+			setup: builder => {
+				builder.onResolve({ filter: /.*/ }, async args => {
 					// The plugin's files are resolved here, the entry too: esbuild then gives them no Node module type
 					// (`"type": "module"`), whose interop would read a whole host package for a default import instead
 					// of honouring the `__esModule` an ESM namespace is wrapped with (§3).
@@ -242,7 +240,7 @@ class ImportRules {
 					if (checked !== undefined) return { errors: [{ text: checked }] };
 					return { path: found.path, pluginData: resolved.asset ? ASSET : undefined };
 				});
-				builder.onLoad({ filter: /.*/ }, async (args) => {
+				builder.onLoad({ filter: /.*/ }, async args => {
 					if (args.namespace !== "file") return undefined;
 					const asset = args.pluginData === ASSET;
 					const loader = asset ? "file" : LOADERS[extname(args.path)];
@@ -305,7 +303,7 @@ class ImportRules {
 		if (from.kind === "package") return { kind: "default" };
 		if (specifier.startsWith(".") || isAbsolute(specifier)) return { kind: "path", path: specifier, asset: false };
 		const name = packageName(specifier);
-		const named = name === this.#own.name ? this.#own : this.#others.find((each) => each.name === name);
+		const named = name === this.#own.name ? this.#own : this.#others.find(each => each.name === name);
 		if (named !== undefined) return this.#byName(specifier, named, from);
 		if (from.kind === "copied") {
 			return { kind: "error", text: `"${specifier}": ${copiedRule(from.plugin)}` };
@@ -369,7 +367,7 @@ class ImportRules {
 	#place(path: string): Place {
 		if (path.split(sep).includes("node_modules")) return { kind: "package" };
 		if (inside(this.#own.dir, path)) return { kind: "own" };
-		const other = this.#others.find((each) => inside(each.dir, path));
+		const other = this.#others.find(each => inside(each.dir, path));
 		return other === undefined ? { kind: "outside" } : { kind: "copied", plugin: other };
 	}
 }

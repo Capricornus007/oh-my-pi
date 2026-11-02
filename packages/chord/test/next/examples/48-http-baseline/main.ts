@@ -21,13 +21,13 @@ const http = chordHttp.createHttp(server, { listen: { host: "127.0.0.1", port: 0
 const app = defineFacet<Principal>((_host, self) => {
 	self.contribute(chordHttp.Http, {
 		routes: {
-			"POST /sign-in": async (request) => {
+			"POST /sign-in": async request => {
 				const set = chordHttp.cookie("user", String(await request.json()), { secret, request, sameSite: "Lax" });
 				return { kind: "json", value: "signed in", headers: { "Set-Cookie": set } };
 			},
 		},
 	});
-	self.contribute(chordHttp.Authenticators, (request) => {
+	self.contribute(chordHttp.Authenticators, request => {
 		const name = chordHttp.readCookie(request, "user", secret);
 		return name === undefined ? undefined : { kind: "user", name };
 	});
@@ -56,10 +56,10 @@ console.log(`1. signed in: ${cookie.slice(0, 12)}…`);
 
 /** A request from Ada's browser: her cookie, and what Fetch Metadata says about who made it (`fetch` sets its own). */
 async function browser(label: string, method: string, path: string, headers: Record<string, string> = {}, body = "") {
-	const answer = await new Promise<string>((resolve) => {
-		const sent = request({ host: "127.0.0.1", port, method, path, headers: { cookie, ...headers } }, (response) => {
+	const answer = await new Promise<string>(resolve => {
+		const sent = request({ host: "127.0.0.1", port, method, path, headers: { cookie, ...headers } }, response => {
 			let text = "";
-			response.on("data", (chunk) => {
+			response.on("data", chunk => {
 				text += chunk;
 			});
 			response.on("end", () => resolve(`${response.statusCode} ${text}`));

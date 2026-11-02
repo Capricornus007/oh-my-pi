@@ -16,7 +16,7 @@ import {
 } from "../src/index.ts";
 import { CountingLink, stateFrames } from "./fixtures/counting.ts";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 200): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -37,7 +37,7 @@ const Doc = remote("t.e8-doc", {
 function docFacet(variant: "a" | "b" | "c"): Facet {
 	return {
 		name: "doc",
-		setup: (api) =>
+		setup: api =>
 			api.serve(Doc, (_input, _principal, self) => {
 				const x = self.state("x", num(), 1);
 				const y = self.state("y", str(), "why");
@@ -80,11 +80,11 @@ describe("variants", () => {
 		assert.equal(view(doc).x.value, 1);
 		assert.throws(
 			() => view(doc).y.value,
-			(error) => isChordError(error, "not_in_variant"),
+			error => isChordError(error, "not_in_variant"),
 		);
 		// Every shape the reference shows is readable in full, at the moment it is shown.
 		const failures: unknown[] = [];
-		doc.onShape((shape) => {
+		doc.onShape(shape => {
 			for (const name of ["x", "y"]) {
 				const member = Doc.description.variants[shape.variant ?? ""]?.[name];
 				if (member?.kind !== "state") continue;
@@ -102,7 +102,7 @@ describe("variants", () => {
 		assert.equal(view(doc).x.value, 1);
 		const unit = stateFrames(link.received).slice(before);
 		assert.deepEqual(
-			unit.filter((frame) => frame.as === "snap").map((frame) => frame.m),
+			unit.filter(frame => frame.as === "snap").map(frame => frame.m),
 			["y"],
 			"only the new member's snapshot",
 		);
@@ -110,7 +110,7 @@ describe("variants", () => {
 		await until(() => view(doc).variant === "c");
 		assert.throws(
 			() => view(doc).x.value,
-			(error) => isChordError(error, "not_in_variant"),
+			error => isChordError(error, "not_in_variant"),
 		);
 		assert.equal(view(doc).y.value, "why");
 		assert.deepEqual(failures, []);
@@ -155,11 +155,11 @@ describe("re-hold after a link loss", () => {
 		browser.connect(link, { principal: { kind: "server" } });
 		await joining.ready;
 		assert.equal(doc.status, "live");
-		const hold = link.sent.find((frame) => frame.t === "hold");
+		const hold = link.sent.find(frame => frame.t === "hold");
 		assert.ok(hold?.t === "hold" && hold.again === true, "a re-hold says again");
 		assert.equal(link.count("sent", "hold"), 1, "one hold for both references");
-		const snaps = stateFrames(link.received).filter((frame) => frame.as === "snap");
-		assert.deepEqual(snaps.map((frame) => frame.m).sort(), ["x", "y"], "one snapshot per member");
+		const snaps = stateFrames(link.received).filter(frame => frame.as === "snap");
+		assert.deepEqual(snaps.map(frame => frame.m).sort(), ["x", "y"], "one snapshot per member");
 		// The old hold was released with the link: the server made a fresh object (its cells start over).
 		assert.equal(view(doc).x.value, 1);
 		await browser.close();

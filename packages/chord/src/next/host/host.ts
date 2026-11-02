@@ -429,7 +429,7 @@ const EMPTY_PARAMS: CheckedParams = { params: {}, key: "" };
 export class ChordHost<P extends Principal = Principal, R extends JsonValue = JsonValue> implements Host<P, R> {
 	readonly batch: Batch;
 	readonly timeouts: { readonly close: number; readonly ready: number };
-	readonly backoff = new Backoff((identity) => this.#due(identity));
+	readonly backoff = new Backoff(identity => this.#due(identity));
 	readonly address: Address | undefined;
 	readonly principal: P | undefined;
 	/** This run of the host, sent in every handshake (R20). */
@@ -489,7 +489,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		this.principal = options.principal;
 		this.#principalKey = options.principalKey;
 		this.#onError = options.onError;
-		this.batch = new Batch((error) => this.report(error), options.telemetry?.metrics);
+		this.batch = new Batch(error => this.report(error), options.telemetry?.metrics);
 		this.compression = options.compression;
 		this.#activity = new Activity(this.batch);
 		// `revokedBy` is called with this host's principals only, the `P`s its links stamp.
@@ -499,7 +499,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		this.#destination = new Destination(this.address, this.#routes, this.#parent);
 		// Chord's own: `openStore` made it.
 		this.store = options.store as ChordStore | undefined;
-		this.store?.attach({ failed: (error) => this.#storageFailed(error), batch: this.batch });
+		this.store?.attach({ failed: error => this.#storageFailed(error), batch: this.batch });
 	}
 
 	async load(facets: readonly PluginFacet<P>[], context: Context): Promise<LoadReport> {
@@ -532,8 +532,8 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		this.#publication.resolve();
 		this.#unbound.wakeAll();
 		const objects = [...this.#types.values()]
-			.filter((served) => served.kind === "local" && served.hostLifetime)
-			.map((served) => this.#object(served, EMPTY_PARAMS, undefined, context));
+			.filter(served => served.kind === "local" && served.hostLifetime)
+			.map(served => this.#object(served, EMPTY_PARAMS, undefined, context));
 		await Promise.all(objects.map(({ firstOutcome }) => firstOutcome));
 		if (this.#state === "loading") this.#state = "loaded";
 		return { failed };
@@ -659,7 +659,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		}
 		if (failing.size > 0) return { kind: "failed", failed: failing };
 		const applied = new Set(fresh.map(({ name }) => name));
-		const removed = [...this.#plugins.keys()].filter((name) => !given.has(name));
+		const removed = [...this.#plugins.keys()].filter(name => !given.has(name));
 		const reloaded = new Set([...applied, ...removed]);
 		const fates: PlannedFate[] = [];
 		const recorded: RecordedFactory[] = [];
@@ -769,7 +769,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		const names = new Set<string>();
 		for (const [name, served] of types) if (published.has(served.plugin)) names.add(name);
 		for (const [name, { plugin }] of staged.registries) if (published.has(plugin)) names.add(name);
-		const started = plan.fates.map((fate) => this.#startFate(fate));
+		const started = plan.fates.map(fate => this.#startFate(fate));
 		for (const type of types.values()) {
 			if (type.kind === "local" && type.hostLifetime) this.#object(type, EMPTY_PARAMS, undefined, context);
 		}
@@ -878,8 +878,8 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		);
 		this.#routes.set(Kind.kind, route);
 		return {
-			retry: (address) => route.retry(address.key),
-			suspend: (address) => route.suspend(address.key),
+			retry: address => route.retry(address.key),
+			suspend: address => route.suspend(address.key),
 		};
 	}
 
@@ -973,7 +973,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 	registryRecord(name: string): RegistryRecord {
 		let record = this.#registries.get(name);
 		if (record === undefined) {
-			record = new RegistryRecord(name, this.batch, (error) => this.report(error));
+			record = new RegistryRecord(name, this.batch, error => this.report(error));
 			this.#registries.set(name, record);
 		}
 		return record;
@@ -1164,8 +1164,8 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 	 * where the object is on this host ("…" for other hosts'), then `closing`.
 	 */
 	cycle(chain: readonly string[], id: string, closing: readonly string[]): ChordError {
-		const labels = new Map([...this.#objects.values()].map((each) => [each.activationId, each.label]));
-		const cycle = chain.slice(chain.indexOf(id)).map((entry) => labels.get(entry) ?? "…");
+		const labels = new Map([...this.#objects.values()].map(each => [each.activationId, each.label]));
+		const cycle = chain.slice(chain.indexOf(id)).map(entry => labels.get(entry) ?? "…");
 		return invalid("cycle", `dependency cycle: ${[...cycle, ...closing].join(" → ")}`);
 	}
 
@@ -1313,10 +1313,13 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		this.#links.add(made);
 		if (this.#ticking === undefined) {
 			const { ping, close } = this.#heartbeat;
-			this.#ticking = setInterval(() => {
-				const now = Date.now();
-				for (const each of [...this.#links]) each.tick(now, ping, close);
-			}, Math.min(ping, close) / 10);
+			this.#ticking = setInterval(
+				() => {
+					const now = Date.now();
+					for (const each of [...this.#links]) each.tick(now, ping, close);
+				},
+				Math.min(ping, close) / 10,
+			);
 		}
 		return made;
 	}
@@ -1375,7 +1378,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 		this.#publication.resolve();
 		this.backoff.clear();
 		// Every object is sealed before any teardown releases a reference, so none ends in the background.
-		const teardowns = [...this.#objects.values()].reverse().map((object) => object.stop());
+		const teardowns = [...this.#objects.values()].reverse().map(object => object.stop());
 		await Promise.all(this.#endings.values());
 		const failures: CloseFailed[] = [];
 		for (const tearDown of teardowns) failures.push(...(await tearDown()));
@@ -1396,7 +1399,7 @@ export class ChordHost<P extends Principal = Principal, R extends JsonValue = Js
 
 	/** Every holder of the parent path, the unplaced one and every route's paths: this host's requests over links. */
 	#pathHolders(): Upstream[] {
-		const routed = [...this.#routes.values()].flatMap((route) => route.holders());
+		const routed = [...this.#routes.values()].flatMap(route => route.holders());
 		return [...this.#parent.holders(), ...this.unplaced.holders(), ...routed];
 	}
 
@@ -1478,7 +1481,7 @@ async function untilUsable(value: RegistryValueSource, usable: () => boolean, co
 	const release = value.wait({
 		dependencyMoved: () => queueMicrotask(() => changed.resolve()),
 		// The value closed with its host: the wait ends with the close's error.
-		closed: (error) => changed.reject(error),
+		closed: error => changed.reject(error),
 	});
 	try {
 		while (!usable()) {

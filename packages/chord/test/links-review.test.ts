@@ -19,8 +19,8 @@ import {
 	remote,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 100): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -28,7 +28,7 @@ async function until(check: () => boolean, attempts = 100): Promise<void> {
 
 function latch() {
 	let open = () => {};
-	const promise = new Promise<void>((resolve) => {
+	const promise = new Promise<void>(resolve => {
 		open = resolve;
 	});
 	return { promise, open };
@@ -111,15 +111,15 @@ function cluster() {
 			const [down, raw] = memoryLinkPair();
 			server.accept(down, { principal });
 			const frames: Frame[] = [];
-			raw.receive((frame) => frames.push(frame));
+			raw.receive(frame => frames.push(frame));
 			raw.send({ t: "hello", protocol: PROTOCOL_VERSION, name: "raw", kind: "client", codeVersion: 0 });
 			return { raw, frames };
 		},
 	};
 	server.route("session:", {
-		principal: (name) => ({ host: name }),
+		principal: name => ({ host: name }),
 		authorize: () => true,
-		resolve: async (name) => {
+		resolve: async name => {
 			await state.resolveGate;
 			const existing = workers.get(name);
 			if (existing !== undefined) return existing.link;
@@ -143,7 +143,7 @@ function cluster() {
 					variant: "main",
 					count,
 					add: (delta: number, ctx: Ctx) => {
-						count.change(ctx, (draft) => {
+						count.change(ctx, draft => {
 							draft.n += delta;
 						});
 						return count.value.n;
@@ -196,7 +196,7 @@ describe("links review: identity and stamping", () => {
 		});
 		const facet = (version: number): Facet => ({
 			name: "echo",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Echo, (_input, _principal, self) => {
 					self.state("n", num(), 0, { version });
 					return { variant: "main", root: (ctx: Ctx) => ctx.rootId };
@@ -213,7 +213,7 @@ describe("links review: identity and stamping", () => {
 		});
 		const go = latch();
 		let rootId = "";
-		const pinned = worker.root(async (ctx) => {
+		const pinned = worker.root(async ctx => {
 			rootId = (await (await ctx.get(Echo, {})).root(ctx)) as string;
 			await go.promise;
 		});
@@ -225,7 +225,7 @@ describe("links review: identity and stamping", () => {
 		raw.send({ t: "hello", protocol: PROTOCOL_VERSION, name: "raw", kind: "client", codeVersion: 0 });
 		raw.send({ t: "root_end", rootId });
 		await sleep(10);
-		await assert.rejects(server.reload([facet(2)], { gateDeadline: 40 }), (error) => {
+		await assert.rejects(server.reload([facet(2)], { gateDeadline: 40 }), error => {
 			assert.ok(isChordError(error, "aborted") && error.reason === "gate_deadline");
 			assert.ok(error.message.includes(rootId));
 			return true;
@@ -238,7 +238,7 @@ describe("links review: identity and stamping", () => {
 		const c = cluster();
 		const gate = latch();
 		c.resolveGate = gate.promise;
-		const browser = c.browser({ guest: "g", revision: 1 }, (p) => ({ ...(p as object), revision: 2 }));
+		const browser = c.browser({ guest: "g", revision: 1 }, p => ({ ...(p as object), revision: 2 }));
 		const counter = browser.host.hold(Counter, { name: "a" });
 		await sleep(5);
 		await c.server.invalidatePrincipal({ guest: "g" });
@@ -273,7 +273,7 @@ describe("links review: relay ownership", () => {
 		await sleep(10);
 		browser.up.close();
 		await until(() => c.log.includes("slow aborted"));
-		const down = [...internals(c.server).connections].find((connection) => connection.peer.name === "session:S1")!;
+		const down = [...internals(c.server).connections].find(connection => connection.peer.name === "session:S1")!;
 		assert.equal(down.relayedCalls.size, 0);
 	});
 
@@ -286,12 +286,12 @@ describe("links review: relay ownership", () => {
 		raw.send({ t: "unsub", hold: 1 });
 		await sleep(5);
 		gate.open();
-		await until(() => c.workers.get("session:S1")?.link.sent.some((frame) => frame.t === "hold") === true);
+		await until(() => c.workers.get("session:S1")?.link.sent.some(frame => frame.t === "hold") === true);
 		await sleep(10);
 		const sent = c.workers.get("session:S1")!.link.sent;
-		const hold = sent.find((frame) => frame.t === "hold");
+		const hold = sent.find(frame => frame.t === "hold");
 		assert.ok(hold?.t === "hold" && hold.state === false);
-		assert.ok(!sent.some((frame) => frame.t === "sub" || frame.t === "unsub"));
+		assert.ok(!sent.some(frame => frame.t === "sub" || frame.t === "unsub"));
 	});
 
 	it("#9 a release while the route resolves settles waiting calls and forwards nothing", async () => {
@@ -303,12 +303,12 @@ describe("links review: relay ownership", () => {
 		raw.send({ t: "call", id: 2, hold: 1, member: "add", args: 1 });
 		await sleep(5);
 		raw.send({ t: "release", id: 1 });
-		await until(() => frames.some((frame) => frame.t === "result" && frame.id === 2));
-		const result = frames.find((frame) => frame.t === "result" && frame.id === 2);
+		await until(() => frames.some(frame => frame.t === "result" && frame.id === 2));
+		const result = frames.find(frame => frame.t === "result" && frame.id === 2);
 		assert.ok(result?.t === "result" && result.error !== undefined);
 		gate.open();
 		await sleep(10);
-		assert.ok(!(c.workers.get("session:S1")?.link.sent ?? []).some((frame) => frame.t === "hold"));
+		assert.ok(!(c.workers.get("session:S1")?.link.sent ?? []).some(frame => frame.t === "hold"));
 	});
 
 	it("a release while the route resolves still admits the resolved worker: its references upstream go live", async () => {
@@ -340,7 +340,7 @@ describe("links review: relay ownership", () => {
 		const counter = browser.host.hold(Counter, { name: "a" });
 		counter.count.subscribe(() => {});
 		await counter.add(1);
-		const down = [...internals(c.server).connections].find((connection) => connection.peer.name === "session:S1")!;
+		const down = [...internals(c.server).connections].find(connection => connection.peer.name === "session:S1")!;
 		assert.equal(down.relayedRefs.size, 1);
 		browser.up.close();
 		await until(() => down.relayedRefs.size === 0);
@@ -358,7 +358,7 @@ describe("links review: relay ownership", () => {
 		assert.equal(c.workers.size, 1);
 		assert.deepEqual(c.principals, [{ guest: "g1" }, { guest: "g2" }]);
 		one.up.close();
-		await until(() => c.log.filter((entry) => entry === "close same").length === 1);
+		await until(() => c.log.filter(entry => entry === "close same").length === 1);
 		assert.equal(await b.add(1), 6);
 	});
 
@@ -384,7 +384,7 @@ describe("links review: relay ownership", () => {
 			}),
 			{
 				accepts: {
-					1: (current) => {
+					1: current => {
 						const view = current.view as {
 							value: { body: string };
 							events: (fn: (event: never) => void) => () => void;
@@ -431,14 +431,14 @@ describe("links review: cross-host reload", () => {
 	});
 	const greeterFacet = (greeting: string): Facet => ({
 		name: "greeter",
-		setup: (api) => api.serve(Greeter, () => ({ variant: "main", greet: (name: string) => `${greeting} ${name}` })),
+		setup: api => api.serve(Greeter, () => ({ variant: "main", greet: (name: string) => `${greeting} ${name}` })),
 	});
 
 	function setup(options: { slowLoad?: Promise<void> } = {}) {
 		const modules = new Map<string, Facet>([["greeter", greeterFacet("v1")]]);
-		const loader: FacetLoader = async (names) => {
+		const loader: FacetLoader = async names => {
 			await options.slowLoad;
-			return names.map((name) => modules.get(String(name))!);
+			return names.map(name => modules.get(String(name))!);
 		};
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 		const connect = () => {
@@ -464,7 +464,7 @@ describe("links review: cross-host reload", () => {
 		const { server, worker, modules } = setup({ slowLoad: gate.promise });
 		await tick();
 		modules.set("greeter", greeterFacet("v2"));
-		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] }, voteDeadline: 30 }), (error) =>
+		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] }, voteDeadline: 30 }), error =>
 			isChordError(error, "aborted"),
 		);
 		gate.open();
@@ -494,13 +494,13 @@ describe("links review: cross-host reload", () => {
 		const Caller = local("t.caller", { version: 1, input: obj({}, { open: true }) });
 		const callerFacet = (active: boolean): Facet => ({
 			name: "caller",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					Caller,
 					(_input, _principal, self) => {
 						const greeter = self.get(Greeter, {});
 						if (active) {
-							self.task(async (ctx) => {
+							self.task(async ctx => {
 								results.push(
 									await greeter.greet("t", ctx).catch((error: unknown) => (error as { code: string }).code),
 								);
@@ -524,7 +524,7 @@ describe("links review: cross-host reload", () => {
 		await tick();
 		modules.set("greeter", greeterFacet("v2"));
 		// The commit frame is lost: the link dies right after the child voted.
-		link.closeOn = (frame) => frame.t === "commit";
+		link.closeOn = frame => frame.t === "commit";
 		await server.reload([], { remote: { "session:": ["greeter"] } });
 		await until(() => !internals(worker).reloading);
 		assert.notEqual(worker.codeVersion, server.codeVersion);
@@ -552,7 +552,7 @@ describe("links review: cross-host reload", () => {
 		});
 		const echoFacet = (version: number): Facet => ({
 			name: "echo",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Echo, (_input, _principal, self) => {
 					self.state("n", num(), 0, { version });
 					return { variant: "main", ping: () => {} };
@@ -569,7 +569,7 @@ describe("links review: cross-host reload", () => {
 				await (await ctx.get(Echo, {})).ping(ctx);
 			},
 		}));
-		await server.root((ctx) => server.hold(Bouncer, {}).bounce(ctx));
+		await server.root(ctx => server.hold(Bouncer, {}).bounce(ctx));
 		await sleep(10);
 		await server.reload([echoFacet(2)], { gateDeadline: 200 });
 	});

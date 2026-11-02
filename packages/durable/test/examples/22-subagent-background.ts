@@ -91,7 +91,7 @@ const Reporter = defineTask<ReporterInput, ReporterState, null>({
 			const submission = await subagent.submit({ ...request, requestId: `subagent:${reporter.id}` }, taskContext);
 			const settled = await submission.wait(taskContext);
 			// One commit decides the report and records the answer as delivered, so a restart does not decide again.
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				const next = (report?: string) => ({ status: "running", checkpoint: { phase: "report", report } }) as const;
 				// `aborted`: stopped, or withdrawn while queued. Nothing to report.
 				if (settled.status === "unanswered") {
@@ -127,7 +127,7 @@ const Reporter = defineTask<ReporterInput, ReporterState, null>({
 });
 
 function textOf(message: AssistantMessage | undefined): string {
-	return (message?.content ?? []).flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
+	return (message?.content ?? []).flatMap(c => (c.type === "text" ? [c.text] : [])).join("");
 }
 
 const subagentTool = defineTool({
@@ -181,7 +181,7 @@ const subagentTool = defineTool({
 		if (message === undefined) return reply(`${action} needs a message.`);
 
 		// spawn and send: one commit starts a reporter for the message.
-		const result = await api.commit(async (tx) => {
+		const result = await api.commit(async tx => {
 			const state = await tx.doc(Subagents, api.conversationId);
 			// Both tasks belong to the main conversation and are background: its Esc and idle waits skip them.
 			const background = { ownership: { kind: "conversation" }, background: true } as const;
@@ -226,11 +226,11 @@ if (process.env.OPENAI_API_KEY !== undefined) {
 	const call = (input: Record<string, string>) =>
 		fauxAssistantMessage([fauxToolCall("subagent", input)], { stopReason: "toolUse" });
 	const answer = (text: string) => fauxAssistantMessage([fauxText(text)]);
-	const route: FauxResponseStep = (request) => {
+	const route: FauxResponseStep = request => {
 		// System messages carry prompt changes; the request is about the message before them.
-		const last = request.messages.findLast((message) => message.role !== "system")!;
+		const last = request.messages.findLast(message => message.role !== "system")!;
 		const content = typeof last.content === "string" ? [{ type: "text", text: last.content }] : last.content;
-		const text = content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+		const text = content.flatMap(part => (part.type === "text" ? [part.text] : [])).join("");
 		// The main agent repeats what the tool said.
 		if (last.role === "toolResult") return answer(`OK. ${text}`);
 		// The main agent.
@@ -279,17 +279,17 @@ const magenta = color(35);
 function contentText(content: string | readonly { type: string; text?: string }[]): string {
 	return typeof content === "string"
 		? content
-		: content.flatMap((part) => (part.text === undefined ? [] : [part.text])).join("");
+		: content.flatMap(part => (part.text === undefined ? [] : [part.text])).join("");
 }
 
 /** Print the main conversation's messages as they are committed. Subagents work in their own conversations. */
 async function follow(harness: Harness, id: ConversationId): Promise<void> {
 	const watch = await (await harness.conversation(id, context))!.watch(context);
 	let newest = watch.value.entries.at(-1)?.id ?? 0;
-	watch.start(async (call) => {
+	watch.start(async call => {
 		if (call.kind !== "value") return;
 		const { value } = call;
-		const entries = value.entries.filter((entry) => entry.id > newest);
+		const entries = value.entries.filter(entry => entry.id > newest);
 		newest = value.entries.at(-1)?.id ?? newest;
 		for (const entry of entries) {
 			const message = entry.model?.[0];
@@ -327,12 +327,11 @@ const settle = async (): Promise<void> => {
 	for (const id of Object.values(reporters)) await harness.waitForTask(id, context);
 	await root.waitForIdle(context);
 	// Event callbacks run after their commit; let the last ones print. A slow machine may need longer.
-	await new Promise((resolve) => setTimeout(resolve, 50));
+	await new Promise(resolve => setTimeout(resolve, 50));
 };
 /** Poll `check` for up to 10 seconds. */
 const until = async (check: () => Promise<boolean>): Promise<void> => {
-	for (let tries = 0; tries < 1000 && !(await check()); tries++)
-		await new Promise((resolve) => setTimeout(resolve, 10));
+	for (let tries = 0; tries < 1000 && !(await check()); tries++) await new Promise(resolve => setTimeout(resolve, 10));
 };
 const working = async (name: string): Promise<boolean> => {
 	const agent = (await harness.snapshot(Subagents, root.id, context))?.agents[name];

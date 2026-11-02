@@ -21,8 +21,8 @@ import {
 } from "../src/index.ts";
 import { CountingLink, stateFrames } from "./fixtures/counting.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 200): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -50,7 +50,7 @@ function serveNotes(host: Host): void {
 			notes,
 			title,
 			add: (text: string, ctx: Ctx) => {
-				notes.change(ctx, (draft) => {
+				notes.change(ctx, draft => {
 					draft.push(text);
 				});
 			},
@@ -79,7 +79,7 @@ function setup(
 		name: "browser",
 		kind: "client",
 		upstream: { link, principal: { kind: "server" } },
-		onError: (error) => errors.push(error),
+		onError: error => errors.push(error),
 		...(options.linger === undefined ? {} : { linger: options.linger }),
 	});
 	return { server, browser, link, errors };
@@ -91,20 +91,20 @@ describe("shared bindings: traffic", () => {
 		const Panel = local("t.e8-panel", { version: 1, input: obj({}, { open: true }), members: { count: num() } });
 		browser.serve(Panel, (_input, _principal, self) => {
 			const notes = self.get(Notes, {});
-			return { count: self.derive([notes.notes], (list) => list.length) };
+			return { count: self.derive([notes.notes], list => list.length) };
 		});
 		const a = browser.hold(Notes, {});
 		const b = browser.hold(Notes, { list: "main" });
 		const panel = browser.hold(Panel, {});
 		await Promise.all([a.ready, b.ready, panel.ready]);
-		const viaCtx = await browser.root(async (ctx) => {
+		const viaCtx = await browser.root(async ctx => {
 			const ref = await ctx.get(Notes, {});
 			return ref.title.value;
 		});
 		assert.equal(viaCtx, "untitled");
 		assert.equal(link.count("sent", "hold"), 1, "one hold for every reference");
-		const snaps = stateFrames(link.received).filter((frame) => frame.as === "snap");
-		assert.deepEqual(snaps.map((frame) => frame.m).sort(), ["notes", "title"]);
+		const snaps = stateFrames(link.received).filter(frame => frame.as === "snap");
+		assert.deepEqual(snaps.map(frame => frame.m).sort(), ["notes", "title"]);
 
 		const before = stateFrames(link.received).length;
 		await a.add("milk");
@@ -166,8 +166,8 @@ describe("shared bindings: linger", () => {
 		assert.equal(link.count("sent", "release"), 0);
 		b.release();
 		await until(() => link.count("sent", "release") === 1);
-		const release = link.sent.find((frame) => frame.t === "release");
-		const holdOfA = link.sent.find((frame) => frame.t === "hold" && (frame.input as { list: string }).list === "a");
+		const release = link.sent.find(frame => frame.t === "release");
+		const holdOfA = link.sent.find(frame => frame.t === "hold" && (frame.input as { list: string }).list === "a");
 		assert.equal(release?.t === "release" ? release.id : 0, holdOfA?.t === "hold" ? holdOfA.id : -1);
 		await browser.close();
 		await server.close();
@@ -199,7 +199,7 @@ describe("shared bindings: identity", () => {
 				const title = self.state("title", str(), "untitled");
 				return { variant: "main", notes, title, add: () => {}, rename: () => {}, clear: () => {} };
 			},
-			{ accepts: { 1: (current) => current } },
+			{ accepts: { 1: current => current } },
 		);
 		// A worker holds the server's objects; the principals it forwards key its bindings.
 		const [down, up] = memoryLinkPair();
@@ -219,7 +219,7 @@ describe("shared bindings: identity", () => {
 			worker.hold(Notes, {}, { principal: { user: "a", grant: 2 } }),
 			worker.hold(NotesV2, {}),
 		];
-		await Promise.all(refs.map((ref) => ref.ready));
+		await Promise.all(refs.map(ref => ref.ready));
 		// host (shared by two inputs), user a grant 1 (shared by two key orders), user a grant 2, the v2 contract.
 		assert.equal(link.count("sent", "hold"), 4);
 		await worker.close();
@@ -245,7 +245,7 @@ describe("hydration over a link", () => {
 			if (variant === "broken") {
 				const source = self.state("source", str(), "not a number");
 				// A derivation exposed under a number schema: its snapshot fails validation.
-				return { variant: "broken", n: self.derive([source], (text) => text as unknown as number) };
+				return { variant: "broken", n: self.derive([source], text => text as unknown as number) };
 			}
 			const none = self.state("none", nul(), null);
 			const empty = self.state("empty", arr(str()), []);
@@ -276,10 +276,10 @@ describe("hydration over a link", () => {
 		assert.throws(
 			// @ts-expect-error `none` is not a member of the bare variant (a narrowed reference does not show it).
 			() => bare.none.value,
-			(error) => isChordError(error, "not_in_variant"),
+			error => isChordError(error, "not_in_variant"),
 		);
 		const broken = browser.hold(Matrix, { variant: "broken" });
-		await assert.rejects(broken.ready, (error) => isChordError(error, "invalid"));
+		await assert.rejects(broken.ready, error => isChordError(error, "invalid"));
 		assert.equal(broken.status, "gone");
 		await browser.close();
 		await server.close();
@@ -290,7 +290,7 @@ describe("hydration over a link", () => {
 		const notes = browser.hold(Notes, {});
 		assert.throws(
 			() => notes.notes.value,
-			(error) => isChordError(error, "not_ready"),
+			error => isChordError(error, "not_ready"),
 		);
 		await notes.ready;
 		assert.deepEqual(notes.notes.value, []);
@@ -305,12 +305,12 @@ describe("method-only references (state: false)", () => {
 		const caller = browser.hold(Notes, {}, { state: false });
 		await caller.ready;
 		await caller.add("x");
-		const hold = link.sent.find((frame) => frame.t === "hold");
+		const hold = link.sent.find(frame => frame.t === "hold");
 		assert.ok(hold?.t === "hold" && hold.state === false);
 		assert.deepEqual(stateFrames(link.received), []);
 		assert.throws(
 			() => caller.notes.value,
-			(error) => isChordError(error, "not_ready"),
+			error => isChordError(error, "not_ready"),
 		);
 
 		const viewer = browser.hold(Notes, {});
@@ -342,9 +342,9 @@ describe("origins of client holds", () => {
 		let worker: HostImpl | undefined;
 		let toWorker: CountingLink | undefined;
 		server.route("session:", {
-			principal: (name) => ({ host: name }),
+			principal: name => ({ host: name }),
 			authorize: () => true,
-			resolve: async (name) => {
+			resolve: async name => {
 				if (toWorker !== undefined) return toWorker;
 				const [down, up] = memoryLinkPair();
 				const created = new HostImpl({
@@ -381,7 +381,7 @@ describe("origins of client holds", () => {
 			return { host, up };
 		};
 		const origins = () =>
-			[...(worker?.upstream?.served.values() ?? [])].map((served) =>
+			[...(worker?.upstream?.served.values() ?? [])].map(served =>
 				served.kind === "local" ? served.origin : undefined,
 			);
 		return { server, browser, origins, sentToWorker: () => toWorker?.sent ?? [] };
@@ -397,21 +397,21 @@ describe("origins of client holds", () => {
 		await own.ready;
 		const holds = c.sentToWorker().filter((frame): frame is Extract<Frame, { t: "hold" }> => frame.t === "hold");
 		assert.equal(holds.length, 3);
-		const relayed = holds.filter((frame) => frame.origin !== undefined);
+		const relayed = holds.filter(frame => frame.origin !== undefined);
 		assert.equal(relayed.length, 2);
 		assert.notEqual(relayed[0]!.origin, relayed[1]!.origin, "two tabs, two origins");
-		assert.equal(holds.filter((frame) => frame.origin === undefined).length, 1);
+		assert.equal(holds.filter(frame => frame.origin === undefined).length, 1);
 
 		// Disconnect is departure: the worker loses that origin at once; a reconnect holds under a new id.
 		const before = new Set(c.origins());
 		one.up.close();
-		await until(() => c.origins().filter((origin) => origin !== undefined).length === 1);
+		await until(() => c.origins().filter(origin => origin !== undefined).length === 1);
 		const three = c.browser();
 		await three.host.hold(Counter, { session: "S1" }).ready;
-		const after = c.origins().filter((origin) => origin !== undefined);
+		const after = c.origins().filter(origin => origin !== undefined);
 		assert.equal(after.length, 2);
 		assert.ok(
-			after.some((origin) => !before.has(origin)),
+			after.some(origin => !before.has(origin)),
 			"a new connection gets a new id",
 		);
 		await c.server.close();
@@ -431,8 +431,8 @@ describe("origins of client holds", () => {
 			input: { session: "S1" },
 			origin: "spoofed",
 		});
-		await until(() => c.sentToWorker().some((frame) => frame.t === "hold"));
-		const hold = c.sentToWorker().find((frame) => frame.t === "hold");
+		await until(() => c.sentToWorker().some(frame => frame.t === "hold"));
+		const hold = c.sentToWorker().find(frame => frame.t === "hold");
 		assert.ok(hold?.t === "hold" && hold.origin !== undefined && hold.origin !== "spoofed");
 		await c.server.close();
 	});
@@ -442,13 +442,13 @@ describe("protocol version 4", () => {
 	it("a version 3 peer is refused; shapes carry no code version", async () => {
 		const { server, browser, link } = setup();
 		await browser.hold(Notes, {}).ready;
-		const shape = link.received.find((frame) => frame.t === "shape");
+		const shape = link.received.find(frame => frame.t === "shape");
 		assert.ok(shape !== undefined && !("codeVersion" in shape));
 		assert.deepEqual(shape.t === "shape" ? [...shape.state].sort() : [], ["notes", "title"]);
 
 		const [down, raw] = memoryLinkPair();
 		server.accept(down, { principal: { user: "old" } });
-		const closed = new Promise<string>((resolve) => (raw as Link).onClose(resolve));
+		const closed = new Promise<string>(resolve => (raw as Link).onClose(resolve));
 		raw.receive(() => {});
 		raw.send({ t: "hello", protocol: 3, name: "old", kind: "client", codeVersion: 0 });
 		assert.equal(await closed, `protocol-version ${PROTOCOL_VERSION}`);

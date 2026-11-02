@@ -36,7 +36,7 @@ const timings: number[] = [];
 const Timing = defineExtension({
 	name: "timing",
 	wraps: [
-		wrapTool(createBashTool(), (bash) => ({
+		wrapTool(createBashTool(), bash => ({
 			...bash,
 			execute: async (args, api, callContext) => {
 				const start = Date.now();
@@ -90,8 +90,8 @@ const python = await harness.createConversation(
 async function probeBash(conversation: Conversation): Promise<string> {
 	await (await conversation.submit({ type: "input", content: "Which venv?" }, context)).wait(context);
 	const page = await conversation.entries({}, 10, undefined, context);
-	const result = page.items.find((entry) => ToolResultEntry.is(entry))?.model?.[0] as ToolResultMessage;
-	return result.content.map((part) => (part.type === "text" ? part.text.trim() : "")).join("");
+	const result = page.items.find(entry => ToolResultEntry.is(entry))?.model?.[0] as ToolResultMessage;
+	return result.content.map(part => (part.type === "text" ? part.text.trim() : "")).join("");
 }
 
 console.log("plain conversation:", await probeBash(plain));

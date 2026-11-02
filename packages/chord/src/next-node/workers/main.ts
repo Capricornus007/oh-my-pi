@@ -93,11 +93,11 @@ class Worker {
 		this.#port = port;
 		this.#options = options;
 		this.#context = withAbortSignal(this.#controller.signal, BACKGROUND_CONTEXT);
-		port.on("message", (message) => this.#message(controlOf<ToWorker>(message)));
+		port.on("message", message => this.#message(controlOf<ToWorker>(message)));
 		port.on("disconnect", () => void this.#shutdown());
 		for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => void this.#shutdown());
-		process.once("uncaughtException", (error) => this.#fatal(error));
-		process.once("unhandledRejection", (error) => this.#fatal(error));
+		process.once("uncaughtException", error => this.#fatal(error));
+		process.once("unhandledRejection", error => this.#fatal(error));
 	}
 
 	/** Takes the lock, makes the parent link, runs `fn`, then reports `ready` and applies reloads. */
@@ -135,7 +135,7 @@ class Worker {
 			start: message.start,
 			parent,
 			plugins: loading,
-			onClose: (closer) => void this.#closers.push(closer),
+			onClose: closer => void this.#closers.push(closer),
 		};
 		const result = await fn(start, this.#context);
 		if (this.#stopping) return;
@@ -143,7 +143,7 @@ class Worker {
 		await this.#follow();
 		this.#ready = true;
 		const failed = new Set(report.failed.map(({ plugin }) => plugin));
-		const added = message.scripts.map(({ plugin }) => plugin.name).filter((name) => !failed.has(name));
+		const added = message.scripts.map(({ plugin }) => plugin.name).filter(name => !failed.has(name));
 		const loaded: ReloadReport = { plugins: { added, changed: [], removed: [] }, failed: report.failed, objects: [] };
 		this.#idle = this.#isIdle();
 		this.#send({ kind: "ready", idle: this.#idle, report: crossedReport(loaded) });
@@ -166,7 +166,7 @@ class Worker {
 		if (this.#reloading) return false;
 		const activity = this.#loaded?.host.activity.value;
 		if (activity !== undefined && activity.references + activity.jobs + activity.lingering > 0) return false;
-		return Object.values(this.#busy?.value ?? {}).every((count) => count === 0);
+		return Object.values(this.#busy?.value ?? {}).every(count => count === 0);
 	}
 
 	/** Reports the idle state when it flipped (after `ready`). */

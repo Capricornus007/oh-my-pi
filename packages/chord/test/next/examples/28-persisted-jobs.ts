@@ -44,24 +44,23 @@ const Notes = local("notes.store", {
 let behaviour: "hang" | "finish" = "hang";
 let jobs: JobHandle<{ path: string }, { count: number }, { done: number }> | undefined;
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Notes, (_, self) => {
 		const imports = self.job(ImportJob, {
 			run: async ({ path }, ctx) => {
 				console.log(`  run ${path}: from done = ${ctx.state.value.done}`);
 				// Progress, deferred: published at once, stored within 100 ms (or with the next immediate change).
 				await ctx.state.change(
-					(draft) => {
+					draft => {
 						draft.done += 1;
 					},
 					ctx,
 					{ persistence: { kind: "deferred", withinMs: 100 } },
 				);
-				if (behaviour === "hang")
-					await new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", resolve));
+				if (behaviour === "hang") await new Promise(resolve => ctx.abortSignal?.addEventListener("abort", resolve));
 				return { count: ctx.state.value.done };
 			},
-			finish: async (outcome) => {
+			finish: async outcome => {
 				console.log(`  finish: ${outcome.kind}`, outcome.kind === "done" ? outcome.result : outcome.error.kind);
 			},
 		});
@@ -78,14 +77,14 @@ async function process(path: string): Promise<{ store: Store; host: Host }> {
 	const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(path)), context);
 	const host = createHost({
 		store,
-		onError: (error) => console.log("  onError:", error.kind),
+		onError: error => console.log("  onError:", error.kind),
 		closeTimeout: 100,
 	});
 	await host.load([{ name: "@example/notes", facet }], context);
 	return { store, host };
 }
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+const settle = () => new Promise(resolve => setTimeout(resolve, 150));
 const directory = await mkdtemp(join(tmpdir(), "chord-example-28-"));
 const path = join(directory, "session.sqlite");
 

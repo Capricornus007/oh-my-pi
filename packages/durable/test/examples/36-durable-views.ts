@@ -35,10 +35,10 @@ const Chat = local("example.chat", {
 	},
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Chat, (_, self) => {
 		const harness = self.open(
-			async (open) => {
+			async open => {
 				const opened = await Harness.open(
 					await StoreStorage.open(store, Chat.name, open),
 					{ models: createModels(), registry: createRegistry() },
@@ -56,7 +56,7 @@ const facet = defineFacet((host) => {
 		const graph = self.follow((observer, ctx) => harness.value.observeTaskGraph(observer, ctx));
 		// 2. A derive over both: one compute per Durable commit.
 		const summary = self.derive([view, graph], ([v, g]) => ({
-			kinds: v.entries.map((entry) => entry.kind),
+			kinds: v.entries.map(entry => entry.kind),
 			tasks: Object.keys(g.tasks).length,
 		}));
 		return {
@@ -71,18 +71,18 @@ const facet = defineFacet((host) => {
 });
 
 const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(":memory:")), context);
-const host = createHost({ store, onError: (error) => console.log("onError", error.kind) });
+const host = createHost({ store, onError: error => console.log("onError", error.kind) });
 await host.load([{ name: "@example/core", facet }], context);
 const chat = await host.get(Chat, {}, context);
 
 // 3. Watch the member: one frame per Durable commit, with its ops.
 const watch = await chat.summary.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("frame:", call.value.kinds, JSON.stringify(call.ops));
 });
 await chat.write("example.first", context);
 await chat.write("example.second", context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("member value:", chat.summary.value);
 
 // 4. Closing the host detaches the observers; the store is the app's.

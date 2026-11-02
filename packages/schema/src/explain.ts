@@ -70,8 +70,8 @@ export class Explainer {
 		}
 		if (node.type !== undefined) {
 			const types = Array.isArray(node.type) ? node.type : [node.type];
-			const checks = types.map((t) => (typeof t === "string" ? TYPE_CHECKS.get(t) : undefined) ?? NEVER);
-			if (!checks.some((check) => check(v))) {
+			const checks = types.map(t => (typeof t === "string" ? TYPE_CHECKS.get(t) : undefined) ?? NEVER);
+			if (!checks.some(check => check(v))) {
 				push("type", `expected ${types.join(" or ")}, got ${typeName(v)}`);
 				return;
 			}
@@ -275,7 +275,7 @@ export class Explainer {
 		out: ValidationError[],
 		exactlyOne: boolean,
 	): void {
-		const matches = branches.filter((s) => this.ok(s, b, v)).length;
+		const matches = branches.filter(s => this.ok(s, b, v)).length;
 		if (matches === 1 || (!exactlyOne && matches > 0)) return;
 		const keyword = exactlyOne ? "oneOf" : "anyOf";
 		if (matches > 1) {
@@ -316,21 +316,21 @@ export class Explainer {
 	private declaredKeys(s: unknown, b: string, v: Record<string, unknown>): number {
 		const node = isSchemaObject(s) && typeof s.$ref === "string" ? this.c.r.resolve(s.$ref, b).node : s;
 		const properties = isSchemaObject(node) && isSchemaObject(node.properties) ? node.properties : {};
-		return Object.keys(v).filter((k) => Object.hasOwn(properties, k)).length;
+		return Object.keys(v).filter(k => Object.hasOwn(properties, k)).length;
 	}
 
 	private tagOf(branches: readonly unknown[], b: string): { key: string; values: unknown[] } | undefined {
-		const resolved = branches.map((s) =>
+		const resolved = branches.map(s =>
 			isSchemaObject(s) && typeof s.$ref === "string" ? this.c.r.resolve(s.$ref, b).node : s,
 		);
 		const first = resolved[0];
 		if (!isSchemaObject(first) || !isSchemaObject(first.properties)) return undefined;
 		for (const key of Object.keys(first.properties)) {
-			const values = resolved.map((s) => {
+			const values = resolved.map(s => {
 				const tag = isSchemaObject(s) && isSchemaObject(s.properties) ? s.properties[key] : undefined;
 				return isSchemaObject(tag) ? tag.const : undefined;
 			});
-			const primitive = values.every((x) => x !== undefined && (typeof x !== "object" || x === null));
+			const primitive = values.every(x => x !== undefined && (typeof x !== "object" || x === null));
 			if (primitive && new Set(values).size === values.length) return { key, values };
 		}
 		return undefined;

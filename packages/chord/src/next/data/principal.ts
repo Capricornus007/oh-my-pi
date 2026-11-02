@@ -52,6 +52,6 @@ function canonical(value: JsonValue): string {
 	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
 	const fields = Object.keys(value)
 		.sort()
-		.map((key) => `${JSON.stringify(key)}:${canonical(value[key]!)}`);
+		.map(key => `${JSON.stringify(key)}:${canonical(value[key]!)}`);
 	return `{${fields.join(",")}}`;
 }

@@ -16,7 +16,7 @@ describe("transactional replicated state", () => {
 		const previous = state.value;
 		const deliveries: number[] = [];
 		state.subscribe((_value, _context, delivery) => deliveries.push(delivery.sequence));
-		state.change(BACKGROUND_CONTEXT, (draft) => {
+		state.change(BACKGROUND_CONTEXT, draft => {
 			draft.changed.value = 3;
 			draft.changed.value = 4;
 		});
@@ -33,7 +33,7 @@ describe("transactional replicated state", () => {
 		const previous = state.value;
 		let escaped: Draft<{ value: number }> | undefined;
 		expect(() =>
-			state.change(BACKGROUND_CONTEXT, (draft) => {
+			state.change(BACKGROUND_CONTEXT, draft => {
 				escaped = draft.nested;
 				draft.nested.value = 2;
 				throw new Error("stop");
@@ -58,9 +58,9 @@ describe("transactional replicated state", () => {
 	it("rejects nested changes and replacements without losing the outer rollback", () => {
 		const state = replicatedState({ left: 0, right: 0 });
 		expect(() =>
-			state.change(BACKGROUND_CONTEXT, (draft) => {
+			state.change(BACKGROUND_CONTEXT, draft => {
 				draft.left = 1;
-				state.change(BACKGROUND_CONTEXT, (nested) => {
+				state.change(BACKGROUND_CONTEXT, nested => {
 					nested.right = 2;
 				});
 			}),
@@ -82,7 +82,7 @@ describe("transactional replicated state", () => {
 		state.subscribe((_value, _context, delivery) => {
 			if (delivery.kind !== "update" || nested) return;
 			nested = true;
-			state.change(BACKGROUND_CONTEXT, (draft) => {
+			state.change(BACKGROUND_CONTEXT, draft => {
 				draft.value = 2;
 			});
 			state.subscribe((_value, _context, delivery) => lateDeliveries.push(delivery));
@@ -90,7 +90,7 @@ describe("transactional replicated state", () => {
 		state.subscribe((value, _context, delivery) => {
 			if (delivery.kind === "update") deliveries.push({ value: value.value, sequence: delivery.sequence });
 		});
-		state.change(BACKGROUND_CONTEXT, (draft) => {
+		state.change(BACKGROUND_CONTEXT, draft => {
 			draft.value = 1;
 		});
 		expect(deliveries).toEqual([
@@ -102,7 +102,7 @@ describe("transactional replicated state", () => {
 
 	it("isolates listener failures after committing the revision", () => {
 		const reports: (() => void)[] = [];
-		const spy = vi.spyOn(globalThis, "queueMicrotask").mockImplementation((report) => {
+		const spy = vi.spyOn(globalThis, "queueMicrotask").mockImplementation(report => {
 			reports.push(report);
 		});
 		try {
@@ -113,7 +113,7 @@ describe("transactional replicated state", () => {
 			});
 			state.subscribe((_value, _context, delivery) => received.push(delivery.sequence));
 			expect(() =>
-				state.change(BACKGROUND_CONTEXT, (draft) => {
+				state.change(BACKGROUND_CONTEXT, draft => {
 					draft.value = 1;
 				}),
 			).not.toThrow();
@@ -132,7 +132,7 @@ describe("transactional replicated state", () => {
 			left: null,
 			right: null,
 		});
-		state.change(BACKGROUND_CONTEXT, (draft) => {
+		state.change(BACKGROUND_CONTEXT, draft => {
 			draft.left = external;
 			draft.right = external;
 			draft.left.value = 2;
@@ -148,7 +148,7 @@ describe("transactional replicated state", () => {
 		state.replace(BACKGROUND_CONTEXT, replacement);
 		expect(state.value).toBe(replacement);
 		expect(state.value.left).not.toBe(state.value.right);
-		state.change(BACKGROUND_CONTEXT, (draft) => {
+		state.change(BACKGROUND_CONTEXT, draft => {
 			draft.left.value = 9;
 		});
 		expect(state.value).toEqual({ left: { value: 9 }, right: { value: 1 } });
@@ -301,7 +301,7 @@ describe("authoritative replicated state sources", () => {
 	it("reports listener failures without throwing them into the source", () => {
 		const source = new TestSource<SourceValue>(Object.freeze({ value: 0 }));
 		const errors: Error[] = [];
-		const state = replicatedState(source, { onError: (error) => errors.push(error) });
+		const state = replicatedState(source, { onError: error => errors.push(error) });
 		const received: number[] = [];
 		state.subscribe((_value, _context, delivery) => {
 			if (delivery.kind === "update") throw new Error("listener failed");
@@ -315,13 +315,13 @@ describe("authoritative replicated state sources", () => {
 		).not.toThrow();
 		source.commit(Object.freeze({ value: 2 }), Object.freeze([["s", ["value"], 2] as const]));
 		expect(received).toEqual([1, 2]);
-		expect(errors.map((error) => error.message)).toEqual(["listener failed", "listener failed"]);
+		expect(errors.map(error => error.message)).toEqual(["listener failed", "listener failed"]);
 	});
 
 	it("reports cursor gaps, disposes the broken attachment, and ignores later frames", () => {
 		const source = new TestSource<SourceValue>(Object.freeze({ value: 0 }), 5);
 		const errors: Error[] = [];
-		const state = replicatedState(source, { onError: (error) => errors.push(error) });
+		const state = replicatedState(source, { onError: error => errors.push(error) });
 		source.commit(Object.freeze({ value: 2 }), Object.freeze([["s", ["value"], 2] as const]), BACKGROUND_CONTEXT, 7);
 		expect(errors[0]?.message).toContain("expected 6, received 7");
 		expect(source.attachments.size).toBe(0);

@@ -18,7 +18,7 @@ await root.configure({ thinkingLevel: "high" }, context);
 // to their conversation. An entry token types an entry kind's `data`.
 const Message = defineEntry<{ from: string }>("message");
 const hello = await root.commit(
-	(tx) =>
+	tx =>
 		tx.appendEntry(Message, root.id, {
 			data: { from: "example" },
 			model: [{ role: "user", content: "hello", timestamp: 1 }],

@@ -32,7 +32,7 @@ function collector(): {
 	const bytes = () => Buffer.concat(chunks);
 	return {
 		bytes,
-		onData: (data) => {
+		onData: data => {
 			chunks.push(Buffer.from(data));
 			const all = bytes().toString("latin1");
 			for (const wait of waiting.splice(0)) {
@@ -40,10 +40,10 @@ function collector(): {
 				else waiting.push(wait);
 			}
 		},
-		waitFor: (text) =>
+		waitFor: text =>
 			bytes().toString("latin1").includes(text)
 				? Promise.resolve()
-				: new Promise((resolve) => waiting.push({ text, resolve })),
+				: new Promise(resolve => waiting.push({ text, resolve })),
 	};
 }
 
@@ -91,7 +91,7 @@ describe.skipIf(process.platform === "win32")("openTerminal", () => {
 		const named = process.platform === "darwin" || process.platform === "linux";
 		let foreground = await terminal.foreground();
 		for (let tries = 0; (!foreground || (named && foreground.name !== "sleep")) && tries < 100; tries++) {
-			await new Promise((resolve) => setTimeout(resolve, 20));
+			await new Promise(resolve => setTimeout(resolve, 20));
 			foreground = await terminal.foreground();
 		}
 		expect(foreground?.pid).toBeGreaterThan(0);

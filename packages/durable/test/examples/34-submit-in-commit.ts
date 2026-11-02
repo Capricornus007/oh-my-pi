@@ -33,7 +33,7 @@ const Visitors = defineDoc<{ muted: string[]; sent: { from: string; text: string
 
 // A tool that waits until released, so messages arrive while the run works.
 let release!: () => void;
-const working = new Promise<void>((resolve) => {
+const working = new Promise<void>(resolve => {
 	release = resolve;
 });
 const build = defineTool({
@@ -57,14 +57,14 @@ const registry = createRegistry();
 registry.install(defineExtension({ name: "build", tools: [build] }));
 const harness = await Harness.open(new MemoryStorage(), { models, registry }, context);
 const root = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
-await root.commit(async (tx) => {
+await root.commit(async tx => {
 	(await tx.doc(Visitors, root.id)).muted.push("bob");
 }, context);
 
 /** A visitor's message: checked, admitted as a steer of the current run, and recorded, in one commit or not at all. */
 async function message(from: string, text: string, requestId: string): Promise<string> {
 	try {
-		return await harness.commit(async (tx) => {
+		return await harness.commit(async tx => {
 			const visitors = await tx.doc(Visitors, root.id);
 			if (visitors.muted.includes(from)) return `${from} is muted`;
 			// Before the commit's own table writes; document writes may come before or after.
@@ -97,7 +97,7 @@ for (const entry of page.items) {
 	const message = entry.model?.[0];
 	if (message?.role === "user") console.log(">", message.content);
 	if (message?.role === "assistant" && message.stopReason === "stop") {
-		console.log("agent:", message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(""));
+		console.log("agent:", message.content.flatMap(part => (part.type === "text" ? [part.text] : [])).join(""));
 	}
 }
 console.log("recorded:", (await harness.snapshot(Visitors, root.id, context))?.sent);

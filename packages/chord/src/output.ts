@@ -84,7 +84,7 @@ function tailRange(bytes: Uint8Array, limits: OutputLimits): [number, number] {
 	const last = bytes[bytes.length - 1] === NEWLINE ? bytes.length - 2 : bytes.length - 1;
 	let start = 0;
 	let lines = 1;
-	for (let index = last < 0 ? -1 : bytes.lastIndexOf(NEWLINE, last); index !== -1; ) {
+	for (let index = last < 0 ? -1 : bytes.lastIndexOf(NEWLINE, last); index !== -1;) {
 		if (lines === limits.maxLines) {
 			start = index + 1;
 			break;
@@ -221,8 +221,7 @@ export class OutputBuffer {
 
 	/** Retained, sanitized output and what the limits dropped from the whole stream. */
 	snapshot(): BoundedOutput {
-		const stored =
-			this.#chunks.length === 1 ? this.#chunks[0]!.text : this.#chunks.map((chunk) => chunk.text).join("");
+		const stored = this.#chunks.length === 1 ? this.#chunks[0]!.text : this.#chunks.map(chunk => chunk.text).join("");
 		const kept = boundOutput(stored, this.#limits);
 		const storedLines = lines(this.#storedNewlines, stored === "" || stored.endsWith("\n"));
 		const keptLines = storedLines - kept.droppedLines;
@@ -391,7 +390,7 @@ export class Progress {
 		const started = this.#clock.now();
 		this.#inFlight = this.#write()
 			.then(
-				(bytes) => {
+				bytes => {
 					this.#nextAt = started + Math.max(this.#minIntervalMs, (bytes * 1000) / PROGRESS_BYTES_PER_SECOND);
 					for (const waiter of waiters) waiter.resolve();
 				},

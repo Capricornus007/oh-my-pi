@@ -45,7 +45,7 @@ type MappedKey = { readonly derive: Derive; holders: number };
  */
 export function refusal(served: Served, version: number, variant: string | undefined): ChordError | undefined {
 	const { contract, provider } = served;
-	if (!provider.accepted.some((accepted) => accepted.version === version)) {
+	if (!provider.accepted.some(accepted => accepted.version === version)) {
 		return new ChordError({ code: "contract_mismatch", message: `${contract.name} v${version} is not served here` });
 	}
 	const mappings = mappingsOf(served, version);
@@ -110,7 +110,7 @@ export class AdaptedMembers {
 			const derive = new Derive([document], ([value]) => mapping(value as JsonValue), batch);
 			// A failure of the mapping is the reader's (its watch gets it); nothing to report for the provider.
 			derive.attach(
-				(declared) => declared as DeriveSource,
+				declared => declared as DeriveSource,
 				() => {},
 			);
 			held = { derive, holders: 0 };
@@ -158,7 +158,7 @@ export class AdaptedMembers {
 		if (mapping === undefined) return undefined;
 		if (mapping === "refuse") throw refused(this.#contract, this.version, member);
 		const { batch } = this.#instance;
-		return (current) => {
+		return current => {
 			batch.count("chord.contract.adapts");
 			// The provider's mapping, typed by its contract; its result is the old shape (not validated).
 			return mapping(current as never) as JsonValue;
@@ -185,19 +185,19 @@ export class AdaptedMembers {
 		// The member when the current variant has it, else the variant's whole current state (a removed member).
 		const kept = current.state.has(member);
 		const names = kept ? [member] : [...current.state.keys()];
-		const sources = names.map((name) => instance.member(name));
+		const sources = names.map(name => instance.member(name));
 		const derive = kept
 			? new Derive(sources, ([value]) => map(value), batch)
 			: new Derive(
 					sources,
-					(values) => map(Object.fromEntries(names.map((name, index) => [name, values[index]]))),
+					values => map(Object.fromEntries(names.map((name, index) => [name, values[index]]))),
 					batch,
 				);
 		this.#derives.add(derive);
 		// The sources are the instance's members already.
 		derive.attach(
-			(source) => source as DeriveSource,
-			(error) => instance.report(member, error),
+			source => source as DeriveSource,
+			error => instance.report(member, error),
 		);
 		return derive;
 	}

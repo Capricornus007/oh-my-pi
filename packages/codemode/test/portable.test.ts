@@ -20,7 +20,7 @@ function recordingRemote(options: Partial<CodemodeServeOptions> = {}) {
 		execute(request: CodemodeRemoteRequest, exchange: CodemodeRemoteExchange) {
 			const done = serveCodemodeRemote(
 				structuredClone(request),
-				async (messages) => {
+				async messages => {
 					exchanges.push(messages.length);
 					return structuredClone(await exchange(structuredClone(messages)));
 				},
@@ -66,7 +66,7 @@ describe("RemoteCodemodeSandbox", () => {
 			tools: [
 				{
 					name: "add",
-					execute: (args) => {
+					execute: args => {
 						seen.push(args);
 						return (args as { a: number }).a + 1;
 					},
@@ -107,7 +107,7 @@ describe("RemoteCodemodeSandbox", () => {
 	it("tells the remote to stop when the caller aborts", async () => {
 		const { remote, served } = recordingRemote();
 		let started: () => void = () => {};
-		const call = new Promise<void>((resolve) => {
+		const call = new Promise<void>(resolve => {
 			started = resolve;
 		});
 		const sandbox = new RemoteCodemodeSandbox({

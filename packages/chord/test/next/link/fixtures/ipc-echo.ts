@@ -3,7 +3,7 @@ import process from "node:process";
 import { ipcLink } from "../../../../src/next/link/index.ts";
 
 const link = ipcLink(process as unknown as Parameters<typeof ipcLink>[0]);
-link.onMessage((message) => {
+link.onMessage(message => {
 	if (message[0] === 0xff) process.exit(0);
 	link.send(message);
 });

@@ -34,7 +34,7 @@ async function run(calls: number): Promise<{ ms: number; commits: number }> {
 					api.executeTool("leaf", { n }, callContext, { progress: false }),
 				),
 			);
-			const failed = results.filter((result) => result.isError).length;
+			const failed = results.filter(result => result.isError).length;
 			return { output: [{ type: "text", text: `${failed} failed` }], isError: failed > 0 };
 		},
 	});
@@ -59,7 +59,7 @@ async function run(calls: number): Promise<{ ms: number; commits: number }> {
 	const ms = Math.round(performance.now() - started);
 	// A run whose nested calls failed measures nothing.
 	const page = await root.entries({}, 10, undefined, context);
-	const result = page.items.find((entry) => ToolResultEntry.is(entry))?.model?.[0];
+	const result = page.items.find(entry => ToolResultEntry.is(entry))?.model?.[0];
 	if (result?.role !== "toolResult" || result.isError) throw new Error(`run: nested calls failed`);
 	await harness.close(context);
 	return { ms, commits };

@@ -36,7 +36,7 @@ const remoteObjects = instancesOf(RemoteObject, "hold");
 forEachCodec(() => {
 	describe("references over a link", () => {
 		it("are live and hydrated when got, with the variant of the link's principal", async () => {
-			const { client, server } = await linked((h) => void serveNotes(h), {
+			const { client, server } = await linked(h => void serveNotes(h), {
 				child: { kind: "guest", session: "S1" },
 			});
 			await addNote(server, "S1", "a");
@@ -53,7 +53,7 @@ forEachCodec(() => {
 
 		it("apply one state message as one batch: a derive over two members never sees half a commit", async () => {
 			const View = local("app.view", { version: 1, params: {}, members: { pair: str() } });
-			const { server } = await linked((h) => void serveNotes(h));
+			const { server } = await linked(h => void serveNotes(h));
 			const seen: string[] = [];
 			const client = createHost({ onError: () => {} });
 			// Connected first (W6): the view's factory references a server type.
@@ -64,7 +64,7 @@ forEachCodec(() => {
 				[
 					{
 						name: "@test/view",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(View, (_, self) => {
 								const notes = self.get(Notes, { session: "S1" });
 								return {
@@ -85,11 +85,11 @@ forEachCodec(() => {
 			await addNote(server, "S1", "b");
 			await transported();
 			expect(frames.map(([value]) => value)).toEqual(["1/1", "2/2"]);
-			expect(seen.every((pair) => pair.split("/")[0] === pair.split("/")[1])).toBe(true);
+			expect(seen.every(pair => pair.split("/")[0] === pair.split("/")[1])).toBe(true);
 		});
 
 		it("call methods: results, ChordErrors, PluginErrors and other throws", async () => {
-			const { client } = await linked((h) => void serveNotes(h));
+			const { client } = await linked(h => void serveNotes(h));
 			const notes = await client.get(Notes, { session: "S1" }, context);
 			if (notes.variant !== "editor") throw new Error("expected the editor");
 			expect(await notes.add({ text: "x" }, context)).toBe(1);
@@ -110,7 +110,7 @@ forEachCodec(() => {
 		});
 
 		it("carry bytes as raw segments both ways", async () => {
-			const { client } = await linked((h) => void serveNotes(h));
+			const { client } = await linked(h => void serveNotes(h));
 			const notes = await client.get(Notes, { session: "S1" }, context);
 			if (notes.variant !== "editor") throw new Error("expected the editor");
 			const data = new Uint8Array([1, 2, 3]);
@@ -121,7 +121,7 @@ forEachCodec(() => {
 
 		it("cancel a call: the caller is rejected at once, the provider's handler aborted", async () => {
 			let probe: ReturnType<typeof serveNotes> | undefined;
-			const { client } = await linked((h) => {
+			const { client } = await linked(h => {
 				probe = serveNotes(h);
 			});
 			const notes = await client.get(Notes, { session: "S1" }, context);
@@ -136,7 +136,7 @@ forEachCodec(() => {
 
 		it("release: pending calls reject released, the provider aborts their handlers and lets the object go", async () => {
 			let probe: ReturnType<typeof serveNotes> | undefined;
-			const { client } = await linked((h) => {
+			const { client } = await linked(h => {
 				probe = serveNotes(h);
 			});
 			const notes = await client.get(Notes, { session: "S1" }, context);
@@ -278,7 +278,7 @@ forEachCodec(() => {
 
 	describe("the wire format of a hold", () => {
 		it("is the snapshot by member, then each commit's changed members with their ops", async () => {
-			const { server } = await linked((h) => void serveNotes(h));
+			const { server } = await linked(h => void serveNotes(h));
 			const [a, b] = memoryLinkPair();
 			server.accept(a, { principal: { kind: "owner" }, codec: testCodec() }, context);
 			const peer = new RawPeer(b);
@@ -307,7 +307,7 @@ forEachCodec(() => {
 	describe("cost guards at the consumer", () => {
 		it("applies state without validating, walking or copying it: unchanged parts stay the same objects", async () => {
 			const { context: counting, counts } = await metered();
-			const { server } = await linked((h) => void serveNotes(h));
+			const { server } = await linked(h => void serveNotes(h));
 			const client = createHost({ onError: () => {} });
 			await client.load([], context);
 			const [a, b] = memoryLinkPair();
@@ -354,11 +354,11 @@ forEachCodec(() => {
 		async function pair() {
 			const seen: string[] = [];
 			const errors: HostError[] = [];
-			const client = createHost({ onError: (error) => errors.push(error) });
+			const client = createHost({ onError: error => errors.push(error) });
 			const [a, b] = memoryLinkPair();
 			client.connect(a, { principal: { kind: "server" }, codec: testCodec() }, context);
 			const peer = new RawPeer(b);
-			const facet = defineFacet((h) =>
+			const facet = defineFacet(h =>
 				h.serve(Pair, (_, self) => {
 					const one = self.get(Notes, { session: "S1" });
 					const two = self.get(Notes, { session: "S2" });
@@ -421,8 +421,8 @@ forEachCodec(() => {
 				hostAddress: () => Server(),
 				variants: { v: { methods: { echo: method(map(int()), map(int())) } } },
 			});
-			const { client } = await linked((h) =>
-				h.serve(Echo, () => ({ variant: "v", members: { echo: async (args) => args } })),
+			const { client } = await linked(h =>
+				h.serve(Echo, () => ({ variant: "v", members: { echo: async args => args } })),
 			);
 			const echo = await client.get(Echo, {}, context);
 			expect(await echo.echo({ $bytes: 0 }, context)).toEqual({ $bytes: 0 });
@@ -448,7 +448,7 @@ forEachCodec(() => {
 
 		/** The calls the provider received, by hold. */
 		const calls = (peer: RawPeer) =>
-			peer.received.flatMap((message) => (message.kind === "call" ? [message.hold] : []));
+			peer.received.flatMap(message => (message.kind === "call" ? [message.hold] : []));
 
 		it("frees a slot once when a hold with a call in flight and one waiting is released", async () => {
 			const { peer, one, two, holds } = await narrow();
@@ -579,7 +579,7 @@ forEachCodec(() => {
 			bound.members[0] = { member: EDITOR.state.notes!, value };
 			peer.send({ kind: "bound", holds: [bound] });
 			peer.close();
-			for (let i = 0; i < 20; i++) await new Promise((resolve) => setTimeout(resolve, 1));
+			for (let i = 0; i < 20; i++) await new Promise(resolve => setTimeout(resolve, 1));
 			expect(notes.state.value.kind).toBe("loading");
 			expect(errors).toEqual([]);
 		});

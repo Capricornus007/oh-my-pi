@@ -68,7 +68,7 @@ export async function openStore(backend: Backend, context: Context, options: Sto
 async function switchOutbox(db: SqliteDatabase, meta: MetaRow, outbox: boolean | undefined): Promise<MetaRow> {
 	if (outbox === undefined || outbox === (meta.outbox === 1)) return meta;
 	const floor = outbox ? meta.last_seq : 0;
-	await db.transaction(async (executor) => {
+	await db.transaction(async executor => {
 		await executor.run(
 			`UPDATE ${TABLES.meta} SET outbox = ?, outbox_floor = ? WHERE singleton = 1`,
 			outbox ? 1 : 0,
@@ -405,7 +405,7 @@ export class ChordStore implements Store {
 		for (const end of [...this.#held]) end();
 		await this.#tail;
 		if (this.#underway > 0) {
-			await new Promise<void>((resolve) => {
+			await new Promise<void>(resolve => {
 				this.#drained = resolve;
 			});
 		}
@@ -432,7 +432,7 @@ export class ChordStore implements Store {
 		let thrown: unknown = NONE;
 		let done: { readonly step: Step; readonly nextId: number };
 		try {
-			done = await this.#db.transaction(async (executor) => {
+			done = await this.#db.transaction(async executor => {
 				try {
 					const step = new Step(executor, seq, this.#ids, this.#catalog);
 					const nextId = await this.#write(step, writes);
@@ -485,9 +485,9 @@ export class ChordStore implements Store {
 		let refused: { readonly error: unknown } | undefined;
 		let done: Series;
 		try {
-			done = await this.#db.transaction(async (executor) => {
+			done = await this.#db.transaction(async executor => {
 				try {
-					return await this.#writeSeries(executor, commits, (error) => {
+					return await this.#writeSeries(executor, commits, error => {
 						refused = { error };
 					});
 				} catch (error) {
@@ -687,7 +687,7 @@ export class ChordStore implements Store {
 		let thrown: unknown = NONE;
 		let replayed: Replayed;
 		try {
-			replayed = await this.#db.transaction(async (executor) => {
+			replayed = await this.#db.transaction(async executor => {
 				try {
 					return await apply(executor, this.#catalog);
 				} catch (error) {
@@ -748,7 +748,7 @@ function watchCalls(executor: SqliteExecutor, calls: { failed: boolean }): Sqlit
 		}
 	};
 	return {
-		exec: (sql) => watched(() => executor.exec(sql)),
+		exec: sql => watched(() => executor.exec(sql)),
 		run: (sql, ...params) => watched(() => executor.run(sql, ...params)),
 		runCounted: (sql, ...params) => watched(() => executor.runCounted(sql, ...params)),
 		get: (sql, ...params) => watched(() => executor.get(sql, ...params)),

@@ -44,7 +44,7 @@ function sampledByteLimits(input: string): number[] {
 		totalBytes,
 		totalBytes + 1,
 	];
-	return [...new Set(candidates.filter((value) => value >= 0))].sort((a, b) => a - b);
+	return [...new Set(candidates.filter(value => value >= 0))].sort((a, b) => a - b);
 }
 
 function bound(text: string, limits: OutputLimits) {
@@ -307,7 +307,7 @@ describe("Progress", () => {
 		await progress.markAndWait();
 		expect(commits).toEqual([1_000]);
 		// Let the first commit finish settling.
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		now = 1_040;
 		const second = progress.markAndWait();
 		expect(timers.map(({ delayMs }) => delayMs)).toEqual([60]);
@@ -320,7 +320,7 @@ describe("Progress", () => {
 		timers[1]!.callback();
 		await second;
 		expect(commits).toEqual([1_000, 1_100]);
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		progress.mark();
 		expect(timers.map(({ delayMs }) => delayMs)).toEqual([60, 20, 100]);
 		await progress.stop();
@@ -334,7 +334,7 @@ describe("Progress", () => {
 			async () => {
 				throw failure;
 			},
-			(error) => errors.push(error),
+			error => errors.push(error),
 			100,
 		);
 		await expect(progress.markAndWait()).rejects.toBe(failure);
@@ -344,7 +344,7 @@ describe("Progress", () => {
 	it("stops: waits for the commit in flight and hands back waiters no commit covered yet", async () => {
 		vi.useFakeTimers({ now: 0 });
 		let release!: () => void;
-		const inFlight = new Promise<void>((resolve) => {
+		const inFlight = new Promise<void>(resolve => {
 			release = resolve;
 		});
 		const progress = new Progress(

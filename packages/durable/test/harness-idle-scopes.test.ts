@@ -118,7 +118,7 @@ async function open(options: { clock?: () => number; retention?: () => number; t
 	const conversation = async (entries = 2): Promise<Conversation> => {
 		const created = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 		for (let index = 0; index < entries; index++) {
-			await created.commit((tx) => tx.appendEntry(created.id, { kind: "note", data: { index } }), context);
+			await created.commit(tx => tx.appendEntry(created.id, { kind: "note", data: { index } }), context);
 		}
 		return created;
 	};
@@ -126,7 +126,7 @@ async function open(options: { clock?: () => number; retention?: () => number; t
 	const work = async (name: string, into: Conversation, read?: ConversationId): Promise<TaskId> => {
 		const input = read === undefined ? { name } : { name, read: read as number };
 		const id = await into.commit(
-			(tx) => tx.createTask(Work, input, { ownership: { kind: "conversation" }, conversationId: into.id }),
+			tx => tx.createTask(Work, input, { ownership: { kind: "conversation" }, conversationId: into.id }),
 			context,
 		);
 		if (read !== undefined) await named(reads, name).promise;
@@ -156,7 +156,7 @@ async function quiet(): Promise<void> {
 describe("idle waiters by scope", () => {
 	it("resolve through owner chains, owned conversations and ended tasks between, ignoring background work", async () => {
 		const { harness, root } = await open();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Work, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Work, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const a = await tx.createTask(Work, { name: "a" }, { ownership: { kind: "task", taskId: b } });
@@ -198,7 +198,7 @@ describe("idle waiters by scope", () => {
 		const storage = new ControlledStorage();
 		const first = await openTasks(storage, [Work]);
 		const firstRoot = await first.harness.root(context);
-		const tree = await firstRoot.commit(async (tx) => {
+		const tree = await firstRoot.commit(async tx => {
 			const p = await tx.createTask(Work, { name: "p" }, { ownership: { kind: "conversation" } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: p } });
 			const d = await tx.createTask(
@@ -244,7 +244,7 @@ describe("idle waiters by scope", () => {
 describe("kept context ranges", () => {
 	it("settles a run end whose sweep drops the chain without a check of every scope", async () => {
 		const { harness, root } = await open();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Work, { name: "p" }, { ownership: { kind: "conversation" } });
 			const t = await tx.createTask(Work, { name: "t" }, { ownership: { kind: "task", taskId: p } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: t } });
@@ -254,7 +254,7 @@ describe("kept context ranges", () => {
 		}, context);
 		const c = (await harness.conversation(tree.c, context))!;
 		const d = await c.commit(
-			(tx) =>
+			tx =>
 				tx.createTask(
 					Work,
 					{ name: "d", read: tree.c as number },
@@ -374,7 +374,7 @@ describe("kept context ranges", () => {
 		await end("read", await work("read", z, a.id));
 		clock = 2_500;
 		// An entry-only commit settles no idleness: the range is dropped where it would be extended.
-		await a.commit((tx) => tx.appendEntry(a.id, { kind: "note", data: { late: true } }), context);
+		await a.commit(tx => tx.appendEntry(a.id, { kind: "note", data: { late: true } }), context);
 		expect(idleState(harness)).toMatchObject({ contexts: 0, idleContexts: 0, idleMismatches: 0 });
 		await harness.close(context);
 	});
@@ -382,13 +382,13 @@ describe("kept context ranges", () => {
 	it("drops a range from the expiry order when an entry commit cannot extend it", async () => {
 		const { harness, conversation, work, end } = await open();
 		const [a, z] = [await conversation(0), await conversation(0)];
-		const first = await a.commit((tx) => tx.appendEntry(a.id, { kind: "note" }), context);
-		const second = await a.commit((tx) => tx.appendEntry(a.id, { kind: "note" }), context);
-		await a.commit((tx) => tx.appendEntry(a.id, { kind: "summary", head: second.id }), context);
+		const first = await a.commit(tx => tx.appendEntry(a.id, { kind: "note" }), context);
+		const second = await a.commit(tx => tx.appendEntry(a.id, { kind: "note" }), context);
+		await a.commit(tx => tx.appendEntry(a.id, { kind: "summary", head: second.id }), context);
 		await end("read", await work("read", z, a.id));
 		expect(idleState(harness)).toMatchObject({ contexts: 1, idleContexts: 1, idleMismatches: 0 });
 		// A marker whose head is older than the range's: the range cannot be extended and is dropped.
-		await a.commit((tx) => tx.appendEntry(a.id, { kind: "summary", head: first.id }), context);
+		await a.commit(tx => tx.appendEntry(a.id, { kind: "summary", head: first.id }), context);
 		expect(idleState(harness)).toMatchObject({ contexts: 0, idleContexts: 0, idleMismatches: 0 });
 		await harness.close(context);
 	});
@@ -438,7 +438,7 @@ describe("incremental idle state", () => {
 		const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)]!;
 		const { harness, root } = await open();
 		// A context range keeps entries: every conversation gets one.
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		const conversations: ConversationId[] = [root.id];
 		const live = new Map<string, { readonly id: TaskId; readonly conversation: ConversationId }>();
 		let count = 0;
@@ -449,7 +449,7 @@ describe("incremental idle state", () => {
 			const name = `t${count++}`;
 			if (action < 0.1) {
 				const created = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
-				await created.commit((tx) => tx.appendEntry(created.id, { kind: "note" }), context);
+				await created.commit(tx => tx.appendEntry(created.id, { kind: "note" }), context);
 				conversations.push(created.id);
 			} else if (action < 0.45 || live.size === 0) {
 				// A task in any conversation, also one whose owner chain ended and was swept; it may read a context.
@@ -459,7 +459,7 @@ describe("incremental idle state", () => {
 				const input = read === undefined ? { name } : { name, read: read as number };
 				const target = await handle(into);
 				const id = await target.commit(
-					(tx) =>
+					tx =>
 						tx.createTask(Work, input, { ownership: { kind: "conversation" }, conversationId: into, background }),
 					context,
 				);
@@ -474,7 +474,9 @@ describe("incremental idle state", () => {
 					continue;
 				}
 				const conversation = random() < 0.5;
-				const created = await (await handle(owner.conversation)).commit(async (tx) => {
+				const created = await (
+					await handle(owner.conversation)
+				).commit(async tx => {
 					if (!conversation) {
 						const id = await tx.createTask(Work, { name }, { ownership: { kind: "task", taskId: owner.id } });
 						return { id, into: owner.conversation, read: false };
@@ -577,7 +579,7 @@ describe("wake()", () => {
 		harness.resume();
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Work, { name: "running" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Work, { name: "running" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await eventually(async () => (await harness.getTask(id, context))!.state.status === "running");

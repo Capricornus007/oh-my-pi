@@ -52,10 +52,10 @@ function recorder(storage: ControlledStorage) {
 		{ readonly advance: WatchCall<Readonly<Counter>>; readonly adopting: boolean } | { readonly end: WatchEnd }
 	> = [];
 	const observer: Observer<Readonly<Counter>> = {
-		advance: (change) => {
+		advance: change => {
 			calls.push({ advance: change, adopting: storage.adopting });
 		},
-		end: (end) => {
+		end: end => {
 			calls.push({ end });
 		},
 	};
@@ -69,7 +69,7 @@ function open() {
 }
 
 const add = (session: SessionImpl, by = 1) =>
-	session.commit(async (tx) => {
+	session.commit(async tx => {
 		(await tx.doc(SessionCounter)).count += by;
 	}, context);
 
@@ -105,14 +105,14 @@ describe("observeDoc", () => {
 	it("advances when memory adopts a held commit, before anything is stored", async () => {
 		const { storage, session } = open();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(ConversationCounter, conversationId);
 		}, context);
 		const { calls, observer } = recorder(storage);
 		const observation = (await session.observeDoc(ConversationCounter, conversationId, observer, context))!;
 		const stored = storage.commits.length;
 		await session.commit(
-			async (tx) => {
+			async tx => {
 				(await tx.doc(ConversationCounter, conversationId)).count = 5;
 			},
 			context,
@@ -132,17 +132,17 @@ describe("observeDoc", () => {
 	it("follows a conversation document's address: a retirement with the last value, then the new incarnation", async () => {
 		const { storage, session } = open();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(ConversationCounter, conversationId)).count = 2;
 		}, context);
 		const { calls, observer } = recorder(storage);
 		const observation = (await session.observeDoc(ConversationCounter, conversationId, observer, context))!;
-		await session.commit((tx) => tx.retireDoc(ConversationCounter, conversationId), context);
+		await session.commit(tx => tx.retireDoc(ConversationCounter, conversationId), context);
 		// The address is absent now: a new attachment finds nothing, the existing one goes on.
 		expect(await session.observeDoc(ConversationCounter, conversationId, recorder(storage).observer, context)).toBe(
 			undefined,
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(ConversationCounter, conversationId)).count = 9;
 		}, context);
 		expect(calls).toEqual([
@@ -191,7 +191,7 @@ describe("observeDoc", () => {
 			await add(session);
 			await session.observeDoc(
 				SessionCounter,
-				{ advance: () => {}, end: (end) => errors.push(end.kind === "failed" ? end.error : end) },
+				{ advance: () => {}, end: end => errors.push(end.kind === "failed" ? end.error : end) },
 				context,
 			);
 			await session.close(context);
@@ -221,7 +221,7 @@ describe("observeDoc", () => {
 			advance: () => {
 				throw bug;
 			},
-			end: (end) => ends.push(end),
+			end: end => ends.push(end),
 		};
 		await session.observeDoc(SessionCounter, throwing, context);
 		const healthy = recorder(storage);
@@ -267,7 +267,7 @@ describe("observeDoc", () => {
 		const gc = runInNewContext("gc") as () => void;
 		const collect = async (): Promise<void> => {
 			for (let round = 0; round < 5; round++) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
+				await new Promise(resolve => setTimeout(resolve, 0));
 				gc();
 			}
 		};
@@ -311,13 +311,13 @@ describe("observeDoc", () => {
 		const gc = runInNewContext("gc") as () => void;
 		const collect = async (): Promise<void> => {
 			for (let round = 0; round < 5; round++) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
+				await new Promise(resolve => setTimeout(resolve, 0));
 				gc();
 			}
 		};
 		const session = new SessionImpl(new MemoryStorage());
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(ConversationCounter, conversationId);
 		}, context);
 		/** Attach an observer that keeps nothing, change the document, and retire it: only a WeakRef to its last value. */
@@ -327,17 +327,17 @@ describe("observeDoc", () => {
 				ConversationCounter,
 				conversationId,
 				{
-					advance: (change) => {
+					advance: change => {
 						if (change.kind === "value" && !change.retired) last = new WeakRef(change.value);
 					},
 					end: () => {},
 				},
 				context,
 			))!;
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(ConversationCounter, conversationId)).count = 7;
 			}, context);
-			await session.commit((tx) => tx.retireDoc(ConversationCounter, conversationId), context);
+			await session.commit(tx => tx.retireDoc(ConversationCounter, conversationId), context);
 			await session.unloadDocuments();
 			return { observation, last: last! };
 		};
@@ -380,8 +380,8 @@ describe("observeCommits", () => {
 	function commits() {
 		const calls: Array<{ readonly seq: number } | { readonly end: WatchEnd }> = [];
 		const observer: CommitObserver = {
-			advance: (publication) => calls.push({ seq: publication.seq }),
-			end: (end) => calls.push({ end }),
+			advance: publication => calls.push({ seq: publication.seq }),
+			end: end => calls.push({ end }),
 		};
 		return { calls, observer };
 	}
@@ -434,7 +434,7 @@ describe("observeCommits", () => {
 				thrown++;
 				throw bug;
 			},
-			end: (end) => ends.push(end),
+			end: end => ends.push(end),
 		});
 		const healthy = commits();
 		session.observeCommits(healthy.observer);
@@ -455,11 +455,11 @@ describe("observeDoc detached during a commit", () => {
 	async function retiring() {
 		const { storage, session } = open();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(ConversationCounter, conversationId)).count = 1;
 		}, context);
 		const recreate = () =>
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				await tx.retireDoc(ConversationCounter, conversationId);
 				(await tx.doc(ConversationCounter, conversationId)).count = 2;
 			}, context);
@@ -475,11 +475,11 @@ describe("observeDoc detached during a commit", () => {
 			ConversationCounter,
 			conversationId,
 			{
-				advance: (change) => {
+				advance: change => {
 					changes.push(change);
 					throw bug;
 				},
-				end: (end) => ends.push(end),
+				end: end => ends.push(end),
 			},
 			context,
 		))!;
@@ -501,11 +501,11 @@ describe("observeDoc detached during a commit", () => {
 			ConversationCounter,
 			conversationId,
 			{
-				advance: (change) => {
+				advance: change => {
 					changes.push(change);
 					observation?.detach();
 				},
-				end: (end) => ends.push(end),
+				end: end => ends.push(end),
 			},
 			context,
 		);

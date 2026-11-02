@@ -46,9 +46,7 @@ export function renderDeclarations(options: RenderDeclarationsOptions): string {
 	const sections: string[] = [];
 	const tools = options.tools ?? [];
 	if (tools.length > 0) {
-		const members = tools.map(
-			(tool) => `${docComment(tool.description, INDENT)}${INDENT}${renderToolSignature(tool)}`,
-		);
+		const members = tools.map(tool => `${docComment(tool.description, INDENT)}${INDENT}${renderToolSignature(tool)}`);
 		sections.push(`declare const tools: {\n${members.join("\n")}\n};`);
 	}
 	const namespaces = new Map<string, string[]>();
@@ -115,7 +113,7 @@ function docComment(description: string | undefined, indent: string): string {
 	if (!text) return "";
 	const lines = text.replaceAll("*/", "*\\/").split(/\r?\n/);
 	if (lines.length === 1) return `${indent}/** ${lines[0]} */\n`;
-	return `${indent}/**\n${lines.map((line) => `${indent} *${line ? ` ${line}` : ""}`).join("\n")}\n${indent} */\n`;
+	return `${indent}/**\n${lines.map(line => `${indent} *${line ? ` ${line}` : ""}`).join("\n")}\n${indent} */\n`;
 }
 
 function propertyKey(name: string): string {
@@ -188,21 +186,21 @@ function toType(schema: CodemodeJsonSchema, context: SchemaContext): string {
 	}
 
 	if ("const" in schema) return JSON.stringify(schema.const) ?? "unknown";
-	if (Array.isArray(schema.enum)) return union(schema.enum.map((value) => JSON.stringify(value) ?? "unknown"));
+	if (Array.isArray(schema.enum)) return union(schema.enum.map(value => JSON.stringify(value) ?? "unknown"));
 
 	const variants = Array.isArray(schema.anyOf) ? schema.anyOf : Array.isArray(schema.oneOf) ? schema.oneOf : undefined;
-	if (variants) return union(variants.map((variant) => toType(variant as CodemodeJsonSchema, context)));
+	if (variants) return union(variants.map(variant => toType(variant as CodemodeJsonSchema, context)));
 	if (Array.isArray(schema.allOf)) {
 		const parts = schema.allOf
-			.map((part) => toType(part as CodemodeJsonSchema, context))
-			.filter((part) => part !== "unknown");
+			.map(part => toType(part as CodemodeJsonSchema, context))
+			.filter(part => part !== "unknown");
 		return parts.length === 0
 			? "unknown"
-			: parts.map((part) => (part.includes(" | ") ? `(${part})` : part)).join(" & ");
+			: parts.map(part => (part.includes(" | ") ? `(${part})` : part)).join(" & ");
 	}
 
 	const type = schema.type;
-	if (Array.isArray(type)) return union(type.map((entry) => toType({ ...schema, type: entry }, context)));
+	if (Array.isArray(type)) return union(type.map(entry => toType({ ...schema, type: entry }, context)));
 	switch (type) {
 		case "string":
 			return "string";
@@ -237,7 +235,7 @@ function arrayType(schema: Record<string, unknown>, context: SchemaContext): str
 		: Array.isArray(schema.items)
 			? schema.items
 			: [];
-	if (tuple.length > 0) return `[${tuple.map((item) => toType(item as CodemodeJsonSchema, context)).join(", ")}]`;
+	if (tuple.length > 0) return `[${tuple.map(item => toType(item as CodemodeJsonSchema, context)).join(", ")}]`;
 	return "unknown[]";
 }
 
@@ -257,7 +255,7 @@ function constraintTags(schema: unknown): string {
 	// The branch's constraints apply together with the property's, so both are read.
 	const variants = Array.isArray(property.anyOf) ? property.anyOf : property.oneOf;
 	const nonNull: unknown[] = Array.isArray(variants)
-		? variants.filter((variant) => (variant as { type?: unknown } | null)?.type !== "null")
+		? variants.filter(variant => (variant as { type?: unknown } | null)?.type !== "null")
 		: [];
 	const branch = nonNull.length === 1 ? nonNull[0] : undefined;
 	const branches =
@@ -265,21 +263,19 @@ function constraintTags(schema: unknown): string {
 			? [property, branch as Record<string, unknown>]
 			: [property];
 	// Draft-04 and OpenAPI 3.0 make `minimum`/`maximum` exclusive with a boolean `exclusiveMinimum`/`exclusiveMaximum`.
-	const schemas = branches.map(
-		(schema): Record<string, unknown> => ({
-			...schema,
-			...(schema.exclusiveMinimum === true ? { minimum: undefined, exclusiveMinimum: schema.minimum } : {}),
-			...(schema.exclusiveMaximum === true ? { maximum: undefined, exclusiveMaximum: schema.maximum } : {}),
-		}),
-	);
+	const schemas = branches.map((schema): Record<string, unknown> => ({
+		...schema,
+		...(schema.exclusiveMinimum === true ? { minimum: undefined, exclusiveMinimum: schema.minimum } : {}),
+		...(schema.exclusiveMaximum === true ? { maximum: undefined, exclusiveMaximum: schema.maximum } : {}),
+	}));
 
 	const tags: string[] = [];
 	const isInteger = (type: unknown) => type === "integer" || (Array.isArray(type) && type.includes("integer"));
-	if (schemas.some((schema) => isInteger(schema.type))) tags.push("@integer");
+	if (schemas.some(schema => isInteger(schema.type))) tags.push("@integer");
 	for (const keyword of TAG_KEYWORDS) {
-		const values = schemas.map((schema) => schema[keyword]);
+		const values = schemas.map(schema => schema[keyword]);
 		if (LOWER_BOUNDS.has(keyword) || UPPER_BOUNDS.has(keyword)) {
-			const numbers = values.filter((value) => typeof value === "number");
+			const numbers = values.filter(value => typeof value === "number");
 			if (numbers.length === 0) continue;
 			tags.push(`@${keyword} ${LOWER_BOUNDS.has(keyword) ? Math.max(...numbers) : Math.min(...numbers)}`);
 			continue;
@@ -288,15 +284,15 @@ function constraintTags(schema: unknown): string {
 			if (typeof value === "number" || typeof value === "string") tags.push(`@${keyword} ${value}`);
 		}
 	}
-	if (schemas.some((schema) => schema.uniqueItems === true)) tags.push("@uniqueItems");
+	if (schemas.some(schema => schema.uniqueItems === true)) tags.push("@uniqueItems");
 	// Annotations, unlike constraints, come from the property itself.
 	if (property.default !== undefined && property.default !== null) {
 		tags.push(`@default ${JSON.stringify(property.default)}`);
 	}
 	if (property.deprecated === true) tags.push("@deprecated");
 	return tags
-		.filter((tag) => tag.length <= MAX_TAG_CHARS)
-		.map((tag) => tag.replace(LINE_TERMINATORS, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`))
+		.filter(tag => tag.length <= MAX_TAG_CHARS)
+		.map(tag => tag.replace(LINE_TERMINATORS, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`))
 		.join(" ");
 }
 
@@ -307,7 +303,7 @@ function objectType(schema: Record<string, unknown>, context: SchemaContext): st
 			: {};
 	const required = new Set(Array.isArray(schema.required) ? schema.required : []);
 	const names = Object.keys(properties).sort();
-	const members = names.map((name) => {
+	const members = names.map(name => {
 		const optional = required.has(name) ? "" : "?";
 		return `${propertyKey(name)}${optional}: ${toType(properties[name] as CodemodeJsonSchema, context)};`;
 	});
@@ -319,15 +315,15 @@ function objectType(schema: Record<string, unknown>, context: SchemaContext): st
 		members.push("[key: string]: unknown;");
 	}
 	if (members.length === 0) return "{}";
-	const comments = names.map((name) => {
+	const comments = names.map(name => {
 		const lines = descriptionOf(properties[name])
 			.split(LINE_TERMINATORS)
-			.map((line) => line.trim())
+			.map(line => line.trim())
 			.filter(Boolean);
 		const tags = context.tags ? constraintTags(properties[name]) : "";
 		return tags ? [...lines, tags] : lines;
 	});
-	if (!comments.some((comment) => comment.length > 0)) return `{ ${members.join(" ")} }`;
+	if (!comments.some(comment => comment.length > 0)) return `{ ${members.join(" ")} }`;
 
 	const lines = ["{"];
 	comments.forEach((comment, index) => {

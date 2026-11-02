@@ -80,7 +80,7 @@ function codemodeChat(globals: CodemodeGlobal[] = [], namespaces: CodemodeNamesp
 	const echo = new Map<string, number>();
 	addTool(
 		setup.registry,
-		tool("echo", async (args) => {
+		tool("echo", async args => {
 			echo.set(args.text ?? "", (echo.get(args.text ?? "") ?? 0) + 1);
 			return { output: [{ type: "text", text: `echo ${args.text ?? ""}` }] };
 		}),
@@ -133,7 +133,7 @@ function codemodeChat(globals: CodemodeGlobal[] = [], namespaces: CodemodeNamesp
 	};
 	addTool(
 		setup.registry,
-		tool("slow", async (args) => {
+		tool("slow", async args => {
 			await slows.gate(args.id ?? 0).promise;
 			finished.push(args.id ?? 0);
 			once(done, args.id ?? 0).resolve();
@@ -144,26 +144,26 @@ function codemodeChat(globals: CodemodeGlobal[] = [], namespaces: CodemodeNamesp
 }
 
 async function scriptTask(harness: Harness): Promise<TaskId> {
-	const tasks = (await harness.commit((tx) => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
-	return tasks.find((task) => (task.input as ToolTaskInput).kind === "model")!.id;
+	const tasks = (await harness.commit(tx => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
+	return tasks.find(task => (task.input as ToolTaskInput).kind === "model")!.id;
 }
 
 async function nestedCount(harness: Harness): Promise<number> {
-	const tasks = (await harness.commit((tx) => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
-	return tasks.filter((task) => (task.input as ToolTaskInput).kind === "nested").length;
+	const tasks = (await harness.commit(tx => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
+	return tasks.filter(task => (task.input as ToolTaskInput).kind === "nested").length;
 }
 
 /** The code mode call's result text. */
 async function resultText(setup: ChatSetup, root: Awaited<ReturnType<typeof openChat>>["root"]) {
 	void setup;
-	const entry = (await allEntries(root)).find((candidate) => ToolResultEntry.is(candidate))!;
+	const entry = (await allEntries(root)).find(candidate => ToolResultEntry.is(candidate))!;
 	const message = entry.model![0]!;
 	return {
 		// Without the "Script completed" header and its wall time, which tests of it check themselves.
 		text:
 			message.role === "toolResult"
 				? message.content
-						.map((item) => (item.type === "text" ? item.text : ""))
+						.map(item => (item.type === "text" ? item.text : ""))
 						.join("")
 						.replace(/^Script (completed|failed)\nWall time [\d.]+ seconds\nOutput:\n/, "")
 				: "",
@@ -279,7 +279,7 @@ describe("durable code mode", () => {
 			chat,
 			`await tools.echo({ text: "a" }); await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const journal = await tx.doc(CodemodeJournalDoc, task);
 					journal.entries[0]!.issuedAfter = 7;
 				}, context);
@@ -296,7 +296,7 @@ describe("durable code mode", () => {
 			chat,
 			`await tools.echo({ text: "a" }); await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const journal = await tx.doc(CodemodeJournalDoc, task);
 					journal.entries[0]!.id = 99;
 				}, context);
@@ -312,7 +312,7 @@ describe("durable code mode", () => {
 	it("ends the call when a resumed script calls a global with other arguments", async () => {
 		const chat = codemodeChat([{ name: "next", execute: async () => 1 }]);
 		const { harness, result } = await restart(chat, `await next(); await tools.hold({});`, async (opened, task) => {
-			await opened.commit(async (tx) => {
+			await opened.commit(async tx => {
 				const journal = await tx.doc(CodemodeJournalDoc, task);
 				journal.entries[0]!.global!.args = "other";
 			}, context);
@@ -333,7 +333,7 @@ describe("durable code mode", () => {
 			for (let i = 0; i < extra; i++) tools.echo({ text: "extra" + i });
 			await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: 3 };
 				}, context);
@@ -357,7 +357,7 @@ describe("durable code mode", () => {
 			chat,
 			`await tools.echo({ text: "a" }); if (load("k")) return "early"; await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: true };
 				}, context);
@@ -380,7 +380,7 @@ describe("durable code mode", () => {
 			chat,
 			`await tools.echo({ text: "a" }); if (load("k")) return "early"; await tools.echo({ text: "b" }); await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: true };
 					// As if the live run crashed before recording result 1's count.
@@ -400,7 +400,7 @@ describe("durable code mode", () => {
 			chat,
 			`await tools.echo({ text: load("k") ?? "a" }); await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: "other" };
 					// As if the restart came before the first journal commit: the rerun runs live from the start.
@@ -428,7 +428,7 @@ describe("durable code mode", () => {
 		chat.holds.reached = deferred();
 		opened = await openChat(await openNodeSqliteStorage(path), chat.setup);
 		const task = await scriptTask(opened.harness);
-		await opened.harness.commit(async (tx) => {
+		await opened.harness.commit(async tx => {
 			delete (await tx.doc(CodemodeJournalDoc, task)).entries[0]!.issuedAfter;
 		}, context);
 		opened.harness.resume();
@@ -459,7 +459,7 @@ describe("durable code mode", () => {
 		]);
 		const { harness, root } = await openChat(await openNodeSqliteStorage(await sqlitePath()), chat.setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const entry = (await allEntries(root)).find((candidate) => ToolResultEntry.is(candidate))!;
+		const entry = (await allEntries(root)).find(candidate => ToolResultEntry.is(candidate))!;
 		const details = (entry.model![0] as { details?: CodemodeToolDetails }).details;
 		// A call still running, or not yet launched, when the script ended shows as cancelled.
 		expect(details?.calls).toMatchObject([
@@ -484,7 +484,7 @@ describe("durable code mode", () => {
 		const task = await scriptTask(opened.harness);
 		// A host shutting down closes the sandbox before the Harness.
 		await chat.sandbox.close();
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		expect((await opened.harness.snapshot(CodemodeRunDoc, task, context))?.result).toBeUndefined();
 		await opened.harness.close(context);
 		// The next process has a new sandbox.
@@ -507,10 +507,9 @@ describe("durable code mode", () => {
 		const { harness, root } = await openChat(await openNodeSqliteStorage(await sqlitePath()), chat.setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(await resultText(chat.setup, root)).toEqual({ text: "1", isError: false });
-		const tasks = (await harness.commit((tx) => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context))
-			.items;
+		const tasks = (await harness.commit(tx => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
 		const hold = tasks.find(
-			(task) =>
+			task =>
 				(task.input as ToolTaskInput).kind === "nested" &&
 				(task.input as { call: { name: string } }).call.name === "hold",
 		)!;
@@ -524,7 +523,7 @@ describe("durable code mode", () => {
 		chat.holds.block = false;
 		const storage = new ControlledStorage();
 		// Hold the fingerprint commit, and so the admission of the script's call, until the script has ended.
-		chat.vm.onStart = (run) => {
+		chat.vm.onStart = run => {
 			const held = storage.holdCommits();
 			void run.result.then(() => held.release());
 		};
@@ -547,7 +546,7 @@ describe("durable code mode", () => {
 			if (k) tools.echo({ text: "new" });
 			await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: "x" };
 					// As if the restart came before the first journal commit.
@@ -569,7 +568,7 @@ describe("durable code mode", () => {
 			chat,
 			`if (load("k")) { await pick(); await tools.echo({ text: "new" }); } else { await tools.hold({}); }`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: true };
 				}, context);
@@ -594,7 +593,7 @@ describe("durable code mode", () => {
 			await pick();
 			await tools.echo({ text: "new" });`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: true };
 				}, context);
@@ -615,7 +614,7 @@ describe("durable code mode", () => {
 			chat,
 			`if (load("k")) { store("x", 1); return "early"; } await tools.hold({});`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: true };
 				}, context);
@@ -647,7 +646,7 @@ describe("durable code mode", () => {
 			if (k) tools.echo({ text: "new" }); else forever();
 			await tools.hold({ id: k ? 2 : 1 });`,
 			async (opened, task) => {
-				await opened.commit(async (tx) => {
+				await opened.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, task);
 					run.start!.store = { k: true };
 				}, context);
@@ -686,7 +685,7 @@ describe("durable code mode", () => {
 			expect(await resultText(chat.setup, root)).toEqual({ text: "1", isError: false });
 			// The script's tool call has ended; its pending global resolves now.
 			late.resolve("late");
-			await new Promise((resolve) => setTimeout(resolve, 20));
+			await new Promise(resolve => setTimeout(resolve, 20));
 			expect(rejections).toEqual([]);
 			await harness.close(context);
 		} finally {
@@ -769,7 +768,7 @@ describe("durable code mode", () => {
 				name: "picture",
 				description: "picture",
 				parameters: obj({ caption: bool() }),
-				execute: async (args) => ({
+				execute: async args => ({
 					output: [
 						...(args.caption ? [{ type: "text" as const, text: "a cat" }] : []),
 						{ type: "image" as const, data: PNG, mimeType: "image/png" },
@@ -814,7 +813,7 @@ describe("durable code mode", () => {
 		const { harness, root } = await openChat(storage, chat.setup);
 		await root.submit({ type: "input", content: "go" }, context);
 		await eventually(() => seen.includes("first"));
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		expect(seen).toEqual(["first"]);
 		await harness.close(context).catch(() => {});
 	});
@@ -826,7 +825,7 @@ describe("durable code mode", () => {
 				chat,
 				`await tools.hold({}); await tools.echo({ text: "late" });`,
 				async (opened, task) => {
-					await opened.commit(async (tx) => {
+					await opened.commit(async tx => {
 						const run = await tx.doc(CodemodeRunDoc, task);
 						if (field === "fingerprint") run.start!.fingerprint = "another sandbox";
 						else run.start!.version = 0;
@@ -846,7 +845,7 @@ describe("durable code mode", () => {
 			chat,
 			`// @options: {"timeout_ms": 300}
 			await tools.hold({}); await tools.echo({ text: "late" });`,
-			() => new Promise((resolve) => setTimeout(resolve, 400)),
+			() => new Promise(resolve => setTimeout(resolve, 400)),
 		);
 		expect(result.isError).toBe(true);
 		expect(result.text).toContain("deadline passed");
@@ -896,16 +895,16 @@ describe("durable code mode", () => {
 		]);
 		const { harness, root } = await openChat(await openNodeSqliteStorage(await sqlitePath()), chat.setup);
 		await (await root.submit({ type: "input", content: "first" }, context)).wait(context);
-		const firstUser = (await allEntries(root)).find((entry) => entry.kind === "pi.user")!;
+		const firstUser = (await allEntries(root)).find(entry => entry.kind === "pi.user")!;
 		await (await root.submit({ type: "input", content: "second" }, context)).wait(context);
-		const results = (await allEntries(root)).filter((entry) => ToolResultEntry.is(entry));
-		const texts = results.map((entry) => (entry.model![0] as { content: { text: string }[] }).content[1]!.text);
+		const results = (await allEntries(root)).filter(entry => ToolResultEntry.is(entry));
+		const texts = results.map(entry => (entry.model![0] as { content: { text: string }[] }).content[1]!.text);
 		expect(texts).toEqual(["1", "[1]"]);
 		// A fork at the first input is from before the first script stored anything.
 		chat.setup.faux.setResponses([script(`return [load("k") ?? null]`), DONE]);
 		const fork = await root.fork(firstUser.id, { ownership: { kind: "ownerless" } }, context);
 		await (await fork.submit({ type: "input", content: "fork" }, context)).wait(context);
-		const forkResult = (await allEntries(fork)).filter((entry) => ToolResultEntry.is(entry)).at(-1)!;
+		const forkResult = (await allEntries(fork)).filter(entry => ToolResultEntry.is(entry)).at(-1)!;
 		expect((forkResult.model![0] as { content: { text: string }[] }).content[1]!.text).toBe("[null]");
 		await harness.close(context);
 	});
@@ -931,7 +930,7 @@ describe("durable code mode", () => {
 		const { harness, root } = await openChat(await openNodeSqliteStorage(await sqlitePath()), chat.setup);
 		let journalCommits = 0;
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of publication.changes) {
 					if (change.type === "document" && change.record.kind === "pi.codemode.journal") journalCommits++;
 				}
@@ -957,14 +956,14 @@ describe("durable code mode output and tool search", () => {
 			env: new NodeExecutionEnv({ cwd }),
 		});
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const entry = (await allEntries(root)).find((candidate) => ToolResultEntry.is(candidate))!;
+		const entry = (await allEntries(root)).find(candidate => ToolResultEntry.is(candidate))!;
 		const message = entry.model![0] as {
 			content: { type: string; text?: string }[];
 			isError: boolean;
 			details?: CodemodeToolDetails;
 		};
 		await harness.close(context);
-		return { text: message.content.map((item) => item.text ?? `<${item.type}>`).join(""), message };
+		return { text: message.content.map(item => item.text ?? `<${item.type}>`).join(""), message };
 	}
 
 	it("lays out text items, console lines, and the returned value under a header", async () => {
@@ -1032,7 +1031,7 @@ describe("durable code mode output and tool search", () => {
 		opened = await openChat(await openNodeSqliteStorage(storage), chat.setup, { env: new NodeExecutionEnv({ cwd }) });
 		opened.harness.resume();
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
-		const entry = (await allEntries(opened.root)).find((candidate) => ToolResultEntry.is(candidate))!;
+		const entry = (await allEntries(opened.root)).find(candidate => ToolResultEntry.is(candidate))!;
 		const details = (entry.model![0] as { details?: CodemodeToolDetails }).details;
 		expect(details?.fullOutputPath).toBe(first);
 		directories.add(dirname(first));
@@ -1046,7 +1045,7 @@ describe("durable code mode output and tool search", () => {
 		const saved = /\[Image saved to (\S+) \(image\/png, \d+ bytes\)\]/.exec(text);
 		expect(saved).not.toBeNull();
 		expect((await readFile(saved![1]!)).toString("base64")).toBe(png);
-		expect(message.content.some((item) => item.type === "image")).toBe(true);
+		expect(message.content.some(item => item.type === "image")).toBe(true);
 	});
 
 	// #11015
@@ -1069,7 +1068,7 @@ describe("durable code mode output and tool search", () => {
 		expect(text).toContain(`image image/png ${png.length}`);
 		expect(text).toMatch(/\[Image saved to \S+ \(image\/png, \d+ bytes\)\]/);
 		expect(text).toContain("hello");
-		expect(message.content.some((item) => item.type === "image")).toBe(true);
+		expect(message.content.some(item => item.type === "image")).toBe(true);
 	});
 
 	it("calls a deferred tool the model is not offered, and finds it in ALL_TOOLS", async () => {

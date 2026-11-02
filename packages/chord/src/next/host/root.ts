@@ -46,7 +46,7 @@ export class RootScopes {
 		const ctx = new CallContext(scope, { principal, incarnation: host.incarnation }, host);
 		const result = Promise.withResolvers<T>();
 		const open: OpenScope = {
-			seal: (reason) => {
+			seal: reason => {
 				if (!this.#open.delete(open)) return;
 				caller?.removeEventListener("abort", aborted);
 				// References first: a `get` still waiting gives up with `released`, not with the abort's reason.
@@ -61,7 +61,7 @@ export class RootScopes {
 		// Plugin code: a synchronous throw becomes the rejection.
 		const running = (async () => fn(ctx))();
 		running.then(
-			(value) => {
+			value => {
 				open.seal(SETTLED);
 				result.resolve(value);
 			},

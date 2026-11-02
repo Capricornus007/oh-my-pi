@@ -131,7 +131,7 @@ export class NativeHandle<T> implements Native<T>, NativeSlot {
 /** Whether `promise` settled within `ms` (it rejects when `promise` does first); `promise` itself runs on. */
 export async function within(promise: Promise<unknown>, ms: number): Promise<"settled" | "timeout"> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
-	const timeout = new Promise<"timeout">((resolve) => {
+	const timeout = new Promise<"timeout">(resolve => {
 		timer = setTimeout(resolve, ms, "timeout");
 	});
 	try {

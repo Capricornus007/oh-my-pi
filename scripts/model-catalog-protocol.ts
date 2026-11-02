@@ -88,7 +88,7 @@ export function parseModelCatalogRepresentation(
 	if (types === undefined || types === null) {
 		return "legacy";
 	}
-	if (types === "" || types.split(",").some((type) => !MODEL_TYPE_RE.test(type))) {
+	if (types === "" || types.split(",").some(type => !MODEL_TYPE_RE.test(type))) {
 		return undefined;
 	}
 	return "typed";
@@ -134,7 +134,7 @@ export function selectModelCatalog(
 	piVersion: string | undefined,
 ): ModelCatalogIndexEntry | undefined {
 	if (piVersion === undefined) {
-		return index.catalogs.find((catalog) => catalog.revision === index.defaultRevision);
+		return index.catalogs.find(catalog => catalog.revision === index.defaultRevision);
 	}
 
 	const requestedVersion = parsePiVersion(piVersion);
@@ -175,7 +175,7 @@ export function parseModelCatalogIndex(value: unknown): ModelCatalogIndex {
 		!Array.isArray(value.catalogs) ||
 		value.catalogs.length === 0 ||
 		value.catalogs.some(
-			(catalog) =>
+			catalog =>
 				typeof catalog !== "object" ||
 				catalog === null ||
 				typeof catalog.minimumPiVersion !== "string" ||
@@ -183,7 +183,7 @@ export function parseModelCatalogIndex(value: unknown): ModelCatalogIndex {
 				typeof catalog.revision !== "string" ||
 				!MODEL_CATALOG_REVISION_RE.test(catalog.revision),
 		) ||
-		!value.catalogs.some((catalog) => catalog.revision === value.defaultRevision)
+		!value.catalogs.some(catalog => catalog.revision === value.defaultRevision)
 	) {
 		throw new Error(`Model catalog index is invalid: ${MODEL_CATALOG_INDEX_KEY}`);
 	}
@@ -212,7 +212,7 @@ function parsePiVersion(version: string): ParsedPiVersion | undefined {
 		return undefined;
 	}
 	const parsed = [Number(match[1]), Number(match[2]), Number(match[3])] as const;
-	if (parsed.some((part) => !Number.isSafeInteger(part))) {
+	if (parsed.some(part => !Number.isSafeInteger(part))) {
 		return undefined;
 	}
 	return [parsed[0], parsed[1], parsed[2], match[4] ?? ""];

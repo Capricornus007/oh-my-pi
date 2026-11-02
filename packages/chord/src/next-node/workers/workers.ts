@@ -210,7 +210,7 @@ class WorkersComponent implements Workers<HostKind> {
 
 	constructor(options: WorkersOptions<Principal, HostKind>, context: Context) {
 		this.#options = options;
-		this.#state = new WorkersState(this.#addresses, new Batch((error) => options.onError(error), undefined));
+		this.#state = new WorkersState(this.#addresses, new Batch(error => options.onError(error), undefined));
 		// Its value is a `Record<string, WorkerState>`.
 		this.state = this.#state as unknown as Watchable<Readonly<Record<string, WorkerState>>>;
 		this.#closeWith(context);
@@ -265,7 +265,7 @@ class WorkersComponent implements Workers<HostKind> {
 		if (!this.#closing.signal.aborted) this.#closing.abort(closed());
 		clearInterval(this.#idleTimer);
 		this.#idleTimer = undefined;
-		const stops = [...this.#addresses.values()].map((routed) => this.#enqueue(routed, () => this.#stop(routed)));
+		const stops = [...this.#addresses.values()].map(routed => this.#enqueue(routed, () => this.#stop(routed)));
 		await awaitWithContext(Promise.all(stops), context);
 	}
 
@@ -388,10 +388,10 @@ class WorkersComponent implements Workers<HostKind> {
 				...(onOutput === undefined ? {} : { onOutput: (stream, chunk) => onOutput(address, stream, chunk) }),
 			},
 			{
-				control: (message) => this.#control(routed, child, message),
+				control: message => this.#control(routed, child, message),
 				linkLost: () => this.#linkLost(child),
 				linkClosed: () => this.#linkClosed(child),
-				exited: (exit) => this.#exited(routed, child, exit),
+				exited: exit => this.#exited(routed, child, exit),
 			},
 		);
 		const child: Child = {
@@ -627,7 +627,7 @@ class WorkersComponent implements Workers<HostKind> {
 	#reload(host: string, child: Child, scripts: readonly PluginScript[], key: string): Promise<RolloutHost> {
 		const reload = child.reloading.then(
 			() =>
-				new Promise<RolloutHost>((resolve) => {
+				new Promise<RolloutHost>(resolve => {
 					const settle = (ended: Ended): void => {
 						resolve(ended.kind === "stopped" ? { host, stopped: true } : { host, error: ended.error });
 					};
@@ -635,7 +635,7 @@ class WorkersComponent implements Workers<HostKind> {
 						settle(child.ended);
 						return;
 					}
-					child.reloaded = (reply) => {
+					child.reloaded = reply => {
 						child.reloaded = undefined;
 						if ("report" in reply) {
 							if (reply.report.failed.length === 0) child.shipped = key;

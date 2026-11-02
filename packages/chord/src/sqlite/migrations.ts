@@ -22,7 +22,7 @@ export async function applySqliteMigrations(
 		}
 	}
 
-	await database.transaction(async (transaction) => {
+	await database.transaction(async transaction => {
 		await transaction.exec(`CREATE TABLE IF NOT EXISTS ${table} (
 			singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
 			version INTEGER NOT NULL CHECK (version >= 0)

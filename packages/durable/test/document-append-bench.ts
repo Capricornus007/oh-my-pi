@@ -33,7 +33,7 @@ async function run(kind: "array" | "family", n: number): Promise<number> {
 	const session = createSession(new MemoryStorage());
 	const started = performance.now();
 	for (let i = 0; i < n; i++) {
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			if (kind === "array") (await tx.doc(Journal)).entries.push({ key: `c${i}`, issued: i, at: i });
 			else Object.assign(await tx.doc(Member, `c${i}`, null), { issued: i, at: i });
 		}, context);

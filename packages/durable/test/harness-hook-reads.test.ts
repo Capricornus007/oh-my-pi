@@ -28,7 +28,7 @@ describe("entry reads for hooks and tasks", () => {
 							const first = page.items[0]!;
 							const user = await api.entry(UserEntry, first.id, ctx);
 							seen.push({
-								kinds: page.items.map((entry) => entry.kind),
+								kinds: page.items.map(entry => entry.kind),
 								...(user === undefined ? {} : { user: user.kind }),
 							});
 							// Another kind: undefined.
@@ -77,14 +77,11 @@ describe("entry reads for hooks and tasks", () => {
 		setup.faux.setResponses([fauxAssistantMessage("done")]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const id = await root.commit(
-			(tx) => tx.createTask(Reader, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await root.commit(tx => tx.createTask(Reader, null, { ownership: { kind: "conversation" } }), context);
 		await harness.waitForTask(id, context);
 		const entries = await allEntries(root);
-		expect(entries.map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant"]);
-		expect(pages.map((page) => page.map((entry) => entry.id))).toEqual([
+		expect(entries.map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant"]);
+		expect(pages.map(page => page.map(entry => entry.id))).toEqual([
 			[entries[0]!.id],
 			[entries[1]!.id],
 			[entries[1]!.id],

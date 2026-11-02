@@ -24,7 +24,7 @@ const DraftDoc = defineState("draft", { schema: obj({ text: str() }), version: 1
 // What the mirror's open finds: nothing configured, then a server that is down, then one that answers.
 const remote = { configured: false, up: false };
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	// 1. A draft lingers 200 ms after its last reference: a tab that closes and reopens quickly finds its text.
 	host.serve(
 		Draft,
@@ -34,7 +34,7 @@ const facet = defineFacet((host) => {
 			return {
 				text: self.derive([doc], ([d]) => d.text),
 				type: async ({ text }, ctx) => {
-					await doc.change((draft) => {
+					await doc.change(draft => {
 						draft.text = text;
 					}, ctx);
 					return null;
@@ -58,9 +58,9 @@ const facet = defineFacet((host) => {
 	});
 });
 
-const host = createHost({ onError: (error) => console.log(`  onError: ${error.kind}`) });
+const host = createHost({ onError: error => console.log(`  onError: ${error.kind}`) });
 await host.load([{ name: "@example/app", facet }], context);
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /** A state for the log: a failure with its kind, when it retries by itself, and its error. */
 function describe(state: RefState): string {
@@ -85,7 +85,7 @@ draft.release();
 // 3. A held reference follows its object: broken first (no retryAt), so nothing happens by itself.
 const mirror = host.hold(Mirror, { id: 1 }, context);
 const watch = await mirror.state.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log(`  ref.state → ${describe(call.value)}`);
 });
 await wait(10);

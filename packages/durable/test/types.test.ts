@@ -267,7 +267,7 @@ it("types submissions, task waits, compaction, and tasks erased into extensions"
 	const Stepper = defineTask<{ steps: number }, Checkpoint, { ran: number }, Hooks>({
 		name: "test.stepper",
 		version: 1,
-		initial: (input) => ({ phase: "plan", steps: input.steps }),
+		initial: input => ({ phase: "plan", steps: input.steps }),
 		phases: {
 			plan: async (task, runtime, context) => {
 				expectTypeOf(task.state.checkpoint.steps).toEqualTypeOf<number>();
@@ -276,7 +276,7 @@ it("types submissions, task waits, compaction, and tasks erased into extensions"
 			},
 			run: async (task, runtime, context) => {
 				expectTypeOf(task.state.checkpoint.step).toEqualTypeOf<number>();
-				await runtime.hooks.each("beforeStep", (handler) => {
+				await runtime.hooks.each("beforeStep", handler => {
 					expectTypeOf(handler).toEqualTypeOf<Hooks["beforeStep"]>();
 				});
 				await runtime.commit(
@@ -288,7 +288,7 @@ it("types submissions, task waits, compaction, and tasks erased into extensions"
 		abort: async () => {},
 	});
 	expectTypeOf<HooksOf<typeof Stepper>>().toEqualTypeOf<Hooks>();
-	const registration = hook(Stepper, { beforeStep: (step) => (step > 1 ? { skip: true } : undefined) });
+	const registration = hook(Stepper, { beforeStep: step => (step > 1 ? { skip: true } : undefined) });
 	// Erased into an extension, whatever its input, phases, and hooks.
 	const erased: AnyTask = Stepper;
 	const extension: Extension = defineExtension({ name: "stepper", tasks: [Stepper], hooks: [registration] });
@@ -300,7 +300,7 @@ it("types submissions, task waits, compaction, and tasks erased into extensions"
 		runtime: TaskRuntime<null, Checkpoint, null, Hooks>,
 	) => {
 		const id = await conversation.commit(
-			(tx) => tx.createTask(Stepper, { steps: 2 }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Stepper, { steps: 2 }, { ownership: { kind: "conversation" } }),
 			callContext,
 		);
 		expectTypeOf(id).toEqualTypeOf<TaskId<{ ran: number }>>();
@@ -329,7 +329,7 @@ it("types submissions, task waits, compaction, and tasks erased into extensions"
 		const unknownHook = hook(Stepper, { afterStep: () => undefined });
 		const wrongInput = conversation.commit(
 			// @ts-expect-error task input is typed by the definition
-			(tx) => tx.createTask(Stepper, { steps: "two" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Stepper, { steps: "two" }, { ownership: { kind: "conversation" } }),
 			callContext,
 		);
 		const missingPhase = defineTask<null, Checkpoint, null>({

@@ -213,7 +213,7 @@ async function runScenario(scenario: Scenario): Promise<Result> {
 		if (settled.status !== "done") throw new Error(`run: ${settled.status}`);
 		// `done` only says the model answered; the script's result says whether it ran through.
 		const latest = (await root.entries({}, 10, undefined, context)).items;
-		const result = latest.find((entry) => ToolResultEntry.is(entry))?.model?.[0];
+		const result = latest.find(entry => ToolResultEntry.is(entry))?.model?.[0];
 		if (result?.role !== "toolResult" || result.isError) throw new Error("run: the script failed");
 		const ms = Math.round(performance.now() - started);
 		clearInterval(sampler);

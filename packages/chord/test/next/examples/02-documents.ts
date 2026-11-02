@@ -33,7 +33,7 @@ const Store = local("example.todos", {
 	},
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Store, (_, self) => {
 		const todos = self.state(Todos);
 		const notes = self.state(Notes);
@@ -42,7 +42,7 @@ const facet = defineFacet((host) => {
 			todos,
 			add: async ({ text, note }, ctx) => {
 				// One transaction over two documents: both change together, or neither does.
-				const id = await self.tx(async (tx) => {
+				const id = await self.tx(async tx => {
 					const draft = await tx.draft(todos);
 					const id = draft.next++;
 					draft.items.push({ id, text });
@@ -54,7 +54,7 @@ const facet = defineFacet((host) => {
 			},
 			// Read keyed documents outside transactions; an absent one is `undefined`.
 			note: async ({ id }, ctx) => (await notes.get(String(id), ctx))?.body ?? "(none)",
-			clear: async (ctx) => {
+			clear: async ctx => {
 				// Shorthands for one document: retire resets a singleton to `initial()`.
 				await todos.retire(ctx);
 				for await (const key of notes.keys(ctx)) await notes.retire(key, ctx);
@@ -64,7 +64,7 @@ const facet = defineFacet((host) => {
 	});
 });
 
-const host = createHost({ onError: (error) => console.error("background error:", error) });
+const host = createHost({ onError: error => console.error("background error:", error) });
 await host.load([{ name: "@example/todos", facet }], context);
 const store = await host.get(Store, {}, context);
 

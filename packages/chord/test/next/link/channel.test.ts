@@ -44,7 +44,7 @@ const hold = {
 } as const;
 
 const problems = (errors: readonly HostError[]) =>
-	errors.flatMap((error) => (error.kind === "protocol_error" ? [(error.error as Error).message] : []));
+	errors.flatMap(error => (error.kind === "protocol_error" ? [(error.error as Error).message] : []));
 
 forEachCodec(() =>
 	describe("the handshake", () => {
@@ -109,7 +109,7 @@ forEachCodec(() =>
 describe("a codec mismatch", () => {
 	it("fails the first hello as a protocol error naming the expected codec", async () => {
 		const errors: HostError[] = [];
-		const server = createHost({ onError: (error) => errors.push(error) });
+		const server = createHost({ onError: error => errors.push(error) });
 		await server.load([], context);
 		const client = createHost({ onError: () => {} });
 		await client.load([], context);
@@ -153,7 +153,7 @@ describe("the heartbeat", () => {
 		await elapse(13_500);
 		expect(peer.kinds()).not.toContain("ping");
 		await elapse(3_000);
-		expect(peer.kinds().filter((kind) => kind === "ping")).toEqual(["ping"]);
+		expect(peer.kinds().filter(kind => kind === "ping")).toEqual(["ping"]);
 		await elapse(15_000);
 		expect(peer.closed).toBe(true);
 		expect(notes.state.value).toEqual({ kind: "loading" });

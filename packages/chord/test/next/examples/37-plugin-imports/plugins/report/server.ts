@@ -16,7 +16,7 @@ import { where } from "example-native";
 // A file of this plugin, read at run time by its absolute path.
 const rates = JSON.parse(readFileSync(pluginFile("data/rates.json"), "utf8")) as { readonly vat: number };
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Report, () => ({
 		text: constant(
 			[

@@ -108,12 +108,12 @@ export class StdioTransport extends TransportEvents implements McpTransport {
 			child.once("exit", () => liveProcessGroups.delete(pid));
 		}
 		child.stdout?.on("data", (chunk: Buffer | string) => this.handleStdout(chunk));
-		child.stdout?.on("error", (error) => this.emitError(error));
-		child.stdin?.on("error", (error) => {
+		child.stdout?.on("error", error => this.emitError(error));
+		child.stdin?.on("error", error => {
 			if (!this.closed) this.emitError(error);
 		});
 		child.stderr?.on("data", (chunk: Buffer | string) => this.handleStderr(chunk));
-		child.stderr?.on("error", (error) => this.emitError(error));
+		child.stderr?.on("error", error => this.emitError(error));
 		child.on("close", () => {
 			this.child = undefined;
 			if (this.stdoutBuffer.toString("utf8").trim()) {
@@ -135,7 +135,7 @@ export class StdioTransport extends TransportEvents implements McpTransport {
 			child.once("spawn", onSpawn);
 			child.once("error", onError);
 		});
-		child.on("error", (error) => {
+		child.on("error", error => {
 			if (!this.closed) this.emitError(error);
 		});
 	}
@@ -145,7 +145,7 @@ export class StdioTransport extends TransportEvents implements McpTransport {
 		if (!this.started || this.closed || !stdin?.writable) throw new McpConnectionClosedError();
 		const payload = `${JSON.stringify(message)}\n`;
 		await new Promise<void>((resolve, reject) => {
-			stdin.write(payload, (error) => (error ? reject(error) : resolve()));
+			stdin.write(payload, error => (error ? reject(error) : resolve()));
 		});
 	}
 
@@ -163,7 +163,7 @@ export class StdioTransport extends TransportEvents implements McpTransport {
 		}
 		// Shutdown per the spec: close stdin and let the server exit, then SIGTERM, then SIGKILL.
 		const closeTimeoutMs = this.options.closeTimeoutMs ?? DEFAULT_CLOSE_TIMEOUT_MS;
-		await new Promise<void>((resolve) => {
+		await new Promise<void>(resolve => {
 			const timers: ReturnType<typeof setTimeout>[] = [];
 			child.once("close", () => {
 				for (const timer of timers) clearTimeout(timer);

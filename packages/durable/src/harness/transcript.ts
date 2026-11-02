@@ -137,8 +137,8 @@ export class ConversationTranscript {
 	 */
 	fillGap(gap: Gap, context: Context): Promise<TranscriptView> {
 		const current =
-			this.#gaps.find((each) => each.after === gap.after && each.upTo === gap.upTo) ??
-			this.#gaps.find((each) => each.after < gap.upTo && gap.after < each.upTo);
+			this.#gaps.find(each => each.after === gap.after && each.upTo === gap.upTo) ??
+			this.#gaps.find(each => each.after < gap.upTo && gap.after < each.upTo);
 		if (current === undefined) {
 			const last = this.#last;
 			if (last === undefined) return Promise.reject(new Error("ConversationTranscript: merge a view first"));
@@ -174,7 +174,7 @@ export class ConversationTranscript {
 	 * ones, shrink the gaps they fill, extend the known range, and open a gap where the range does not continue it.
 	 */
 	#cover(lo: number, hi: number, added: readonly EntryRecord[]): void {
-		const fresh = added.filter((entry) => !this.#ids.has(entry.id));
+		const fresh = added.filter(entry => !this.#ids.has(entry.id));
 		for (const entry of fresh) this.#ids.add(entry.id);
 		const held = this.#entries;
 		// New entries past every held one: the items grow at their end.
@@ -196,7 +196,7 @@ export class ConversationTranscript {
 			rebuild = true;
 		} else if (hi !== Number.NEGATIVE_INFINITY && hi < this.#low) {
 			// Below the oldest known ID: what lies between is missing.
-			const upTo = held.find((item) => item.entry.id > hi)?.entry.id ?? this.#low + 1;
+			const upTo = held.find(item => item.entry.id > hi)?.entry.id ?? this.#low + 1;
 			this.#gaps = [gapOf(hi, upTo), ...this.#gaps];
 			this.#low = lo;
 			rebuild = true;
@@ -229,7 +229,7 @@ export class ConversationTranscript {
 			}
 			changed = true;
 			if (lo > gap.after) {
-				const firstKnown = this.#entries.find((item) => item.entry.id > lo)?.entry.id ?? lo + 1;
+				const firstKnown = this.#entries.find(item => item.entry.id > lo)?.entry.id ?? lo + 1;
 				gaps.push(gapOf(gap.after, Math.min(gap.upTo, firstKnown)));
 			}
 			if (hi + 1 < gap.upTo) gaps.push(gapOf(hi, gap.upTo));

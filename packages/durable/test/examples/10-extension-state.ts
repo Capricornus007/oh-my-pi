@@ -41,7 +41,7 @@ const Todo = defineExtension({
 			description: "Add an item to your todo list",
 			parameters: obj({ item: str() }),
 			execute: async (args, api, callContext) => {
-				await api.commit(async (tx) => {
+				await api.commit(async tx => {
 					(await tx.doc(Todos, api.conversationId)).items.push(args.item);
 				}, callContext);
 				return { output: [{ type: "text", text: `added ${args.item}` }] };
@@ -78,9 +78,9 @@ await (await root.submit({ type: "input", content: "What is next?" }, context)).
 const { messages } = await root.context(context);
 console.log(
 	"system messages:",
-	messages.flatMap((message) =>
+	messages.flatMap(message =>
 		message.role === "system"
-			? [{ sections: message.sections, toolsAdded: message.toolsAdded?.map((tool) => tool.name) }]
+			? [{ sections: message.sections, toolsAdded: message.toolsAdded?.map(tool => tool.name) }]
 			: [],
 	),
 );

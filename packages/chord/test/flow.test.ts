@@ -17,7 +17,7 @@ import {
 	remote,
 } from "../src/index.ts";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 200): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -48,7 +48,7 @@ class AckGate implements Link {
 		this.#held = undefined;
 	}
 	receive(handler: (frame: Frame) => void): void {
-		this.inner.receive((frame) => {
+		this.inner.receive(frame => {
 			this.received.push(frame);
 			handler(frame);
 		});
@@ -79,7 +79,7 @@ const WorkerCounter = counterOn("t.flow-worker-counter", "w");
 
 let release = () => {};
 const waiting = () =>
-	new Promise<void>((resolve) => {
+	new Promise<void>(resolve => {
 		const previous = release;
 		release = () => {
 			previous();
@@ -94,7 +94,7 @@ function serveCounter(host: Host, type = Counter): void {
 			variant: "main",
 			count,
 			add: (delta: number, ctx: Ctx) => {
-				count.change(ctx, (draft) => {
+				count.change(ctx, draft => {
 					draft.n += delta;
 				});
 				return count.value.n;
@@ -129,7 +129,7 @@ describe("link flow control", () => {
 		const { host, gate } = client(server, 200);
 		const counter = host.hold(Counter, {});
 		const values: unknown[] = [];
-		counter.count.subscribe((value) => values.push(value));
+		counter.count.subscribe(value => values.push(value));
 		await until(() => values.at(-1) !== undefined);
 
 		gate.paused = true;
@@ -153,7 +153,7 @@ describe("link flow control", () => {
 		const { host, gate } = client(server, 64);
 		const counter = host.hold(Counter, {});
 		const values: unknown[] = [];
-		counter.count.subscribe((value) => values.push(value));
+		counter.count.subscribe(value => values.push(value));
 		await until(() => values.at(-1) !== undefined);
 
 		gate.paused = true;
@@ -163,7 +163,7 @@ describe("link flow control", () => {
 		await until(() => (values.at(-1) as { n: number }).n === 100);
 		const sent = stateFrames(gate.received.slice(before));
 		assert.ok(
-			sent.some((frame) => frame.as === "reset"),
+			sent.some(frame => frame.as === "reset"),
 			"a reset replaced the ops",
 		);
 		assert.ok(sent.length < 10, `few state frames, not one per change (${sent.length})`);
@@ -196,9 +196,9 @@ describe("link flow control", () => {
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 		const toWorker: Frame[] = [];
 		server.route("w", {
-			principal: (name) => ({ host: name }),
+			principal: name => ({ host: name }),
 			authorize: () => true,
-			resolve: async (name) => {
+			resolve: async name => {
 				const [down, up] = memoryLinkPair();
 				const worker = createHost({
 					self: { kind: "host" },
@@ -215,25 +215,25 @@ describe("link flow control", () => {
 						toWorker.push(frame);
 						return down.send(frame);
 					},
-					receive: (handler) => down.receive(handler),
-					onClose: (handler) => down.onClose(handler),
-					close: (reason) => down.close(reason),
+					receive: handler => down.receive(handler),
+					onClose: handler => down.onClose(handler),
+					close: reason => down.close(reason),
 				} satisfies Link;
 			},
 		});
 		const { host, gate } = client(server, 64);
 		const counter = host.hold(WorkerCounter, {});
 		const values: unknown[] = [];
-		counter.count.subscribe((value) => values.push(value));
+		counter.count.subscribe(value => values.push(value));
 		await until(() => values.at(-1) !== undefined);
-		const resyncs = () => toWorker.filter((frame) => frame.t === "resync").length;
+		const resyncs = () => toWorker.filter(frame => frame.t === "resync").length;
 		assert.equal(resyncs(), 0);
 
 		gate.paused = true;
 		for (let i = 0; i < 100; i++) await counter.add(1);
 		// An overflow drops the waiting ops and asks the worker for a reset (which then waits in the slot).
 		assert.ok(resyncs() >= 1, "the overflowing stream was resynced downstream");
-		assert.ok(!toWorker.some((frame) => frame.t === "sub" || frame.t === "unsub"));
+		assert.ok(!toWorker.some(frame => frame.t === "sub" || frame.t === "unsub"));
 		gate.release();
 		await until(() => (values.at(-1) as { n: number }).n === 100);
 		await host.close();
@@ -246,14 +246,14 @@ describe("link flow control", () => {
 		const [down, raw] = memoryLinkPair();
 		server.accept(down, { principal: { user: "u" }, window: 1 });
 		const frames: Frame[] = [];
-		raw.receive((frame) => frames.push(frame));
+		raw.receive(frame => frames.push(frame));
 		raw.send({ t: "hello", protocol: PROTOCOL_VERSION, name: "raw", kind: "client", codeVersion: 0 });
 		raw.send({ t: "hold", id: 1, at: "server", token: Counter.description, input: {} });
 		for (let i = 0; i < 5; i++) raw.send({ t: "call", id: 3 + i, hold: 1, member: "add", args: 1 });
-		await until(() => frames.filter((frame) => frame.t === "result").length === 5);
+		await until(() => frames.filter(frame => frame.t === "result").length === 5);
 		await sleep(5);
 		assert.equal(stateFrames(frames).length, 6, "the snapshot and one frame per change");
-		assert.ok(!frames.some((frame) => frame.t === "ack"));
+		assert.ok(!frames.some(frame => frame.t === "ack"));
 		assert.equal((frames[0] as Extract<Frame, { t: "hello" }>).acks, true);
 		await server.close();
 	});
@@ -290,7 +290,7 @@ describe("link call limit", () => {
 		const second = counter.wait();
 		await assert.rejects(
 			counter.add(1),
-			(error) => isChordError(error, "unavailable") && error.reason === "too_many_calls",
+			error => isChordError(error, "unavailable") && error.reason === "too_many_calls",
 		);
 		release();
 		await Promise.all([first, second]);

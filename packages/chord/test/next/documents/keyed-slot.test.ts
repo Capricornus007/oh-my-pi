@@ -87,7 +87,7 @@ async function seed(store: ChordStore, entries: Record<string, string>): Promise
 	for (const [key, title] of Object.entries(entries)) {
 		await notes().change(
 			key,
-			(draft) => {
+			draft => {
 				draft.title = title;
 			},
 			context,
@@ -105,7 +105,7 @@ describe("keyed reads in memory", () => {
 		for (const key of ["b", "\u{1F600}", "a", "\uFFFF"])
 			await memos!.change(
 				key,
-				(d) => {
+				d => {
 					d.title = key;
 				},
 				context,
@@ -127,7 +127,7 @@ describe("migration on access", () => {
 			version: 2,
 			initial: () => ({ title: "" }),
 			keyed: true,
-			migrate: (old) => {
+			migrate: old => {
 				const title = old.title as string;
 				if (title === "bad") throw new Error("cannot migrate");
 				migrated.push(title);
@@ -141,7 +141,7 @@ describe("migration on access", () => {
 		for (const key of ["a", "b", "c"]) {
 			await memos[0]!.change(
 				key,
-				(draft) => {
+				draft => {
 					draft.title = key === "c" ? "bad" : key;
 				},
 				context,
@@ -152,7 +152,7 @@ describe("migration on access", () => {
 		expect(migrated).toEqual([]);
 		expect(await memos[1]!.get("a", context)).toEqual({ title: "a!" });
 		expect(migrated).toEqual(["a"]);
-		await attempts[1]!.tx(async (tx) => {
+		await attempts[1]!.tx(async tx => {
 			expect(await tx.draft(memos[1]!, "b")).toEqual({ title: "b!" });
 		}, context);
 		expect(migrated).toEqual(["a", "b"]);
@@ -183,7 +183,7 @@ describe("keys and the text rules", () => {
 		expect(await keysOf(notes())).toEqual(["x\uFFFD"]);
 		// One key: the change through either spelling reaches the same document and record.
 		await notes().change("x\uFFFD", title("two"), context);
-		await attempts[0]!.tx(async (tx) => {
+		await attempts[0]!.tx(async tx => {
 			(await tx.draft(notes(), "x\uD800")).title += "!";
 		}, context);
 		expect(await notes().get("x\uD800", context)).toEqual({ title: "two!" });
@@ -240,7 +240,7 @@ describe("keyed watches", () => {
 		expect(await memos!.watch("a", context)).toBeUndefined();
 		await memos!.change(
 			"a",
-			(d) => {
+			d => {
 				d.title = "x";
 			},
 			context,
@@ -250,7 +250,7 @@ describe("keyed watches", () => {
 		const changes = changesOf(watch);
 		await memos!.change(
 			"a",
-			(d) => {
+			d => {
 				d.title = "y";
 			},
 			context,
@@ -260,13 +260,13 @@ describe("keyed watches", () => {
 		await delivered();
 		await memos!.change(
 			"a",
-			(d) => {
+			d => {
 				d.title = "z";
 			},
 			context,
 		);
 		await delivered();
-		await attempts[0]!.tx(async (tx) => {
+		await attempts[0]!.tx(async tx => {
 			await tx.retire(memos!, "a");
 			(await tx.draft(memos!, "a")).title = "w";
 		}, context);
@@ -288,7 +288,7 @@ describe("keyed watches", () => {
 		});
 		await memos!.change(
 			"a",
-			(d) => {
+			d => {
 				d.title = "x";
 			},
 			context,
@@ -321,7 +321,7 @@ describe("at(key)", () => {
 		const changes = changesOf(await upper!.watch(context));
 		await memos!.change(
 			"a",
-			(d) => {
+			d => {
 				d.title = "x";
 			},
 			context,
@@ -411,7 +411,7 @@ describe("cold keyed loads on the line", () => {
 		await seed(store, { a: "x" });
 		const { host, notes, attempts } = await persisted(store);
 		let get: Promise<Note | undefined> | undefined;
-		await attempts[0]!.tx(async (tx) => {
+		await attempts[0]!.tx(async tx => {
 			get = notes().get("a", context);
 			const draft = await tx.draft(notes(), "a");
 			expect(draft.title).toBe("x");
@@ -432,7 +432,7 @@ describe("cold keyed loads on the line", () => {
 		const { host, notes } = await persisted(store);
 		const keys: string[] = [];
 		for await (const key of notes().keys(context)) keys.push(key);
-		expect(keys).toEqual([...Object.keys(entries).filter((key) => key.startsWith("k")), "\uFFFF", "\u{1F600}"]);
+		expect(keys).toEqual([...Object.keys(entries).filter(key => key.startsWith("k")), "\uFFFF", "\u{1F600}"]);
 		await host.close(context);
 	});
 
@@ -470,7 +470,7 @@ describe("cold keyed loads on the line", () => {
 				(_, self) => {
 					void self
 						.state(Other)
-						.change("a", (draft) => void Object.assign(draft, { title: "kept", n: "1" }), context);
+						.change("a", draft => void Object.assign(draft, { title: "kept", n: "1" }), context);
 				},
 				{ store },
 			);
@@ -484,7 +484,7 @@ describe("cold keyed loads on the line", () => {
 			expect(reference.state.value).toMatchObject({ kind: "failed", cause: { kind: "broken" } });
 			await host.close(context);
 			const reader = await storeRestartable(objects, (_, self) => void self.state(Other), { store });
-			expect(await store.read((executor) => executor.all("SELECT key FROM chord_documents"), context)).toEqual([
+			expect(await store.read(executor => executor.all("SELECT key FROM chord_documents"), context)).toEqual([
 				{ key: "a" },
 			]);
 			await reader.host.close(context);
@@ -506,7 +506,7 @@ describe("cold keyed loads on the line", () => {
 			(_, self) =>
 				void self.state(Newer).change(
 					"a",
-					(draft) => {
+					draft => {
 						draft.title = "kept";
 					},
 					context,
@@ -601,7 +601,7 @@ describe("cold keyed loads on the line", () => {
 			p = self.state(P);
 		});
 		const held = holdNextCommit(store);
-		const change = p!.change((draft) => {
+		const change = p!.change(draft => {
 			draft.title = "p";
 		}, context);
 		await held.entered;
@@ -629,7 +629,7 @@ describe("cold keyed loads on the line", () => {
 		let self: StoreSelf | undefined;
 		let notes: KeyedHandle<Note> | undefined;
 		const { host } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Notes, (_, s) => {
 					self = s;
 					notes = s.state(Note);
@@ -641,7 +641,7 @@ describe("cold keyed loads on the line", () => {
 		const held = holdNextCommit(store);
 		const change = notes!.change(
 			"b",
-			(draft) => {
+			draft => {
 				draft.title = "y";
 			},
 			context,
@@ -665,7 +665,7 @@ describe("cold keyed loads on the line", () => {
 		const { host, notes, attempts, restart } = await persisted(store);
 		const gate = holdNextRead(store);
 		const old = notes();
-		const cut = attempts[0]!.tx(async (tx) => {
+		const cut = attempts[0]!.tx(async tx => {
 			(await tx.draft(old, "a")).title = "z";
 		}, context);
 		await gate.reached;

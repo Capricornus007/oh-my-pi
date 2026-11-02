@@ -122,7 +122,7 @@ class DurableObjectSqliteExecutor implements SqliteExecutor {
 		return this.storage.sql
 			.exec(sql, ...bind(params))
 			.toArray()
-			.map((value) => row<T>(value));
+			.map(value => row<T>(value));
 	}
 
 	/** Throws when this handle may no longer run SQL. */

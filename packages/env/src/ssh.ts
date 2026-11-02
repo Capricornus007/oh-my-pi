@@ -149,11 +149,11 @@ function runSsh(
 		child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
 		child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
 		child.stdin.on("error", () => {});
-		child.on("error", (error) => {
+		child.on("error", error => {
 			clearTimeout(timer);
 			reject(new SshError(error.message, null, ""));
 		});
-		child.on("close", (code) => {
+		child.on("close", code => {
 			clearTimeout(timer);
 			const output = Buffer.concat(stdout).toString("utf8");
 			const diagnostics = Buffer.concat(stderr).toString("utf8");
@@ -188,7 +188,7 @@ export async function scanHostKey(target: SshTarget): Promise<{ lines: string[];
 			if (!(error instanceof SshError) && !(error instanceof HostKeyUnknownError)) throw error;
 		});
 		const lines = existsSync(scanned)
-			? (await readFile(scanned, "utf8")).split("\n").filter((line) => line.trim() !== "")
+			? (await readFile(scanned, "utf8")).split("\n").filter(line => line.trim() !== "")
 			: [];
 		if (lines.length === 0) throw new Error(`No host key received from ${target.host}`);
 		const fingerprints = await new Promise<string[]>((resolve, reject) => {
@@ -198,7 +198,7 @@ export async function scanHostKey(target: SshTarget): Promise<{ lines: string[];
 				output += chunk.toString("utf8");
 			});
 			child.on("error", reject);
-			child.on("close", () => resolve(output.split("\n").filter((line) => line.trim() !== "")));
+			child.on("close", () => resolve(output.split("\n").filter(line => line.trim() !== "")));
 		});
 		return { lines, fingerprints };
 	} finally {
@@ -232,7 +232,7 @@ async function changeKnownHosts(file: string, change: (lines: string[]) => strin
 		.then(async () => {
 			await mkdir(dirname(file), { recursive: true, mode: 0o700 });
 			const existing = existsSync(file)
-				? (await readFile(file, "utf8")).split("\n").filter((line) => line !== "")
+				? (await readFile(file, "utf8")).split("\n").filter(line => line !== "")
 				: [];
 			const lines = change(existing);
 			const temporary = `${file}.${randomBytes(6).toString("hex")}.tmp`;
@@ -257,8 +257,8 @@ async function changeKnownHosts(file: string, change: (lines: string[]) => strin
  */
 export async function acceptHostKey(target: SshTarget, lines: readonly string[]): Promise<void> {
 	const alias = target.hostKeyAlias;
-	const accepted = lines.map((line) => ({ line: line.trim(), ...parseHostKeyLine(alias, line) }));
-	await changeKnownHosts(target.knownHostsFile, (existing) => {
+	const accepted = lines.map(line => ({ line: line.trim(), ...parseHostKeyLine(alias, line) }));
+	await changeKnownHosts(target.knownHostsFile, existing => {
 		const trusted = new Map<string, string>();
 		for (const line of existing) {
 			const [host, type, key] = line.trim().split(/\s+/);
@@ -280,8 +280,8 @@ export async function acceptHostKey(target: SshTarget, lines: readonly string[])
 
 /** Stop trusting every key stored for the target's alias, e.g. after the owner confirmed a changed host key. */
 export async function forgetHostKey(target: SshTarget): Promise<void> {
-	await changeKnownHosts(target.knownHostsFile, (existing) =>
-		existing.filter((line) => line.trim().split(/\s+/)[0] !== target.hostKeyAlias),
+	await changeKnownHosts(target.knownHostsFile, existing =>
+		existing.filter(line => line.trim().split(/\s+/)[0] !== target.hostKeyAlias),
 	);
 }
 

@@ -33,7 +33,7 @@ export function normalizeForFuzzyMatch(text: string): string {
 			.normalize("NFKC")
 			// Strip trailing whitespace per line
 			.split("\n")
-			.map((line) => line.trimEnd())
+			.map(line => line.trimEnd())
 			.join("\n")
 			// Smart single quotes → '
 			.replace(/[\u2018\u2019\u201A\u201B]/g, "'")
@@ -70,7 +70,7 @@ type TextReplacement = Pick<MatchedEdit, "matchIndex" | "matchLength" | "newText
 
 function getLineSpans(content: string): LineSpan[] {
 	let offset = 0;
-	return splitLinesWithEndings(content).map((line) => {
+	return splitLinesWithEndings(content).map(line => {
 		const span = { start: offset, end: offset + line.length };
 		offset = span.end;
 		return span;
@@ -303,7 +303,7 @@ export function applyEditsToNormalizedContent(
 	edits: Edit[],
 	path: string,
 ): AppliedEditsResult {
-	const normalizedEdits = edits.map((edit) => ({
+	const normalizedEdits = edits.map(edit => ({
 		oldText: normalizeToLF(edit.oldText),
 		newText: normalizeToLF(edit.newText),
 	}));
@@ -314,8 +314,8 @@ export function applyEditsToNormalizedContent(
 		}
 	}
 
-	const initialMatches = normalizedEdits.map((edit) => fuzzyFindText(normalizedContent, edit.oldText));
-	const usedFuzzyMatch = initialMatches.some((match) => match.usedFuzzyMatch);
+	const initialMatches = normalizedEdits.map(edit => fuzzyFindText(normalizedContent, edit.oldText));
+	const usedFuzzyMatch = initialMatches.some(match => match.usedFuzzyMatch);
 	const replacementBaseContent = usedFuzzyMatch ? normalizeForFuzzyMatch(normalizedContent) : normalizedContent;
 
 	const matchedEdits: MatchedEdit[] = [];

@@ -38,7 +38,7 @@ type Deferred = { readonly promise: Promise<void>; readonly resolve: () => void 
 
 function deferred(): Deferred {
 	let resolve!: () => void;
-	const promise = new Promise<void>((done) => {
+	const promise = new Promise<void>(done => {
 		resolve = done;
 	});
 	return { promise, resolve };
@@ -47,7 +47,7 @@ function deferred(): Deferred {
 /** The end of `closed`, or undefined while the watch is open. */
 function endOf(watch: { readonly closed: Promise<WatchEnd> }): { readonly end: WatchEnd | undefined } {
 	const settled: { end: WatchEnd | undefined } = { end: undefined };
-	void watch.closed.then((end) => {
+	void watch.closed.then(end => {
 		settled.end = end;
 	});
 	return settled;
@@ -55,7 +55,7 @@ function endOf(watch: { readonly closed: Promise<WatchEnd> }): { readonly end: W
 
 async function createState(): Promise<ReturnType<typeof openTestSession>> {
 	const harness = openTestSession();
-	await harness.session.commit((tx) => tx.doc(StateDoc).then(() => undefined), context);
+	await harness.session.commit(tx => tx.doc(StateDoc).then(() => undefined), context);
 	return harness;
 }
 
@@ -72,12 +72,12 @@ describe("Session document watches", () => {
 		const { session, publications } = await createState();
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		const initial = watch.value;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await flush();
 		const firstPublished = documentValues(publications.at(-1)!)[0]!;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 2;
 		}, context);
 		await flush();
@@ -103,7 +103,7 @@ describe("Session document watches", () => {
 		expect(initial?.value).toBe(0);
 
 		// A listener that keeps up gets each commit's ops as published.
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 3;
 		}, context);
 		await flush();
@@ -136,12 +136,12 @@ describe("Session document watches", () => {
 				active--;
 			}),
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await entered.promise;
 		for (let value = 2; value <= 20; value++) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(StateDoc)).value = value;
 			}, context);
 		}
@@ -164,7 +164,7 @@ describe("Session document watches", () => {
 				const current = value.value;
 				values.push(current);
 				if (current === 1) {
-					await session.commit(async (tx) => {
+					await session.commit(async tx => {
 						(await tx.doc(StateDoc)).value = 2;
 					}, context);
 				} else {
@@ -172,7 +172,7 @@ describe("Session document watches", () => {
 				}
 			}),
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await completed.promise;
@@ -184,7 +184,7 @@ describe("Session document watches", () => {
 		const { session } = await createState();
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		for (let value = 1; value <= 101; value++) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(StateDoc)).value = value;
 			}, context);
 		}
@@ -201,7 +201,7 @@ describe("Session document watches", () => {
 
 	it("replaces the root once more than 10,000 ops are pending after folding", async () => {
 		const { session } = openTestSession();
-		await session.commit((tx) => tx.doc(KeysDoc).then(() => undefined), context);
+		await session.commit(tx => tx.doc(KeysDoc).then(() => undefined), context);
 		const watch = (await session.watchDoc(KeysDoc, context))!;
 		// Sets of distinct keys, in commits small enough to stay ops: 4,000 + 4,000 + 2,001 pending ops.
 		for (const [from, to] of [
@@ -209,7 +209,7 @@ describe("Session document watches", () => {
 			[4_000, 8_000],
 			[8_000, 10_001],
 		] as const) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				const state = await tx.doc(KeysDoc);
 				for (let index = from; index < to; index++) state.keys[`k${index}`] = index;
 			}, context);
@@ -241,12 +241,12 @@ describe("Session document watches", () => {
 				}
 			}),
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await entered.promise;
 		for (let value = 2; value <= 102; value++) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(StateDoc)).value = value;
 			}, context);
 		}
@@ -262,21 +262,21 @@ describe("Session document watches", () => {
 		const { session } = await createState();
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		for (let value = 1; value <= 100; value++) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(StateDoc)).value = value;
 			}, context);
 		}
 		const last = (await session.snapshot(StateDoc, context))!;
-		await session.commit((tx) => tx.retireDoc(StateDoc), context);
+		await session.commit(tx => tx.retireDoc(StateDoc), context);
 		const changes: WatchCall<Readonly<State>>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
 		await flush();
 		expect(changes).toEqual([{ kind: "value", value: last, ops: [["s", ["value"], 100]], retired: true }]);
 		expect((changes[0] as { value: unknown }).value).toBe(last);
 		expect(watch.value).toBe(last);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 7;
 		}, context);
 		await flush();
@@ -293,7 +293,7 @@ describe("Session document watches", () => {
 		const { session } = await createState();
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		const initial = watch.value;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const state = await tx.doc(StateDoc);
 			const first = state.items.shift()!;
 			state.items.unshift(first);
@@ -332,7 +332,7 @@ describe("Session document watches", () => {
 			entered.resolve();
 			await release.promise;
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, commitContext);
 		await entered.promise;
@@ -355,7 +355,7 @@ describe("Session document watches", () => {
 				delivered = value;
 			}),
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await flush();
@@ -371,16 +371,16 @@ describe("Session document watches", () => {
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		const before = watch.value;
 		const changes: WatchCall<Readonly<State>>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 5;
 			await tx.retireDoc(StateDoc);
 		}, context);
 		await flush();
 		// Storage got the change, then the retirement; the commit publishes the retirement only.
-		expect(storage.commits.at(-1)!.map((write) => write.type)).toEqual(["document.change", "document.retire"]);
+		expect(storage.commits.at(-1)!.map(write => write.type)).toEqual(["document.change", "document.retire"]);
 		expect(changes).toEqual([{ kind: "value", value: before, ops: [], retired: true }]);
 		expect((changes[0] as { value: unknown }).value).toBe(before);
 		await watch.stop();
@@ -391,10 +391,10 @@ describe("Session document watches", () => {
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		const settled = endOf(watch);
 		const changes: WatchCall<Readonly<State>>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.retireDoc(StateDoc);
 			(await tx.doc(StateDoc)).value = 10;
 		}, context);
@@ -402,7 +402,7 @@ describe("Session document watches", () => {
 		const recreated = (await session.snapshot(StateDoc, context))!;
 		expect(changes).toHaveLength(1);
 		expect(changes[0]).toEqual({ kind: "value", value: recreated, ops: [["r", recreated]], retired: true });
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 11;
 		}, context);
 		await flush();
@@ -416,7 +416,7 @@ describe("Session document watches", () => {
 		const { session } = await createState();
 		const watch = (await session.watchDoc(StateDoc, context))!;
 		const baseline = watch.value;
-		await session.commit((tx) => tx.retireDoc(StateDoc), context);
+		await session.commit(tx => tx.retireDoc(StateDoc), context);
 		await session.close(context);
 		expect(await watch.closed).toEqual({ kind: "ended" });
 		expect(watch.value).toBe(baseline);
@@ -436,11 +436,11 @@ describe("Session document watches", () => {
 				await release.promise;
 			}),
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await entered.promise;
-		await session.commit((tx) => tx.retireDoc(StateDoc), context);
+		await session.commit(tx => tx.retireDoc(StateDoc), context);
 		await session.close(context);
 		expect(await watch.closed).toEqual({ kind: "ended" });
 		release.resolve();
@@ -488,7 +488,7 @@ describe("Session document watches", () => {
 			entered.resolve();
 			await release.promise;
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await entered.promise;
@@ -509,7 +509,7 @@ describe("Session document watches", () => {
 			entered.resolve();
 			await release.promise;
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		await entered.promise;
@@ -530,7 +530,7 @@ describe("Session document watches", () => {
 		healthy.start(async () => {
 			healthyCalls++;
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 1;
 		}, context);
 		const end = await failed.closed;
@@ -555,10 +555,10 @@ describe("Session document watches", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ value: 0, migrated: false }),
-			migrate: (value) => ({ value: value.value as number, migrated: true }),
+			migrate: value => ({ value: value.value as number, migrated: true }),
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		await session.unloadDocuments();
 		const commits = storage.commits.length;
 		const watch = (await session.watchDoc(Current, context))!;
@@ -570,10 +570,10 @@ describe("Session document watches", () => {
 				values.push(value.value);
 			}),
 		);
-		await session.commit((tx) => tx.doc(Current).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Current).then(() => undefined), context);
 		await flush();
 		expect(values).toEqual([]);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Current)).value = 4;
 		}, context);
 		await flush();
@@ -591,7 +591,7 @@ describe("Session document watches", () => {
 				expect(replica).toEqual(value);
 			}),
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const state = await tx.doc(StateDoc);
 			state.value = 3;
 			state.items.splice(0, 1);
@@ -612,7 +612,7 @@ describe("Session document watches", () => {
 		expect(reloaded).not.toBe(baseline);
 		expect(storage.documentReadCount).toBeGreaterThan(reads);
 		watch.start(async () => undefined);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(StateDoc)).value = 7;
 		}, context);
 		await flush();
@@ -641,29 +641,29 @@ describe("Session document watches", () => {
 		const { session } = openTestSession();
 		const watched = await createConversation(session);
 		const other = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Notes, watched)).text = "a";
 			(await tx.doc(Members, "watched", null)).text = "a";
 		}, context);
 		const notes = (await session.watchDoc(Notes, watched, context))!;
 		const member = (await session.watchDoc(Members, "watched", context))!;
 		const changes: WatchCall<Readonly<{ text: string }>>[] = [];
-		notes.start(async (change) => {
+		notes.start(async change => {
 			changes.push(change);
 		});
-		member.start(async (change) => {
+		member.start(async change => {
 			changes.push(change);
 		});
 		// The same kinds at other addresses: created, changed, retired, and created again.
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Notes, other)).text = "other";
 			(await tx.doc(Members, "other", null)).text = "other";
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.retireDoc(Notes, other);
 			await tx.retireDoc(Members, "other");
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Notes, other)).text = "again";
 			(await tx.doc(Members, "other", null)).text = "again";
 		}, context);
@@ -689,21 +689,21 @@ describe("Session document watches", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ value: 0, migrated: false }),
-			migrate: (value) => ({ value: value.value as number, migrated: true }),
+			migrate: value => ({ value: value.value as number, migrated: true }),
 		});
 		const { session } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		const watch = (await session.watchDoc(Old, context))!;
 		const changes: WatchCall<unknown>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.retireDoc(Current);
 			(await tx.doc(Current)).value = 5;
 		}, context);
 		await flush();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Current)).value = 6;
 		}, context);
 		await flush();
@@ -725,19 +725,19 @@ describe("Session document watches", () => {
 		const gc = runInNewContext("gc") as () => void;
 		const collect = async (): Promise<void> => {
 			for (let round = 0; round < 5; round++) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
+				await new Promise(resolve => setTimeout(resolve, 0));
 				gc();
 			}
 		};
 		/** Watch the document, retire and recreate it, and deliver the new value; `drop` then unloads the cache. */
 		const follow = async (session: SessionImpl, drop: boolean) => {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(StateDoc)).retained = { label: "first incarnation" };
 			}, context);
 			const watch = (await session.watchDoc(StateDoc, context))!;
 			const first = new WeakRef(watch.value.retained);
 			watch.start(async () => {});
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				await tx.retireDoc(StateDoc);
 				(await tx.doc(StateDoc)).value = 2;
 			}, context);
@@ -765,7 +765,7 @@ describe("Session document watches", () => {
 		const gc = runInNewContext("gc") as () => void;
 		const collect = async (): Promise<void> => {
 			for (let round = 0; round < 5; round++) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
+				await new Promise(resolve => setTimeout(resolve, 0));
 				gc();
 			}
 		};
@@ -782,13 +782,13 @@ describe("Session document watches", () => {
 		const conversationId = await createConversation(session);
 		/** A started watch of a document that is then retired; `stop` says whether to stop it before returning. */
 		const acquire = async (stop: boolean) => {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(Notes, conversationId)).text = "kept";
 			}, context);
 			const watch = (await session.watchDoc(Notes, conversationId, context))!;
 			const listener = async (): Promise<void> => {};
 			watch.start(listener);
-			await session.commit((tx) => tx.retireDoc(Notes, conversationId), context);
+			await session.commit(tx => tx.retireDoc(Notes, conversationId), context);
 			await flush();
 			if (stop) await watch.stop();
 			return { watch: new WeakRef(watch), listener: new WeakRef(listener) };
@@ -811,7 +811,7 @@ describe("Session document watches", () => {
 		const gc = runInNewContext("gc") as () => void;
 		const collect = async (): Promise<void> => {
 			for (let round = 0; round < 5; round++) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
+				await new Promise(resolve => setTimeout(resolve, 0));
 				gc();
 			}
 		};
@@ -824,11 +824,11 @@ describe("Session document watches", () => {
 				() => Number.POSITIVE_INFINITY,
 				() => () => {},
 			);
-			await session.commit((tx) => tx.doc(StateDoc).then(() => undefined), context);
+			await session.commit(tx => tx.doc(StateDoc).then(() => undefined), context);
 			const watch: DocumentWatch<State> = (await session.watchDoc(StateDoc, context))!;
 			const listener = async (): Promise<void> => {};
 			watch.start(listener);
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(StateDoc)).value = 1;
 			}, context);
 			await flush();

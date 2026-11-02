@@ -198,7 +198,7 @@ export function composeRouter(table: RegistryTable<HttpContribution>, { report }
 			const tree = routes.get(method);
 			return tree === undefined ? undefined : lookup(tree, path);
 		},
-		socket: (path) => lookup(sockets, path),
+		socket: path => lookup(sockets, path),
 		hosts,
 		framers,
 		relays,
@@ -395,7 +395,7 @@ function resolveWraps(
 	for (const { plugin, value } of table) for (const wrap of value.wraps ?? []) all.push({ wrap, plugin });
 	all.sort((a, b) => PHASES.indexOf(a.wrap.phase) - PHASES.indexOf(b.wrap.phase));
 	for (const { wrap, plugin } of all) {
-		if (wrap.route !== undefined && !routes.some((route) => route.pattern === wrap.route)) {
+		if (wrap.route !== undefined && !routes.some(route => route.pattern === wrap.route)) {
 			report({
 				message: `wrap "${wrap.name}" names route "${wrap.route}", which nobody contributes`,
 				plugins: [plugin],

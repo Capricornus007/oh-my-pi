@@ -18,11 +18,11 @@ import {
 	type Self,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 
 function latch() {
 	let open = () => {};
-	const promise = new Promise<void>((resolve) => {
+	const promise = new Promise<void>(resolve => {
 		open = resolve;
 	});
 	return { promise, open };
@@ -63,7 +63,7 @@ const ServerGreeter = remote("t.server-greeter", {
 function greeterFacet(greeting: string, options: { fail?: boolean; stateVersion?: number } = {}): Facet {
 	return {
 		name: "greeter",
-		setup: (api) => {
+		setup: api => {
 			const greeter = (self: Self) => {
 				if (options.fail) throw new Error("worker factory fails");
 				const count = self.state(
@@ -76,7 +76,7 @@ function greeterFacet(greeting: string, options: { fail?: boolean; stateVersion?
 					variant: "main" as const,
 					count,
 					greet: (name: string, ctx: Ctx) => {
-						count.change(ctx, (draft) => {
+						count.change(ctx, draft => {
 							draft.n += 1;
 						});
 						return `${greeting} ${name}`;
@@ -96,10 +96,10 @@ function dropping(link: Link, drop: (frame: Frame) => boolean): Link {
 		get closed() {
 			return link.closed;
 		},
-		send: (frame) => (drop(frame) ? undefined : link.send(frame)),
-		receive: (handler) => link.receive(handler),
-		onClose: (handler) => link.onClose(handler),
-		close: (reason) => link.close(reason),
+		send: frame => (drop(frame) ? undefined : link.send(frame)),
+		receive: handler => link.receive(handler),
+		onClose: handler => link.onClose(handler),
+		close: reason => link.close(reason),
 	};
 }
 
@@ -112,7 +112,7 @@ const Ping = remote("t.cluster-ping", {
 
 function setup() {
 	const modules = new Map<string, Facet>([["greeter", greeterFacet("v1")]]);
-	const loader: FacetLoader = async (names) => names.map((name) => modules.get(String(name))!);
+	const loader: FacetLoader = async names => names.map(name => modules.get(String(name))!);
 	const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 	const [down, up] = memoryLinkPair();
 	server.accept(down, { principal: { worker: "w" }, kind: "host", name: "session:S1" });
@@ -134,14 +134,14 @@ describe("cross-host reload", () => {
 		const greeter = server.hold(Greeter, { session: "S1" });
 		assert.equal(await greeter.greet("a"), "v1 a");
 		const go = latch();
-		const pinned = server.root(async (ctx) => {
+		const pinned = server.root(async ctx => {
 			await greeter.greet("p", ctx);
 			await go.promise;
 			return greeter.greet("p", ctx);
 		});
 		await tick();
 		const shapes: string[] = [];
-		greeter.onShape((shape) => shapes.push(shape.contract));
+		greeter.onShape(shape => shapes.push(shape.contract));
 		modules.set("greeter", greeterFacet("v2"));
 		const report = await server.reload([], { remote: { "session:": ["greeter"] } });
 		// No waiting: the commit frame precedes this call on the FIFO link, so the worker has committed when it arrives.
@@ -164,7 +164,7 @@ describe("cross-host reload", () => {
 		await greeter.greet("a");
 		const before = [server.codeVersion, worker.codeVersion];
 		modules.set("greeter", greeterFacet("v2", { fail: true }));
-		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] } }), (error) => {
+		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] } }), error => {
 			assert.ok(isChordError(error, "unavailable"));
 			assert.match(error.message, /session:S1: .*worker factory fails/);
 			return true;
@@ -178,7 +178,7 @@ describe("cross-host reload", () => {
 		await tick();
 		const greeter = server.hold(Greeter, { session: "S1" });
 		const go = latch();
-		const blocker = server.root(async (ctx) => {
+		const blocker = server.root(async ctx => {
 			await greeter.greet("g", ctx);
 			await go.promise;
 		});
@@ -186,7 +186,7 @@ describe("cross-host reload", () => {
 		const before = [server.codeVersion, worker.codeVersion];
 		const bumped = greeterFacet("v2", { stateVersion: 2 });
 		modules.set("greeter", bumped);
-		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] }, gateDeadline: 30 }), (error) => {
+		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] }, gateDeadline: 30 }), error => {
 			assert.ok(isChordError(error, "aborted") && error.reason === "gate_deadline");
 			assert.match(error.message, /session:S1: .*blocking roots: server#\w+:\d+/);
 			return true;
@@ -241,7 +241,7 @@ describe("cross-host reload", () => {
 		const fresh = createHost({
 			self: { kind: "host" },
 			name: "session:fresh",
-			loader: async (names) => names.map((name) => modules.get(String(name))!),
+			loader: async names => names.map(name => modules.get(String(name))!),
 			onError: () => {},
 		});
 		onTestFinished(() => fresh.close());
@@ -255,7 +255,7 @@ describe("cross-host reload", () => {
 	it("only the server coordinates reloads", async () => {
 		const { worker } = setup();
 		await tick();
-		await assert.rejects(worker.reload([]), (error) => isChordError(error, "unavailable"));
+		await assert.rejects(worker.reload([]), error => isChordError(error, "unavailable"));
 	});
 
 	it("browsers are not participants: they see shape and reset pushes, or upgrade_required", async () => {
@@ -264,7 +264,7 @@ describe("cross-host reload", () => {
 		server.route("session:", {
 			authorize: () => true,
 			resolve: async () => workerLink,
-			principal: (name) => ({ host: name }),
+			principal: name => ({ host: name }),
 		});
 		const [down, up] = memoryLinkPair();
 		server.accept(down, { principal: { guest: "g" } });
@@ -278,7 +278,7 @@ describe("cross-host reload", () => {
 		const viewer = browser.hold(Greeter, { session: "S1" });
 		assert.equal(await viewer.greet("a"), "v1 a");
 		const shapes: string[] = [];
-		viewer.onShape((shape) => shapes.push(shape.contract));
+		viewer.onShape(shape => shapes.push(shape.contract));
 		modules.set("greeter", greeterFacet("v2"));
 		await server.reload([], { remote: { "session:": ["greeter"] } });
 		for (let i = 0; i < 20 && shapes.length === 0; i++) await tick();
@@ -287,7 +287,7 @@ describe("cross-host reload", () => {
 
 		modules.set("greeter", {
 			name: "greeter",
-			setup: (api) => api.serve(GreeterV2, () => ({ variant: "main", hello: (name: string) => `hi ${name}` })),
+			setup: api => api.serve(GreeterV2, () => ({ variant: "main", hello: (name: string) => `hi ${name}` })),
 		});
 		await server.reload([], { remote: { "session:": ["greeter"] } });
 		for (let i = 0; i < 20 && viewer.status !== "gone"; i++) await tick();
@@ -304,7 +304,7 @@ describe("cross-host reload", () => {
 		const go = latch();
 		const slow: Facet = {
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
 					self.resource("late", {
 						version: 1,
@@ -320,7 +320,7 @@ describe("cross-host reload", () => {
 		};
 		modules.set("greeter", slow);
 		const codeVersion = worker.codeVersion;
-		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] }, voteDeadline: 50 }), (error) =>
+		await assert.rejects(server.reload([], { remote: { "session:": ["greeter"] }, voteDeadline: 50 }), error =>
 			isChordError(error, "aborted"),
 		);
 		go.open();
@@ -339,9 +339,9 @@ describe("cross-host reload", () => {
 			self: { kind: "host" },
 			name: "server",
 			onError: () => {},
-			loader: async (names) => {
+			loader: async names => {
 				await loading.promise;
-				return names.map((name) => ({ name: String(name), setup: () => {} }));
+				return names.map(name => ({ name: String(name), setup: () => {} }));
 			},
 		});
 		onTestFinished(() => server.close());
@@ -353,7 +353,7 @@ describe("cross-host reload", () => {
 			self: { kind: "host" },
 			name: "session:S1",
 			upstream: { link: up, principal: { kind: "server" } },
-			loader: async (names) => names.map((name) => modules.get(String(name))!),
+			loader: async names => names.map(name => modules.get(String(name))!),
 			onError: () => {},
 		});
 		onTestFinished(() => worker.close());
@@ -376,7 +376,7 @@ describe("cross-host reload", () => {
 		const first = server.codeVersion;
 		const go = latch();
 		// A server root of the first code version that calls the worker only after the next two reloads started.
-		const pinned = server.root(async (ctx) => {
+		const pinned = server.root(async ctx => {
 			await go.promise;
 			return greeter.greet("p", ctx);
 		});
@@ -409,7 +409,7 @@ describe("cross-host reload", () => {
 			self: { kind: "host" },
 			name: "session:S1",
 			upstream: { link: up, principal: { kind: "server" } },
-			loader: async (names) => names.map((name) => modules.get(String(name))!),
+			loader: async names => names.map(name => modules.get(String(name))!),
 			onError: () => {},
 		});
 		onTestFinished(() => worker.close());
@@ -433,9 +433,9 @@ describe("cross-host reload", () => {
 			self: { kind: "host" },
 			name: "server",
 			onError: () => {},
-			loader: async (names) => {
+			loader: async names => {
 				if (blockServer) await serverLoading.promise;
-				return names.map((name) => ({ name: String(name), setup: () => {} }));
+				return names.map(name => ({ name: String(name), setup: () => {} }));
 			},
 		});
 		onTestFinished(() => server.close());
@@ -450,9 +450,9 @@ describe("cross-host reload", () => {
 			self: { kind: "host" },
 			name: "session:S1",
 			upstream: { link: up, principal: { kind: "server" } },
-			loader: async (names) => {
+			loader: async names => {
 				if (blockWorker) await workerLoading.promise;
-				return names.map((name) => modules.get(String(name))!);
+				return names.map(name => modules.get(String(name))!);
 			},
 			onError: () => {},
 		});
@@ -479,16 +479,16 @@ describe("cross-host reload", () => {
 	it("a child behind whose hello waits for a running reload is fenced at once: its calls up are admitted (spec 9)", async () => {
 		const pingFacet: Facet = {
 			name: "ping",
-			setup: (api) => api.serve(Ping, () => ({ variant: "main", ping: () => "pong" })),
+			setup: api => api.serve(Ping, () => ({ variant: "main", ping: () => "pong" })),
 		};
 		const loading = latch();
 		const server = createHost({
 			self: { kind: "host" },
 			name: "server",
 			onError: () => {},
-			loader: async (names) => {
+			loader: async names => {
 				await loading.promise;
-				return names.map((name) => ({ name: String(name), setup: () => {} }));
+				return names.map(name => ({ name: String(name), setup: () => {} }));
 			},
 		});
 		onTestFinished(() => server.close());
@@ -506,7 +506,7 @@ describe("cross-host reload", () => {
 		});
 		onTestFinished(() => worker.close());
 		// While the server's reload still loads its modules, a worker root (code version 1) calls the server.
-		const answer = await worker.root(async (ctx) => (await ctx.get(Ping, {})).ping(ctx));
+		const answer = await worker.root(async ctx => (await ctx.get(Ping, {})).ping(ctx));
 		assert.equal(answer, "pong");
 		loading.open();
 		await reloading;
@@ -516,13 +516,13 @@ describe("cross-host reload", () => {
 
 	it("a reconnecting child behind its parent, still retaining its previous code version, reconciles without waiting out the retire deadline", async () => {
 		const modules = new Map<string, Facet>([["greeter", greeterFacet("v1")]]);
-		const loader: FacetLoader = async (names) => names.map((name) => modules.get(String(name))!);
+		const loader: FacetLoader = async names => names.map(name => modules.get(String(name))!);
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 		onTestFinished(() => server.close());
 		const [down, up] = memoryLinkPair();
 		// The `retire` frame is lost: the worker keeps code version 1, not permitted to retire it.
 		server.accept(
-			dropping(down, (frame) => frame.t === "retire"),
+			dropping(down, frame => frame.t === "retire"),
 			{ principal: { worker: "w" }, kind: "host", name: "session:S1" },
 		);
 		const worker = createHost({
@@ -549,7 +549,7 @@ describe("cross-host reload", () => {
 		const started = Date.now();
 		worker.connect(up2, { principal: { kind: "server" } });
 		for (let i = 0; i < 400 && worker.codeVersion !== server.codeVersion; i++)
-			await new Promise((resolve) => setTimeout(resolve, 5));
+			await new Promise(resolve => setTimeout(resolve, 5));
 		assert.equal(worker.codeVersion, server.codeVersion);
 		assert.ok(Date.now() - started < 2000, `reconciled after ${Date.now() - started} ms`);
 	});
@@ -581,19 +581,19 @@ describe("cross-host reload", () => {
 			},
 		}));
 		// Records the cancel the server sends down: the guarantee is that it leaves before the old resources close.
-		const watched = dropping(down, (frame) => {
+		const watched = dropping(down, frame => {
 			if (frame.t === "cancel") log.push("cancel sent");
 			return false;
 		});
 		server.route("session:", {
 			authorize: () => true,
 			resolve: async () => watched,
-			principal: (name) => ({ host: name }),
+			principal: name => ({ host: name }),
 		});
 		const Store = local("t.cluster-store", { version: 1, input: obj({}, { open: true }) });
 		const storeFacet = (version: number): Facet => ({
 			name: "store",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					Store,
 					(_input, _principal, self) => {
@@ -622,7 +622,7 @@ describe("cross-host reload", () => {
 		const call = browser.hold(Slow, {}).wait();
 		call.catch(() => {});
 		for (let i = 0; i < 50 && log.length === 0 && !worker.codeVersion; i++) await tick();
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		await server.reload([storeFacet(2)]);
 		await server.reload([storeFacet(3)], { retireDeadline: 20 });
 		const settled = await Promise.race([
@@ -630,12 +630,12 @@ describe("cross-host reload", () => {
 				() => "resolved",
 				() => "rejected",
 			),
-			new Promise((resolve) => setTimeout(() => resolve("pending"), 2000)),
+			new Promise(resolve => setTimeout(() => resolve("pending"), 2000)),
 		]);
 		assert.equal(settled, "rejected", "the browser's call is cancelled with its root");
 		for (let i = 0; i < 50 && !log.includes("worker aborted"); i++) await tick();
 		assert.deepEqual(
-			log.filter((entry) => entry === "cancel sent" || entry === "server closes 1"),
+			log.filter(entry => entry === "cancel sent" || entry === "server closes 1"),
 			["cancel sent", "server closes 1"],
 		);
 		assert.ok(log.includes("worker aborted"));

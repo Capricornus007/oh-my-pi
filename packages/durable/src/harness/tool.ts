@@ -159,7 +159,7 @@ export const ToolTask = defineTask<ToolTaskInput, ToolTaskCheckpoint, ToolTaskRe
 			if ("error" in checked) return reject(runtime, task.input, call, tool, invalid(checked.error), context);
 			let args = checked.args;
 			let block: string | undefined;
-			await runtime.hooks.each("beforeTool", async (hook) => {
+			await runtime.hooks.each("beforeTool", async hook => {
 				if (block !== undefined) return;
 				try {
 					const decision = await hook({ ...call, arguments: args }, runtime, context);
@@ -181,7 +181,7 @@ export const ToolTask = defineTask<ToolTaskInput, ToolTaskCheckpoint, ToolTaskRe
 			// The slot's status and arguments are presentation, stored like progress (`PROGRESS_COMMIT`); the intent is
 			// durable before the tool runs. Parallel calls of one round then share no immediate write to `pi.live`.
 			await runtime.commit(
-				async (tx) => {
+				async tx => {
 					const slot = toolSlot(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId);
 					if (slot !== undefined) slot.status = "running";
 					// A nested slot shows the arguments the call runs with, which repair, hooks, and coercion may have changed.
@@ -208,7 +208,7 @@ export const ToolTask = defineTask<ToolTaskInput, ToolTaskCheckpoint, ToolTaskRe
 			if (replay === "safe" && tool?.replay === "safe") {
 				// The rerun reports from scratch: clear what the interrupted attempt published, and show the slot running with
 				// the arguments it runs with again, as the deferred commit that showed them may have been lost with the crash.
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					const slot = toolSlot(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId);
 					if (slot !== undefined) {
 						clearProgress(slot);
@@ -340,7 +340,7 @@ async function resolveTool(
 	context: Context,
 ): Promise<ToolRegistration | undefined> {
 	const agent = await runtime.agent(context);
-	return (input.kind === "model" ? agent.tools : agent.callable).find((tool) => tool.name === name);
+	return (input.kind === "model" ? agent.tools : agent.callable).find(tool => tool.name === name);
 }
 
 /** The tool's output limits, the defaults filled in; all defaults when the tool did not resolve. */
@@ -470,7 +470,7 @@ async function run(
 			const retained = reported.output.snapshot();
 			return { text: retained.text, truncated: retained.droppedBytes > 0 };
 		},
-		diagnostic: (diagnostic) => {
+		diagnostic: diagnostic => {
 			assertLive();
 			reported.diagnostics.push(copyJson(diagnostic, { omitUndefinedProperties: true }) as ToolDiagnostic);
 			progress.mark();
@@ -487,7 +487,7 @@ async function run(
 		commit: async (change, commitContext, options) => {
 			let result: Awaited<ReturnType<typeof change>> | undefined;
 			await runtime.commit(
-				async (tx) => {
+				async tx => {
 					result = await change(tx);
 					return undefined;
 				},
@@ -505,7 +505,7 @@ async function run(
 		): Promise<TaskId<R>> => {
 			const child = options.ownership.kind === "task" && !resumes ? { abandonOnRestart: true, ...options } : options;
 			let id: TaskId<R> | undefined;
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				id = await tx.createTask(task, input, child);
 				return undefined;
 			}, taskContext);
@@ -632,7 +632,7 @@ function publishProgress(runtime: Runtime, reported: Reported, enabled: boolean,
 			if (detailsChanged) bytes += utf8ByteLength(JSON.stringify(current.details ?? null));
 			if (added.length > 0) bytes += utf8ByteLength(JSON.stringify(added));
 			await runtime.commit(
-				async (tx) => {
+				async tx => {
 					const slot = toolSlot(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId);
 					if (slot === undefined) return undefined;
 					// REMINDER: assign `output` as one string field. Chord then diffs it into an append, or a trim plus an
@@ -656,7 +656,7 @@ function publishProgress(runtime: Runtime, reported: Reported, enabled: boolean,
 			written = current;
 			return bytes;
 		},
-		(error) => {
+		error => {
 			// Rejections after an abort mark or close are expected; the committed state stays consistent.
 			if (!runtime.signal.aborted) runtime.report(error);
 		},
@@ -690,7 +690,7 @@ async function finalResult(
 		details: result.details === undefined ? reported.details : result.details,
 		diagnostics: [...reported.diagnostics, ...(result.diagnostics ?? [])],
 	};
-	await runtime.hooks.each("afterTool", async (hook) => {
+	await runtime.hooks.each("afterTool", async hook => {
 		final = (await hook(call, final, runtime, context)) ?? final;
 	});
 	// The retained output's truncation applies only while afterTool kept that output.
@@ -710,7 +710,7 @@ async function finalResult(
 			final = rest;
 			// Only names the extension: a failed resolution leaves the report without the name.
 			const extension = await runtime.agent(context).then(
-				(agent) => toolExtension(agent, tool.name),
+				agent => toolExtension(agent, tool.name),
 				() => undefined,
 			);
 			runtime.report(new Error(broken), { kind: "extension", ...optionalExtension(extension) });
@@ -728,9 +728,9 @@ async function finalResult(
 		tool.structuredOutputSchema !== undefined &&
 		final.isError === true &&
 		final.structuredOutput === undefined &&
-		![...(final.diagnostics ?? []), ...harness].some((diagnostic) => diagnostic.severity === "error")
+		![...(final.diagnostics ?? []), ...harness].some(diagnostic => diagnostic.severity === "error")
 	) {
-		const text = bounded.content.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n");
+		const text = bounded.content.flatMap(item => (item.type === "text" ? [item.text] : [])).join("\n");
 		if (text !== "") harness.push(toolDiagnostic("tool_error", text));
 	}
 	return { ...final, output: bounded.content, diagnostics: [...(final.diagnostics ?? []), ...harness] };
@@ -755,7 +755,7 @@ async function afterHarnessResult(
 	context: Context,
 ): Promise<ToolExecutionResult> {
 	let final = result;
-	await runtime.hooks.each("afterTool", async (hook) => {
+	await runtime.hooks.each("afterTool", async hook => {
 		final = (await hook(call, final, runtime, context)) ?? final;
 	});
 	const harness: ToolDiagnostic[] = [];
@@ -796,7 +796,7 @@ function structuredOutputError(tool: ToolRegistration, result: ToolExecutionResu
 		first?.path
 			.slice(1)
 			.split("/")
-			.map((segment) => segment.replace(/~1/g, "/").replace(/~0/g, "~"))
+			.map(segment => segment.replace(/~1/g, "/").replace(/~0/g, "~"))
 			.join(".") || "root";
 	return `Tool ${tool.name} returned structuredOutput that does not match its schema: ${path}: ${first?.message ?? "invalid"}`;
 }
@@ -819,13 +819,13 @@ async function settle(
 	// A crash in between leaves the call in `execute`: a safe rerun reattaches to the calls, an interruption ends here.
 	// Every live nested call the task owns, also those an earlier attempt made and this one never called again.
 	const nestedIds = (await runtime.ownedTasks(context))
-		.filter((record) => record.kind === ToolTask.definition.name && (record.input as ToolTaskInput).kind === "nested")
-		.map((record) => record.id);
+		.filter(record => record.kind === ToolTask.definition.name && (record.input as ToolTaskInput).kind === "nested")
+		.map(record => record.id);
 	// Read before the settling commit: no admission starts after `ended`, and those underway were awaited.
 	const madeNested = (await runtime.memo(MADE_NESTED_CALLS, context)) === true;
 	// Mark them all before waiting for any: one may run until a sibling is cancelled.
-	await Promise.all(nestedIds.map((id) => runtime.abortOwned(id, context)));
-	await runtime.commit(async (tx) => {
+	await Promise.all(nestedIds.map(id => runtime.abortOwned(id, context)));
+	await runtime.commit(async tx => {
 		const conversationId = runtime.conversationId;
 		const live = await tx.doc(LiveDoc, conversationId);
 		const slot = toolSlot(live, runtime.taskId);
@@ -916,7 +916,7 @@ async function startNestedCall(
 	};
 	let id: TaskId<ToolTaskResult> | undefined;
 	let replayed = false;
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		// Opened, or created empty for a key not made yet.
 		const state = await tx.doc(NestedCallDoc, runtime.taskId, key, null);
 		const existing = state.taskId;
@@ -1059,9 +1059,9 @@ function summaryOf(result: NestedToolExecutionResult, output: Content): NestedTo
 
 /** The error messages of a nested result, else the text items of its output, joined with newlines. */
 function errorTextOf(result: NestedToolExecutionResult, output: Content): string {
-	const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
-	if (errors.length > 0) return errors.map((diagnostic) => diagnostic.message).join("\n");
-	return output.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n");
+	const errors = result.diagnostics.filter(diagnostic => diagnostic.severity === "error");
+	if (errors.length > 0) return errors.map(diagnostic => diagnostic.message).join("\n");
+	return output.flatMap(item => (item.type === "text" ? [item.text] : [])).join("\n");
 }
 
 /**
@@ -1095,7 +1095,7 @@ export async function appendToolResult(
 }
 
 function renderDiagnostics(diagnostics: readonly ToolDiagnostic[]): string {
-	return `<harness>\n${diagnostics.map((diagnostic) => `[${diagnostic.severity}] ${diagnostic.message}`).join("\n")}\n</harness>`;
+	return `<harness>\n${diagnostics.map(diagnostic => `[${diagnostic.severity}] ${diagnostic.message}`).join("\n")}\n</harness>`;
 }
 
 /**
@@ -1107,7 +1107,7 @@ function boundContent(
 	limits: OutputLimits,
 ): { content: Content; droppedBytes: number; droppedLines: number } {
 	const texts = content.filter((item): item is TextContent => item.type === "text");
-	const bounded = boundOutput(texts.map((item) => item.text).join(""), limits);
+	const bounded = boundOutput(texts.map(item => item.text).join(""), limits);
 	if (bounded.droppedBytes === 0) return { content, droppedBytes: 0, droppedLines: 0 };
 	const keep = limits.retain === "head" ? texts[0] : texts.at(-1);
 	const result: Content = [];
@@ -1141,6 +1141,6 @@ function jsonEqual(a: JsonValue, b: JsonValue): boolean {
 	}
 	const keys = Object.keys(a);
 	return (
-		keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && jsonEqual(a[key]!, b[key]!))
+		keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && jsonEqual(a[key]!, b[key]!))
 	);
 }

@@ -9,7 +9,7 @@ export default defineFacet((_host, self) =>
 			"/echo/:room": (socket, request, ctx) => {
 				const who = JSON.stringify(ctx.principal);
 				socket.send(`welcome to ${request.params.room}, ${who}`);
-				socket.on("message", (data) => socket.send(`echo: ${String(data)}`));
+				socket.on("message", data => socket.send(`echo: ${String(data)}`));
 			},
 		},
 	}),

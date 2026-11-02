@@ -42,7 +42,7 @@ function task(name: string, version = 1) {
 }
 
 function names(items: readonly { readonly name: string }[]): string[] {
-	return items.map((item) => item.name);
+	return items.map(item => item.name);
 }
 
 /** Resolve `state` against `snapshot` and `settings`, collecting reports. */
@@ -52,7 +52,7 @@ function resolve(
 	settings: HarnessSettings = {},
 	reports: unknown[] = [],
 ) {
-	return resolveAgent(state, snapshot, resolveSettings(settings), (error) => reports.push(error));
+	return resolveAgent(state, snapshot, resolveSettings(settings), error => reports.push(error));
 }
 
 async function rendered(agent: ReturnType<typeof resolve>): Promise<[string, string | undefined][]> {
@@ -64,7 +64,7 @@ async function rendered(agent: ReturnType<typeof resolve>): Promise<[string, str
 		read: { snapshot: async () => undefined, snapshotAsOf: async () => undefined },
 	};
 	return Promise.all(
-		agent.sections.map(async (item) => [item.key, await item.render(input, context)] as [string, string | undefined]),
+		agent.sections.map(async item => [item.key, await item.render(input, context)] as [string, string | undefined]),
 	);
 }
 
@@ -195,8 +195,8 @@ describe("agent resolution", () => {
 		const Timing = defineExtension<AppTool>({
 			name: "timing",
 			wraps: [
-				wrapTool(bash, (inner) => ({ ...inner, description: `${inner.description} (timed)` })),
-				wrapTool(bash, (inner) => ({ ...inner, description: `${inner.description} [2]` })),
+				wrapTool(bash, inner => ({ ...inner, description: `${inner.description} (timed)` })),
+				wrapTool(bash, inner => ({ ...inner, description: `${inner.description} [2]` })),
 				// No `grep` is selected: the wrapper does nothing and reports nothing.
 				wrapTool(tool("grep"), () => {
 					calls.push("grep");
@@ -207,7 +207,7 @@ describe("agent resolution", () => {
 		for (const extension of [Coding, Venv, Timing]) local.install(extension);
 		const reports: unknown[] = [];
 		const agent = resolve(undefined, local.snapshot(), {}, reports);
-		expect(agent.tools.map((each) => [each.name, each.description])).toEqual([
+		expect(agent.tools.map(each => [each.name, each.description])).toEqual([
 			["read", "read tool"],
 			["bash", "venv bash (timed) [2]"],
 			["edit", "edit tool"],
@@ -229,7 +229,7 @@ describe("agent resolution", () => {
 				wrapTool(read, () => {
 					throw new Error("wrapper failed");
 				}),
-				wrapTool(edit, (inner) => ({ ...inner, name: "renamed" })),
+				wrapTool(edit, inner => ({ ...inner, name: "renamed" })),
 				wrapSection("cwd", () => {
 					throw new Error("section wrapper failed");
 				}),
@@ -240,8 +240,8 @@ describe("agent resolution", () => {
 		const reports: unknown[] = [];
 		const agent = resolve(undefined, local.snapshot(), {}, reports);
 		expect(names(agent.tools)).toEqual(["bash"]);
-		expect(agent.sections.map((each) => each.key)).toEqual(["preamble"]);
-		expect(reports.map((error) => (error as Error).message)).toEqual([
+		expect(agent.sections.map(each => each.key)).toEqual(["preamble"]);
+		expect(reports.map(error => (error as Error).message)).toEqual([
 			"wrapper failed",
 			"Wrapper renamed edit to renamed",
 			"section wrapper failed",
@@ -254,7 +254,7 @@ describe("agent resolution", () => {
 			name: "override",
 			sections: [section("preamble", () => "You review.", { tag: false })],
 			wraps: [
-				wrapSection("cwd", (inner) => ({
+				wrapSection("cwd", inner => ({
 					...inner,
 					render: async (input, ctx) => `${await inner.render(input, ctx)}!`,
 				})),

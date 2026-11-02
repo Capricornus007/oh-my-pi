@@ -22,7 +22,7 @@ export function fingerprints(): JsonValue {
 		const data = contractData(C);
 		return {
 			params: data.params.normal,
-			versions: data.versions.map((version) => ({
+			versions: data.versions.map(version => ({
 				fingerprint: version.fingerprint,
 				variants: Object.fromEntries(
 					[...version.variants].map(([name, variant]) => [
@@ -100,7 +100,7 @@ async function read(path: string, context: Context): Promise<JsonValue> {
 	finished.length = 0;
 	const { store, host } = await ownerHost(path, declared.EditsV3, "finish", context);
 	const owner = await host.get(declared.Owner, {}, context);
-	for (let i = 0; i < 100 && finished.length < 3; i++) await new Promise((resolve) => setTimeout(resolve, 10));
+	for (let i = 0; i < 100 && finished.length < 3; i++) await new Promise(resolve => setTimeout(resolve, 10));
 	const dump = await owner.dump({}, context);
 	const result = {
 		dump: dump as JsonValue,

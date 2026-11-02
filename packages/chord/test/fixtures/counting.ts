@@ -41,7 +41,7 @@ export class CountingLink implements Link {
 	}
 
 	receive(handler: (frame: Frame) => void): void {
-		this.inner.receive((frame) => {
+		this.inner.receive(frame => {
 			this.received.push(frame);
 			this.receivedBytes += JSON.stringify(frame).length;
 			handler(frame);
@@ -58,12 +58,12 @@ export class CountingLink implements Link {
 
 	/** Frames of type `t` this side sent (`sent`) or received (`received`). */
 	count(direction: "sent" | "received", t: Frame["t"]): number {
-		return this[direction].filter((frame) => frame.t === t).length;
+		return this[direction].filter(frame => frame.t === t).length;
 	}
 
 	/** Frames this side sent or received, except pings, pongs and acknowledgements. */
 	traffic(direction: "sent" | "received"): Frame[] {
-		return this[direction].filter((frame) => frame.t !== "ping" && frame.t !== "pong" && frame.t !== "ack");
+		return this[direction].filter(frame => frame.t !== "ping" && frame.t !== "pong" && frame.t !== "ack");
 	}
 }
 

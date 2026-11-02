@@ -31,9 +31,9 @@ export function rankDocuments(query: string, documents: readonly SearchDocument[
 	const indexed = documents.map(indexDocument);
 	const averageLength = indexed.reduce((sum, document) => sum + document.textLength, 0) / indexed.length || 1;
 	const idf = new Map(
-		[...queryTerms].map((term) => {
+		[...queryTerms].map(term => {
 			const frequency = indexed.filter(
-				(document) =>
+				document =>
 					document.nameTerms.has(term) || document.textCounts.has(term) || document.namespaceTerms.has(term),
 			).length;
 			return [term, Math.log(1 + (indexed.length - frequency + 0.5) / (frequency + 0.5))] as const;
@@ -57,7 +57,7 @@ export function rankDocuments(query: string, documents: readonly SearchDocument[
 		}
 		if (score === 0) continue;
 		const local = document.localNameTerms;
-		if (local.length > 0 && local.every((term) => queryTerms.has(term))) score += fullNameBonus;
+		if (local.length > 0 && local.every(term => queryTerms.has(term))) score += fullNameBonus;
 		matches.push({ name: document.name, score, covered, exact: isExactNameQuery(exactQuery, document.name) });
 	}
 	return matches
@@ -66,7 +66,7 @@ export function rankDocuments(query: string, documents: readonly SearchDocument[
 				Number(right.exact) - Number(left.exact) || right.covered - left.covered || right.score - left.score,
 		)
 		.slice(0, limit)
-		.map((match) => match.name);
+		.map(match => match.name);
 }
 
 const K1 = 1.2;
@@ -149,10 +149,10 @@ export function tokenize(text: string): string[] {
 	// text, such as Chinese written without spaces, goes through it.
 	const words = /^[a-z0-9 ]*$/.test(normalized)
 		? normalized.split(" ")
-		: Array.from(wordSegmenter.segment(normalized), (segment) => (segment.isWordLike ? segment.segment : ""));
+		: Array.from(wordSegmenter.segment(normalized), segment => (segment.isWordLike ? segment.segment : ""));
 	return words
-		.filter((word) => word.length > 0 && !STOP_WORDS.has(word))
-		.map((word) => (/^[a-z0-9]+$/.test(word) ? stem(word) : word));
+		.filter(word => word.length > 0 && !STOP_WORDS.has(word))
+		.map(word => (/^[a-z0-9]+$/.test(word) ? stem(word) : word));
 }
 
 /** Naive singular form, so `issues` matches `issue` and `searches` matches `search`. */

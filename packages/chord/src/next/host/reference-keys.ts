@@ -146,7 +146,7 @@ export class ReferenceKeys {
 		// No frames from the old instance while the new one loads the key.
 		entry.source.hold();
 		const loading = target.pinKey(entry.member, entry.key, version, BACKGROUND_CONTEXT).then(
-			(pin) => {
+			pin => {
 				if (entry.instance !== instance || entry.holders === 0) {
 					pin.release();
 					return;

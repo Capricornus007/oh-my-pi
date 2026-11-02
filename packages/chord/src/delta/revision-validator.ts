@@ -56,7 +56,7 @@ function assertPlainObject(value: object): void {
 
 function assertDenseArray(value: readonly unknown[]): void {
 	const keys = Reflect.ownKeys(value);
-	if (keys.length !== value.length + 1 || keys.some((key) => typeof key !== "string")) {
+	if (keys.length !== value.length + 1 || keys.some(key => typeof key !== "string")) {
 		throw new TypeError("Replicated state arrays must be dense and contain only indexed entries");
 	}
 	for (let index = 0; index < value.length; index++) {

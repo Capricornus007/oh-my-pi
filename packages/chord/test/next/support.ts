@@ -78,7 +78,7 @@ export type Counts = { walks: number; validations: number; compilations: number 
 /** Runs `work` with a counting context and returns the counters it added. */
 export async function counted(work: (context: Context) => void): Promise<Counts> {
 	const telemetry = new InMemoryTelemetryContext();
-	await telemetry.startSpan({ name: "test" }, (span) => work(withTelemetry(span, BACKGROUND_CONTEXT)));
+	await telemetry.startSpan({ name: "test" }, span => work(withTelemetry(span, BACKGROUND_CONTEXT)));
 	const counts: Counts = { walks: 0, validations: 0, compilations: 0 };
 	for (const { name, value } of telemetry.getMetrics()) {
 		const counter = name.replace("chord.data.", "") as keyof Counts;
@@ -92,17 +92,17 @@ const gc = runInNewContext("gc") as () => void;
 
 /** Expects every referent to be collected once nothing else holds it. */
 export async function expectCollected(...refs: WeakRef<object>[]): Promise<void> {
-	for (let round = 0; round < 10 && refs.some((ref) => ref.deref() !== undefined); round++) {
-		await new Promise((resolve) => setImmediate(resolve));
+	for (let round = 0; round < 10 && refs.some(ref => ref.deref() !== undefined); round++) {
+		await new Promise(resolve => setImmediate(resolve));
 		gc();
 	}
-	expect(refs.map((ref) => ref.deref() === undefined)).toEqual(refs.map(() => true));
+	expect(refs.map(ref => ref.deref() === undefined)).toEqual(refs.map(() => true));
 }
 
 /** The heap in use once pending work ran and garbage was collected, repeatedly. */
 export async function settledHeap(): Promise<number> {
 	for (let round = 0; round < 5; round++) {
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		gc();
 	}
 	return process.memoryUsage().heapUsed;
@@ -119,7 +119,7 @@ export async function metered(): Promise<{
 }> {
 	const telemetry = new InMemoryTelemetryContext();
 	// A settled span still records through its adapter's metrics.
-	const span = await telemetry.startSpan({ name: "test" }, (span) => span);
+	const span = await telemetry.startSpan({ name: "test" }, span => span);
 	const counts = (): Record<string, number> => {
 		const result: Record<string, number> = {};
 		for (const { name, value } of telemetry.getMetrics()) result[name] = (result[name] ?? 0) + value;
@@ -130,13 +130,13 @@ export async function metered(): Promise<{
 
 /** Waits until queued watch frames have been delivered. */
 export function delivered(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 0));
+	return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 /** Starts `watch` and collects its frames as `[value, ops]`. */
 export function framesOf<T>(watch: WatchHandle<T>): [T, readonly Op[]][] {
 	const frames: [T, readonly Op[]][] = [];
-	watch.start(async (call) => {
+	watch.start(async call => {
 		if (call.kind === "value") frames.push([call.value, call.ops]);
 	});
 	return frames;
@@ -145,7 +145,7 @@ export function framesOf<T>(watch: WatchHandle<T>): [T, readonly Op[]][] {
 /** Starts `watch` and collects every call it gets: values (the `retired` flag included) and failures. */
 export function changesOf<T>(watch: WatchHandle<T>): WatchCall<T>[] {
 	const calls: WatchCall<T>[] = [];
-	watch.start(async (call) => {
+	watch.start(async call => {
 		calls.push(call);
 	});
 	return calls;
@@ -153,7 +153,7 @@ export function changesOf<T>(watch: WatchHandle<T>): WatchCall<T>[] {
 
 /** The values of `calls` (a failure as `{ failed: message }`), for short expectations. */
 export function valuesOf<T>(calls: readonly WatchCall<T>[]): (T | { readonly failed: string })[] {
-	return calls.map((call) => (call.kind === "value" ? call.value : { failed: (call.error as Error).message }));
+	return calls.map(call => (call.kind === "value" ? call.value : { failed: (call.error as Error).message }));
 }
 
 /**
@@ -207,7 +207,7 @@ async function restartableOf<C extends typeof Restartable | typeof StoreRestarta
 ) {
 	const attempts: Self[] = [];
 	let started = 0;
-	const { host, errors } = await loaded((h) => {
+	const { host, errors } = await loaded(h => {
 		options.serve?.(h);
 		// Both types have the one method `touch`; the factory's `self` is the attempt either way.
 		h.serve(Type as typeof Restartable, (_, self) => {
@@ -245,7 +245,7 @@ export async function loaded(
 ): Promise<{ readonly host: Host; readonly errors: HostError[]; readonly failed: readonly PluginFailure[] }> {
 	const errors: HostError[] = [];
 	const { telemetry, closeTimeout, readyTimeout, store } = options;
-	const host = createHost({ telemetry, closeTimeout, readyTimeout, store, onError: (error) => errors.push(error) });
+	const host = createHost({ telemetry, closeTimeout, readyTimeout, store, onError: error => errors.push(error) });
 	const facets = [{ name: "@test/app", facet: defineFacet(setup) }];
 	const { failed } = await host.load(facets, options.context ?? BACKGROUND_CONTEXT);
 	return { host, errors, failed };
@@ -260,7 +260,7 @@ export async function loadedPlugins(
 	options: { readonly telemetry?: InMemoryTelemetryContext; readonly readyTimeout?: number } = {},
 ): Promise<{ readonly host: Host; readonly errors: HostError[]; readonly failed: readonly PluginFailure[] }> {
 	const errors: HostError[] = [];
-	const host = createHost({ ...options, onError: (error) => errors.push(error) });
+	const host = createHost({ ...options, onError: error => errors.push(error) });
 	const facets = Object.entries(setups).map(([name, setup]) => ({ name, facet: defineFacet(setup) }));
 	const { failed } = await host.load(facets, BACKGROUND_CONTEXT);
 	return { host, errors, failed };
@@ -292,7 +292,7 @@ export function faultyDatabase(): { readonly db: NodeSqliteDatabase; fail(statem
 		if (sql === "ROLLBACK") exec(sql);
 		throw new Error(`injected: ${sql} failed`);
 	};
-	return { db: new NodeSqliteDatabase(database), fail: (statement) => void failing.add(statement) };
+	return { db: new NodeSqliteDatabase(database), fail: statement => void failing.add(statement) };
 }
 
 /** A store over `faultyDatabase()`, and its `fail`. */
@@ -328,7 +328,7 @@ export function holdNextCommit(store: ChordStore): { readonly entered: Promise<v
 
 /** The owner of a test's table handles: its failures collected. */
 export function tableOwner(failures: ChordError[] = []): TableOwner & { readonly failures: ChordError[] } {
-	return { label: "app.store", scope: {}, assertLive: () => {}, fail: (error) => void failures.push(error), failures };
+	return { label: "app.store", scope: {}, assertLive: () => {}, fail: error => void failures.push(error), failures };
 }
 
 /** Creates `definition` (and its indexes) in `store` as `app.store:<name>` and returns a handle to it. */
@@ -365,12 +365,12 @@ export function fakeTimers(): void {
 
 /** Waits until every pending promise callback has run. */
 export function flushed(): Promise<void> {
-	return new Promise((resolve) => setImmediate(resolve));
+	return new Promise(resolve => setImmediate(resolve));
 }
 
 /** The kinds and objects of the reported `activation_failed` errors, with their causes' kinds. */
 export function failures(errors: readonly HostError[]): string[] {
-	return errors.flatMap((error) =>
+	return errors.flatMap(error =>
 		error.kind === "activation_failed" ? [`${error.object}: ${error.failure.kind}`] : [],
 	);
 }
@@ -408,10 +408,10 @@ export async function linked(
 		principal: { kind: "server" },
 		telemetry,
 		readyTimeout,
-		onError: (error) => errors.server.push(error),
+		onError: error => errors.server.push(error),
 	});
 	await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(setup) }], context);
-	const client = createHost<TestPrincipal>({ telemetry, readyTimeout, onError: (error) => errors.client.push(error) });
+	const client = createHost<TestPrincipal>({ telemetry, readyTimeout, onError: error => errors.client.push(error) });
 	await client.load([], context);
 	const links = memoryLinkPair();
 	server.accept(links[0], { principal: options.child ?? { kind: "owner" }, codec: testCodec() }, context);
@@ -445,7 +445,7 @@ export class RawPeer {
 	) {
 		this.#link = link;
 		this.codec = options.codec ?? testCodec();
-		link.onMessage((bytes) => {
+		link.onMessage(bytes => {
 			const message = checkMessage(this.codec.decode(bytes), BACKGROUND_CONTEXT);
 			this.received.push(message);
 			if (options.ack !== false && (message.kind === "bound" || message.kind === "state")) this.ack(message.origin);
@@ -481,10 +481,10 @@ export class RawPeer {
 	/** The first received message of `kind` not taken yet, waiting for it; throws if the link closes first. */
 	async next<K extends Message["kind"]>(kind: K): Promise<Extract<Message, { kind: K }>> {
 		for (;;) {
-			const index = this.received.findIndex((message) => message.kind === kind);
+			const index = this.received.findIndex(message => message.kind === kind);
 			if (index >= 0) return this.received.splice(index, 1)[0] as Extract<Message, { kind: K }>;
 			if (this.closed) throw new Error(`link closed before ${kind}`);
-			await new Promise<void>((resolve) => this.#waiters.push(resolve));
+			await new Promise<void>(resolve => this.#waiters.push(resolve));
 		}
 	}
 
@@ -555,7 +555,7 @@ export async function rawLinked(
 		principal: { kind: "server" },
 		readyTimeout: options.readyTimeout,
 		compression: options.compression,
-		onError: (error) => errors.push(error),
+		onError: error => errors.push(error),
 	});
 	await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(setup) }], BACKGROUND_CONTEXT);
 	const [a, b] = memoryLinkPair();
@@ -641,7 +641,7 @@ export function serveNotes(
 		return {
 			list: self.derive([doc], ([d]) => d.list),
 			add: async ({ text }, ctx) => {
-				await doc.change((draft) => void draft.list.push({ text }), ctx);
+				await doc.change(draft => void draft.list.push({ text }), ctx);
 				return doc.value.list.length;
 			},
 		};
@@ -654,7 +654,7 @@ export function serveNotes(
 		const count = self.derive([store.list], ([list]) => list.length);
 		const wait = async (ctx: Ctx<TestPrincipal>) => {
 			probe.waits.push(ctx);
-			await new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", resolve));
+			await new Promise(resolve => ctx.abortSignal?.addEventListener("abort", resolve));
 			return null;
 		};
 		if (principal.kind === "guest") return { variant: "reader", members: { notes, count, wait } };
@@ -691,7 +691,7 @@ export async function rawProvider(
 	const client = createHost<TestPrincipal>({
 		readyTimeout: options.readyTimeout,
 		compression: options.compression,
-		onError: (error) => errors.push(error),
+		onError: error => errors.push(error),
 	});
 	await client.load([], BACKGROUND_CONTEXT);
 	const peer = await rawParent(client, options.limits);
@@ -713,7 +713,7 @@ export async function rawParent(host: Host<TestPrincipal>, limits?: PartLimits):
 /** Starts a `ref.state` watch and collects the states it delivers, by kind (failed ones with their error's message). */
 export function statesOf(watch: NativeWatchHandle<RefState>): string[] {
 	const states: string[] = [];
-	watch.start(async (call) => {
+	watch.start(async call => {
 		if (call.kind !== "value") return;
 		const state = call.value;
 		states.push(state.kind === "failed" ? `failed: ${state.cause.error.message}` : state.kind);
@@ -829,7 +829,7 @@ export async function relayed(
 		principal: { kind: "server" },
 		revokedBy: options.serverRevokedBy ?? revokedBy,
 		compression: compression.server,
-		onError: (error) => errors.server.push(error),
+		onError: error => errors.server.push(error),
 	});
 	const codec = options.codecs?.route ?? testCodec();
 	const worker = (address: Address<typeof Session>): Resolved => {
@@ -841,10 +841,10 @@ export async function relayed(
 			principal,
 			revokedBy,
 			compression: compression.worker,
-			onError: (error) => errors.worker.push(error),
+			onError: error => errors.worker.push(error),
 		});
 		host.connect(b, { principal: { kind: "server" }, trusted: options.trusted, codec }, context);
-		const facet = defineFacet<TestPrincipal>((h) => {
+		const facet = defineFacet<TestPrincipal>(h => {
 			serveNotes(h, PlacedNotes);
 			options.worker?.(h);
 		});
@@ -862,11 +862,8 @@ export async function relayed(
 		},
 		context,
 	);
-	await server.load(
-		[{ name: "@test/server", facet: defineFacet<TestPrincipal>((h) => options.server?.(h)) }],
-		context,
-	);
-	const tab = createHost<TestPrincipal>({ compression: compression.tab, onError: (error) => errors.tab.push(error) });
+	await server.load([{ name: "@test/server", facet: defineFacet<TestPrincipal>(h => options.server?.(h)) }], context);
+	const tab = createHost<TestPrincipal>({ compression: compression.tab, onError: error => errors.tab.push(error) });
 	await tab.load([], context);
 	const [a, b] = memoryLinkPair();
 	const tabCodec = options.codecs?.tab ?? testCodec();
@@ -889,7 +886,7 @@ export function rawWorkers(
 		readonly limits?: PartLimits;
 	} = {},
 ): (address: Address<typeof Session>) => Promise<Resolved> {
-	return async (address) => {
+	return async address => {
 		const [a, b] = memoryLinkPair();
 		peers.push(new RawPeer(b, options));
 		const principal = { kind: "worker", session: address.params.id } as const;
@@ -941,10 +938,10 @@ export const ArchiveTables = (() => {
 		key: ["id"],
 		indexes: { by_path: ["path", "at"] },
 	});
-	const EditsV2 = evolveTable(EditsV1, (t) => t.add("done", bool({ default: false })));
+	const EditsV2 = evolveTable(EditsV1, t => t.add("done", bool({ default: false })));
 	const NotesV1 = defineTable("notes", { version: 1, columns: { id: int(), text: str() }, key: ["id"] });
-	const NotesV2 = evolveTable(NotesV1, (t) =>
-		t.rows((row) => {
+	const NotesV2 = evolveTable(NotesV1, t =>
+		t.rows(row => {
 			if (row.id === 120) throw new Error("crash");
 			return { text: `${row.text}!` };
 		}),
@@ -996,7 +993,7 @@ export async function archiveStore(options?: { readonly outbox?: boolean }): Pro
 		},
 	};
 	await store.commit(
-		["", "a", "b", "gone"].map((key) =>
+		["", "a", "b", "gone"].map(key =>
 			createDocument({ ...address, key }, base({ title: key }), JSON.stringify({ title: key })),
 		),
 		created,

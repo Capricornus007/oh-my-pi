@@ -125,7 +125,7 @@ describe("group commit: scheduler regions", () => {
 		const { harness } = await openTasks(storage, [Hold]);
 		const root = await harness.root(context);
 		harness.resume();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const a = await tx.createTask(Hold, { name: "a" }, { ownership: { kind: "task", taskId: b } });
@@ -140,7 +140,7 @@ describe("group commit: scheduler regions", () => {
 		const held = storage.holdCommits();
 		const c = (await harness.conversation(tree.c, context))!;
 		const creating = c.commit(
-			(tx) => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await held.entered;
@@ -161,7 +161,7 @@ describe("group commit: scheduler regions", () => {
 		const { harness } = await openTasks(storage, [Hold]);
 		const root = await harness.root(context);
 		harness.resume();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
@@ -171,13 +171,13 @@ describe("group commit: scheduler regions", () => {
 		await eventually(async () => (await status(harness, tree.b)) === "running");
 		// A call in flight, so what follows is admitted and stays unpublished, in this order.
 		const held = storage.holdCommits();
-		const blocker = root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		const blocker = root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		await held.entered;
 		// B ends; then D is created in C while B still shows live; then P ends.
 		gate("b").resolve();
 		await flush();
 		const creating = c.commit(
-			(tx) => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await flush();
@@ -199,7 +199,7 @@ describe("group commit: scheduler regions", () => {
 		const { harness } = await openTasks(storage, [Hold, TwoPhases]);
 		const root = await harness.root(context);
 		harness.resume();
-		const { owner, child } = await root.commit(async (tx) => {
+		const { owner, child } = await root.commit(async tx => {
 			const owner = await tx.createTask(Hold, { name: "o" }, { ownership: { kind: "conversation" } });
 			const child = await tx.createTask(TwoPhases, { name: "t" }, { ownership: { kind: "task", taskId: owner } });
 			return { owner, child };
@@ -227,13 +227,13 @@ describe("group commit: scheduler regions", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, [Waits]);
 		const root = await harness.root(context);
-		const { x, y } = await root.commit(async (tx) => {
+		const { x, y } = await root.commit(async tx => {
 			const x = await tx.createTask(Waits, { name: "x" }, { ownership: { kind: "conversation" } });
 			const y = await tx.createTask(Waits, { name: "y" }, { ownership: { kind: "conversation" } });
 			return { x, y };
 		}, context);
 		// Each waits on the other, named in a memo.
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			// Every table read before the first write.
 			const records = [(await tx.task(x))!, (await tx.task(y))!];
 			setTask(tx, { ...records[0]!, memos: { on: y } } as TaskRecord<JsonValue, JsonValue, JsonValue>);
@@ -261,7 +261,7 @@ describe("group commit: scheduler regions", () => {
 		const { harness } = await openTasks(storage, [Hold]);
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Hold, { name: "r" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "r" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		// The reservation's write is in flight: a scheduler commit with writes is never delivered before it is published.
@@ -297,12 +297,12 @@ describe("group commit: scheduler regions", () => {
 		const { harness } = await openTasks(storage, [], { registry });
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(V2, { name: "m" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(V2, { name: "m" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		// Stored at version 1, and written again by a commit that is in flight when the reservation reads it.
 		const held = storage.holdCommits();
-		const writing = root.commit(async (tx) => {
+		const writing = root.commit(async tx => {
 			const record = (await tx.task(id))!;
 			setTask(tx, { ...record, version: 1, memos: { touched: true } } as TaskRecord<
 				JsonValue,
@@ -340,11 +340,11 @@ describe("group commit: scheduler regions", () => {
 		const { harness, infos } = await openTasks(storage, [], { registry });
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(V2, { name: "m" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(V2, { name: "m" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const held = storage.holdCommits();
-		const writing = root.commit(async (tx) => {
+		const writing = root.commit(async tx => {
 			const record = (await tx.task(id))!;
 			setTask(tx, { ...record, version: 1 } as TaskRecord<JsonValue, JsonValue, JsonValue>);
 		}, context);
@@ -356,7 +356,7 @@ describe("group commit: scheduler regions", () => {
 		await eventually(() => migrations > 0);
 		await flush();
 		expect(migrations).toBe(1);
-		expect(infos.filter((info) => info.kind === "migration_failed")).toHaveLength(1);
+		expect(infos.filter(info => info.kind === "migration_failed")).toHaveLength(1);
 		await harness.close(context);
 	});
 
@@ -367,12 +367,12 @@ describe("group commit: scheduler regions", () => {
 		harness.resume();
 		// Root R is listed for its last live task, T.
 		const last = await root.commit(
-			(tx) => tx.createTask(Hold, { name: "t" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "t" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await eventually(async () => (await status(harness, last)) === "running");
 		const published = new Set<TaskId>();
-		followCommits(harness, (publication) => {
+		followCommits(harness, publication => {
 			if (publication.kind !== "stored") return;
 			for (const change of publication.changes) if (change.type === "task") published.add(change.value.id);
 		});
@@ -381,7 +381,7 @@ describe("group commit: scheduler regions", () => {
 		gate("t").resolve();
 		await held.entered;
 		let created: TaskId | undefined;
-		const creating = root.commit(async (tx) => {
+		const creating = root.commit(async tx => {
 			created = await tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } });
 			return created;
 		}, context);
@@ -407,14 +407,14 @@ describe("group commit: scheduler regions", () => {
 		const root = await harness.root(context);
 		harness.resume();
 		// Live P, in the root conversation, owns the empty conversation C.
-		const { p, c } = await root.commit(async (tx) => {
+		const { p, c } = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: p } });
 			return { p, c: c.id };
 		}, context);
 		await eventually(async () => (await status(harness, p)) === "running");
 		const published = new Set<TaskId>();
-		followCommits(harness, (publication) => {
+		followCommits(harness, publication => {
 			if (publication.kind !== "stored") return;
 			for (const change of publication.changes) if (change.type === "task") published.add(change.value.id);
 		});
@@ -424,7 +424,7 @@ describe("group commit: scheduler regions", () => {
 		gate("p").resolve();
 		await held.entered;
 		let created: TaskId | undefined;
-		const creating = conversation.commit(async (tx) => {
+		const creating = conversation.commit(async tx => {
 			created = await tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } });
 			return created;
 		}, context);
@@ -449,7 +449,7 @@ describe("group commit: scheduler regions", () => {
 		const root = await harness.root(context);
 		harness.resume();
 		// Live G owns P, which owns the empty conversation C.
-		const { g, p, c } = await root.commit(async (tx) => {
+		const { g, p, c } = await root.commit(async tx => {
 			const g = await tx.createTask(Hold, { name: "g" }, { ownership: { kind: "conversation" } });
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "task", taskId: g } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: p } });
@@ -457,7 +457,7 @@ describe("group commit: scheduler regions", () => {
 		}, context);
 		await eventually(async () => (await status(harness, p)) === "running");
 		const published = new Set<TaskId>();
-		followCommits(harness, (publication) => {
+		followCommits(harness, publication => {
 			if (publication.kind !== "stored") return;
 			for (const change of publication.changes) if (change.type === "task") published.add(change.value.id);
 		});
@@ -467,7 +467,7 @@ describe("group commit: scheduler regions", () => {
 		gate("p").resolve();
 		await held.entered;
 		let created: TaskId | undefined;
-		const creating = conversation.commit(async (tx) => {
+		const creating = conversation.commit(async tx => {
 			created = await tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } });
 			return created;
 		}, context);
@@ -493,7 +493,7 @@ describe("group commit: scheduler regions", () => {
 		let opened = await openTasks(storage, [Hold]);
 		const root = await opened.harness.root(context);
 		opened.harness.resume();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "conversation" } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
 			return { b, c: c.id };
@@ -512,7 +512,7 @@ describe("group commit: scheduler regions", () => {
 		const c = (await harness.conversation(tree.c, context))!;
 		const held = storage.holdCommits();
 		const creating = c.commit(
-			(tx) => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await held.entered;
@@ -539,7 +539,7 @@ describe("group commit: records a decision copies", () => {
 	/** Runtimes of running probes, by name, so a test commits for them. */
 	const runtimes = new Map<string, TaskRuntime<Probe, { phase: "hold"; n: number }, null, object>>();
 	const untilAborted = (signal: AbortSignal) =>
-		new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+		new Promise<void>(resolve => signal.addEventListener("abort", () => resolve(), { once: true }));
 	/** Holds until aborted, its runtime exposed; fails once its gate opens. Its abort handler holds too. */
 	const Probe = defineTask<Probe, { phase: "hold"; n: number }, null>({
 		name: "gc.probe",
@@ -565,7 +565,7 @@ describe("group commit: records a decision copies", () => {
 		initial: () => ({ phase: "spawn" }),
 		phases: {
 			spawn: async (task, runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					const on: TaskId[] = [];
 					for (const name of ["x", "y"]) {
 						on.push(await tx.createTask(Probe, { name }, { ownership: { kind: "task", taskId: task.id } }));
@@ -609,7 +609,7 @@ describe("group commit: records a decision copies", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, [Probe]);
 		const root = await harness.root(context);
-		const { parent, child } = await root.commit(async (tx) => {
+		const { parent, child } = await root.commit(async tx => {
 			const parent = await tx.createTask(Probe, { name: "p" }, { ownership: { kind: "conversation" } });
 			const child = await tx.createTask(Probe, { name: "c" }, { ownership: { kind: "task", taskId: parent } });
 			return { parent, child };
@@ -627,7 +627,7 @@ describe("group commit: records a decision copies", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, [Probe, Waiter]);
 		const root = await harness.root(context);
-		await root.commit((tx) => tx.createTask(Waiter, null, { ownership: { kind: "conversation" } }), context);
+		await root.commit(tx => tx.createTask(Waiter, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();
 		await eventually(() => runtimes.has("x") && runtimes.has("y"));
 		await flush();
@@ -664,7 +664,7 @@ describe("group commit: reads on the line", () => {
 			initial: () => ({ phase: "spawn" }),
 			phases: {
 				spawn: async (task, runtime, ctx) =>
-					runtime.commit(async (tx) => {
+					runtime.commit(async tx => {
 						const on: TaskId[] = [];
 						for (let n = 0; n < 300; n++) {
 							on.push(await tx.createTask(Child, null, { ownership: { kind: "task", taskId: task.id } }));
@@ -682,10 +682,7 @@ describe("group commit: reads on the line", () => {
 		const storage = new Counting();
 		const { harness } = await openTasks(storage, [Parent, Child]);
 		const root = await harness.root(context);
-		const id = await root.commit(
-			(tx) => tx.createTask(Parent, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await root.commit(tx => tx.createTask(Parent, null, { ownership: { kind: "conversation" } }), context);
 		storage.taskReads = 0;
 		harness.resume();
 		expect((await harness.waitForTask(id, context)).state.outcome).toEqual({ status: "completed", result: 300 });
@@ -717,11 +714,11 @@ describe("group commit: outcomes and publication through the Harness", () => {
 		const root = await harness.root(context);
 		const other = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 		const one = await root.commit(
-			(tx) => tx.createTask(Hold, { name: "one" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "one" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const two = await other.commit(
-			(tx) => tx.createTask(Hold, { name: "two" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "two" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		harness.resume();
@@ -729,7 +726,7 @@ describe("group commit: outcomes and publication through the Harness", () => {
 			async () => (await status(harness, one)) === "running" && (await status(harness, two)) === "running",
 		);
 		const ended = new Set<TaskId>();
-		followCommits(harness, (publication) => {
+		followCommits(harness, publication => {
 			if (publication.kind !== "stored") return;
 			for (const change of publication.changes) {
 				if (change.type === "task" && change.value.state.status === "terminal") ended.add(change.value.id);
@@ -737,7 +734,7 @@ describe("group commit: outcomes and publication through the Harness", () => {
 		});
 		// Both end in one call, behind a commit in flight.
 		const held = storage.holdCommits();
-		const blocker = root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		const blocker = root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		await held.entered;
 		let seen: boolean | undefined;
 		const waited = harness.waitForTask(one, context).then(() => {
@@ -772,13 +769,13 @@ describe("group commit: outcomes and publication through the Harness", () => {
 		const { harness } = await openTasks(storage, [Listens]);
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Listens, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Listens, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		harness.resume();
 		await eventually(async () => (await status(harness, id)) === "running");
 		const held = storage.holdCommits();
-		const entry = root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		const entry = root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		await held.entered;
 		const closing = harness.close(context);
 		await signalled.promise;
@@ -788,7 +785,7 @@ describe("group commit: outcomes and publication through the Harness", () => {
 		await closing;
 		const reopened = await openTasks(storage.reopen(), [Listens]);
 		const conversation = (await reopened.harness.conversation(root.id as ConversationId, context))!;
-		expect((await conversation.entries({}, 10, undefined, context)).items.map((item) => item.kind)).toContain("note");
+		expect((await conversation.entries({}, 10, undefined, context)).items.map(item => item.kind)).toContain("note");
 		// Close wrote the task it stopped back as pending.
 		expect(await status(reopened.harness, id)).toBe("pending");
 		await reopened.harness.close(context);

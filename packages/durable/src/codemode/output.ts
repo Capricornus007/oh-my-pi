@@ -42,7 +42,7 @@ function valueText(value: unknown): string {
  * `==> text N/M <==` line; `console` lines follow all other output in one `<console_output>` block.
  */
 function formatItems(output: readonly CodemodeOutputItem[]): Item[] {
-	const total = output.filter((item) => item.type === "text" && !item.console).length;
+	const total = output.filter(item => item.type === "text" && !item.console).length;
 	const items: Item[] = [];
 	const consoleLines: string[] = [];
 	let index = 0;
@@ -101,7 +101,7 @@ async function truncate(
 	limits: Limits,
 	write: OutputFile,
 ): Promise<{ items: Item[]; fullOutputPath?: string }> {
-	const texts = items.filter((item): item is TextContent => item.type === "text").map((item) => item.text);
+	const texts = items.filter((item): item is TextContent => item.type === "text").map(item => item.text);
 	const combined = texts.join("\n");
 	// Within the limits too: a UTF-16 unit is at most 3 UTF-8 bytes, and the rest of the result is a few short lines.
 	const budget = Math.min(maxTokens * CHARS_PER_TOKEN, Math.floor(limits.maxBytes / 4));
@@ -120,7 +120,7 @@ async function truncate(
 			? `\n\n[Full output: ${spilled.path} (read with offset/limit)]`
 			: `\n\n[Could not save the full output: ${spilled.error}]`;
 	return {
-		items: [{ type: "text", text }, ...items.filter((item) => item.type === "image")],
+		items: [{ type: "text", text }, ...items.filter(item => item.type === "image")],
 		...("path" in spilled ? { fullOutputPath: spilled.path } : {}),
 	};
 }
@@ -129,7 +129,7 @@ async function truncate(
 async function saveImages(items: readonly Item[], write: OutputFile): Promise<Item[]> {
 	const labels = new Map<string, Promise<string>>();
 	const label = async ({ data, mimeType }: ImageContent, index: number): Promise<string> => {
-		const bytes = Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
+		const bytes = Uint8Array.from(atob(data), char => char.charCodeAt(0));
 		const kind = `${mimeType}, ${bytes.length} bytes`;
 		// A failed write must not discard the result of a script whose calls already ran: it becomes part of the label.
 		const saved = await write(`image-${index}${IMAGE_EXTENSIONS[mimeType] ?? ".bin"}`, bytes);
@@ -167,7 +167,7 @@ function formatError(
 	const summary =
 		calls.length === 0
 			? "No tool calls were made."
-			: `Tool calls made before the failure (they are not undone): ${calls.map((call) => `${call.name} (${call.status})`).join(", ")}`;
+			: `Tool calls made before the failure (they are not undone): ${calls.map(call => `${call.name} (${call.status})`).join(", ")}`;
 	return `${head}\n\n${summary}`;
 }
 
@@ -189,7 +189,7 @@ export async function formatResult(
 	const items = formatItems(output);
 	if (!result.ok) items.push({ type: "text", text: `Script error:\n${formatError(result, options.calls)}` });
 	const generated = options.generatedImages;
-	if (generated > 0 && !items.some((item) => item.type === "image")) {
+	if (generated > 0 && !items.some(item => item.type === "image")) {
 		items.push({
 			type: "text",
 			text: `Note: models.generateImages() returned ${generated} image${generated === 1 ? "" : "s"} that the script did not show. Show each image block of result.output with image(block).`,

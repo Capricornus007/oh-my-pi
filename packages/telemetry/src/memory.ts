@@ -166,7 +166,7 @@ function startInertSpan<T>(
 	options: SpanOptions,
 	callback: (span: TelemetrySpan) => T | Promise<T>,
 ): Promise<T> {
-	return NOOP_TELEMETRY_CONTEXT.startSpan(options, (noop) =>
+	return NOOP_TELEMETRY_CONTEXT.startSpan(options, noop =>
 		callback({
 			...noop,
 			metrics: state.metrics,
@@ -336,8 +336,8 @@ export class InMemoryTelemetryContext
 
 	private storedSpans(): StoredSpan[] {
 		return this.state.spans
-			.filter((span) => span.settled)
-			.map((span) => ({
+			.filter(span => span.settled)
+			.map(span => ({
 				id: carrierId(span.context),
 				traceId: span.context["pi-memory-trace"]!,
 				...(span.parentContext ? { parentId: carrierId(span.parentContext) } : {}),
@@ -345,12 +345,12 @@ export class InMemoryTelemetryContext
 				startedMs: span.startedMs,
 				endedMs: span.endedMs!,
 				attributes: copyAttributes(span.attributes),
-				events: span.events.map((event) => ({
+				events: span.events.map(event => ({
 					name: event.name,
 					timeMs: event.timeMs,
 					attributes: copyAttributes(event.attributes),
 				})),
-				links: span.links.map((link) => ({
+				links: span.links.map(link => ({
 					traceId: link.context["pi-memory-trace"]!,
 					spanId: carrierId(link.context),
 					attributes: copyAttributes(link.attributes),
@@ -361,7 +361,7 @@ export class InMemoryTelemetryContext
 	}
 
 	async getTrace(traceId: string): Promise<StoredTrace | undefined> {
-		const spans = this.storedSpans().filter((span) => span.traceId === traceId);
+		const spans = this.storedSpans().filter(span => span.traceId === traceId);
 		return spans.length ? { traceId, spans } : undefined;
 	}
 
@@ -378,16 +378,16 @@ export class InMemoryTelemetryContext
 			trace.spans.push(span);
 		}
 		const matches = [...grouped.values()]
-			.filter((trace) => {
+			.filter(trace => {
 				const first = trace.spans[0]!;
 				return (
 					(query.name === undefined || first.name === query.name) &&
 					(query.startMin === undefined || first.startedMs >= query.startMin) &&
 					(query.startMax === undefined || first.startedMs <= query.startMax) &&
 					(!after || first.startedMs < after[0] || (first.startedMs === after[0] && trace.traceId > after[1])) &&
-					(!query.errors || trace.spans.some((span) => span.status.status === "error")) &&
+					(!query.errors || trace.spans.some(span => span.status.status === "error")) &&
 					(!query.attributes ||
-						trace.spans.some((span) =>
+						trace.spans.some(span =>
 							Object.entries(query.attributes!).every(([key, value]) => span.attributes[key] === value),
 						))
 				);
@@ -440,18 +440,18 @@ export class InMemoryTelemetryContext
 
 	/** Returns detached snapshots in span-start order. */
 	getSpans(): readonly RecordedTelemetrySpan[] {
-		return this.state.spans.map((span) => ({
+		return this.state.spans.map(span => ({
 			id: span.id,
 			parentId: span.parentId,
 			context: { ...span.context },
 			parentContext: span.parentContext ? { ...span.parentContext } : null,
-			links: span.links.map((link) => ({
+			links: span.links.map(link => ({
 				context: { ...link.context },
 				attributes: copyAttributes(link.attributes),
 			})),
 			name: span.name,
 			attributes: copyAttributes(span.attributes),
-			events: span.events.map((event) => ({
+			events: span.events.map(event => ({
 				name: event.name,
 				attributes: copyAttributes(event.attributes),
 			})),

@@ -518,7 +518,7 @@ class Reader {
 		const part = this.part();
 		if (flags === PRESENT) return { [key]: part } as { [P in K]?: Part };
 		const lengths = this.list(() => this.varint());
-		const segments = lengths.map((length) => this.raw(length));
+		const segments = lengths.map(length => this.raw(length));
 		return { [key]: part, segments } as { [P in K]?: Part } & { segments: Uint8Array[] };
 	}
 
@@ -555,7 +555,7 @@ function hex(text: string, length: number): Uint8Array {
 }
 
 function hexText(bytes: Uint8Array): string {
-	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+	return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** 16 bytes as a UUID's text. */

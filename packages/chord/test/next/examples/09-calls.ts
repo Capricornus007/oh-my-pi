@@ -35,12 +35,12 @@ const Files = remote("example.files", {
 
 const stored = new Map<string, Uint8Array>();
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(Files, () => ({
 		variant: "owner",
 		members: {
 			// ctx.principal is the caller as its link stamped it; ctx.incarnation the calling host's run (R20).
-			whoami: async (ctx) => `${ctx.principal?.kind} from ${ctx.incarnation.slice(0, 8)}…`,
+			whoami: async ctx => `${ctx.principal?.kind} from ${ctx.incarnation.slice(0, 8)}…`,
 			upload: async ({ name, data }) => {
 				stored.set(name, data);
 				return data.byteLength;
@@ -51,8 +51,8 @@ const facet = defineFacet<P>((host) => {
 				throw new PluginError("quota", "the store is full", { limit: 1 });
 			},
 			// A handler's context is aborted when its caller cancels or releases the reference.
-			slow: (ctx) =>
-				new Promise((resolve) =>
+			slow: ctx =>
+				new Promise(resolve =>
 					ctx.abortSignal?.addEventListener("abort", () => {
 						console.log("server: slow aborted:", (ctx.abortSignal?.reason as Error).message);
 						resolve(null);
@@ -65,12 +65,12 @@ const facet = defineFacet<P>((host) => {
 const server = createHost<P>({
 	address: Server(),
 	principal: { kind: "server" },
-	onError: (error) => console.error("server:", error),
+	onError: error => console.error("server:", error),
 });
 await server.load([{ name: "@example/files", facet }], context);
 const [up, down] = memoryLinkPair();
 server.accept(up, { principal: { kind: "owner" } }, context);
-const client = createHost<P>({ onError: (error) => console.error("client:", error) });
+const client = createHost<P>({ onError: error => console.error("client:", error) });
 client.connect(down, { principal: { kind: "server" } }, context);
 await client.load([], context);
 
@@ -106,10 +106,10 @@ await slow.catch((error: unknown) => console.log("client: slow rejected:", (erro
 
 // 5. Release rejects the calls made through the reference; the provider aborts their handlers.
 const pending = files.slow(context);
-await new Promise((resolve) => setTimeout(resolve, 5));
+await new Promise(resolve => setTimeout(resolve, 5));
 files.release();
 await pending.catch((error: unknown) => console.log("client: pending call:", (error as Error).message));
-await new Promise((resolve) => setTimeout(resolve, 5));
+await new Promise(resolve => setTimeout(resolve, 5));
 
 await client.close(context);
 await server.close(context);

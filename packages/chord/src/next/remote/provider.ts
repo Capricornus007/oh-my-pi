@@ -280,7 +280,7 @@ export class ProviderSide {
 
 	/** A hold's members changed in the current batch; its flush sends or queues it. */
 	touched(hold: Hold): void {
-		if (this.#touched.length === 0) this.link.host.batch.flushing((context) => this.#flush(context));
+		if (this.#touched.length === 0) this.link.host.batch.flushing(context => this.#flush(context));
 		this.#touched.push(hold);
 	}
 
@@ -505,12 +505,12 @@ export class ProviderSide {
 				this.#binding.clear();
 				this.#bindingTurn = false;
 				// Every snapshot in one synchronous step: the binding shows all of them at one moment.
-				this.#sendOwn({ kind: "bound", holds: holds.map((hold) => hold.boundEntry(context)) });
+				this.#sendOwn({ kind: "bound", holds: holds.map(hold => hold.boundEntry(context)) });
 			} else if (this.#waiting.size > 0) {
 				const holds = [...this.#waiting];
 				this.#waiting.clear();
 				this.#bindingTurn = this.#binding.size > 0;
-				this.#sendOwn({ kind: "state", holds: holds.map((hold) => hold.pendingEntry(context)) });
+				this.#sendOwn({ kind: "state", holds: holds.map(hold => hold.pendingEntry(context)) });
 			} else {
 				return;
 			}

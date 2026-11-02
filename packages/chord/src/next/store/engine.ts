@@ -102,7 +102,7 @@ export function createDocument(
 ): StagedWrite {
 	return {
 		order: "create",
-		apply: async (step) => {
+		apply: async step => {
 			const id = step.ids.mint();
 			step.created.push(id);
 			created?.(id);
@@ -159,7 +159,7 @@ export function changeDocument(id: number, revision: number, content: DocumentCo
 	const write: DocumentWrite = { kind: "document.change", id, revision, content };
 	return {
 		order: "write",
-		apply: async (step) => {
+		apply: async step => {
 			await writeContent(step, id, "none", revision, content, text);
 			return [write];
 		},
@@ -210,7 +210,7 @@ export function retireDocument(id: number, revision: number): StagedWrite {
 	const write: DocumentWrite = { kind: "document.retire", id, revision };
 	return {
 		order: "retire",
-		apply: async (step) => {
+		apply: async step => {
 			// A Chord document keeps no history (`none`): its row goes with a conditional, counted DELETE (6a's).
 			const deleted = await step.runCounted(
 				`DELETE FROM ${TABLES.documents} WHERE id = ? AND revision = ? AND retired_at IS NULL`,

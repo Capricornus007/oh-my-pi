@@ -100,7 +100,7 @@ function testsTask(state: Probe) {
 				if (state.gate !== undefined) await Promise.race([state.gate.promise, aborted(runtime.signal)]);
 				const handle =
 					state.admit === undefined ? undefined : await runtime.conversation(runtime.conversationId, ctx);
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					if (state.admit !== undefined) await state.admit(handle!, tx);
 					await tx.appendEntry(runtime.conversationId, { kind: "test.tests", data: task.input.label });
 					return completed(task.input.label);
@@ -122,7 +122,7 @@ function install(setup: ChatSetup, state: Probe, afterRun?: GenerationHooks["aft
 	const Tests = testsTask(state);
 	const handler: GenerationHooks["afterRun"] =
 		afterRun ??
-		(async (run) => {
+		(async run => {
 			state.asked.push(run);
 			if (state.hookGate !== undefined) await state.hookGate.promise;
 			return { tasks: [runEndTask(Tests, { label: `run ${state.asked.length}` })] };
@@ -166,13 +166,13 @@ function call(name: string, id: string) {
 }
 
 function kindOf(entries: readonly EntryRecord[], kind: string): EntryRecord[] {
-	return entries.filter((entry) => entry.kind === kind);
+	return entries.filter(entry => entry.kind === kind);
 }
 
 /** Texts of the user messages of the conversation's entries, in order. */
 function userTexts(entries: readonly EntryRecord[]): string[] {
-	return entries.flatMap((entry) =>
-		(entry.model ?? []).flatMap((message) => (message.role === "user" ? [textOf(message) ?? ""] : [])),
+	return entries.flatMap(entry =>
+		(entry.model ?? []).flatMap(message => (message.role === "user" ? [textOf(message) ?? ""] : [])),
 	);
 }
 
@@ -260,7 +260,7 @@ describe("afterRun", () => {
 		await opened.harness.close(context);
 
 		const setup = chatSetup();
-		install(setup, state, async (run) => {
+		install(setup, state, async run => {
 			state.asked.push(run);
 			return undefined;
 		});
@@ -286,7 +286,7 @@ describe("afterRun", () => {
 				tasks: [Tests],
 				hooks: [
 					hook(GenerationTask, {
-						afterRun: async (run) => {
+						afterRun: async run => {
 							state.asked.push(run);
 							// Only the first run gets a task.
 							return state.asked.length === 1 ? { tasks: [runEndTask(Tests, { label: "run 1" })] } : undefined;
@@ -332,7 +332,7 @@ describe("afterRun", () => {
 			expect((await submission.wait(context)).status).toBe("done");
 		}
 		const entries = await allEntries(root);
-		const kinds = entries.filter((entry) => entry.kind !== "pi.system").map((entry) => entry.kind);
+		const kinds = entries.filter(entry => entry.kind !== "pi.system").map(entry => entry.kind);
 		expect(kinds).toEqual([
 			"pi.user",
 			"pi.assistant",
@@ -363,7 +363,7 @@ describe("afterRun", () => {
 		expect(kindOf(await allEntries(root), "pi.reset")).toEqual([]);
 		state.gate.resolve();
 		await root.waitForIdle(context);
-		const kinds = (await allEntries(root)).map((entry) => entry.kind);
+		const kinds = (await allEntries(root)).map(entry => entry.kind);
 		expect(kinds.slice(-2)).toEqual(["test.tests", "pi.reset"]);
 		await harness.close(context);
 	});
@@ -594,7 +594,7 @@ describe("afterRun", () => {
 		await root.waitForIdle(context);
 		expect(state.runs).toEqual(["ok"]);
 		// One report per hook, against the hook's extension; the requests of one hook come together.
-		expect(setup.infos.filter((info) => info.kind === "extension_error")).toEqual([
+		expect(setup.infos.filter(info => info.kind === "extension_error")).toEqual([
 			expect.objectContaining({ extension: "after-run" }),
 			expect.objectContaining({ extension: "broken" }),
 			expect.objectContaining({ extension: "not-a-list" }),
@@ -642,7 +642,7 @@ describe("afterRun", () => {
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		await root.waitForIdle(context);
 		const created = await harness.commit(
-			(tx) => tx.scanTasks({ conversationId: root.id, kind: "test.versioned" }, 10),
+			tx => tx.scanTasks({ conversationId: root.id, kind: "test.versioned" }, 10),
 			context,
 		);
 		expect(created.items).toHaveLength(1);
@@ -668,7 +668,7 @@ describe("afterRun", () => {
 								undefined,
 								ctx,
 							);
-							kinds.push(...page.items.map((entry) => entry.kind));
+							kinds.push(...page.items.map(entry => entry.kind));
 							expect((await api.entry(run.answer, ctx))?.kind).toBe("pi.assistant");
 							return undefined;
 						},
@@ -680,7 +680,7 @@ describe("afterRun", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		await root.waitForIdle(context);
-		expect(kinds.filter((kind) => kind !== "pi.system")).toEqual([
+		expect(kinds.filter(kind => kind !== "pi.system")).toEqual([
 			"pi.user",
 			"pi.assistant",
 			"pi.tool-result",
@@ -721,7 +721,7 @@ describe("afterRun", () => {
 								undefined,
 								ctx,
 							);
-							runs.push(page.items.map((entry) => entry.kind));
+							runs.push(page.items.map(entry => entry.kind));
 							return undefined;
 						},
 					}),
@@ -738,11 +738,11 @@ describe("afterRun", () => {
 		gate.resolve();
 		await submission.wait(context);
 		await root.waitForIdle(context);
-		const active = (await root.context(context)).entries.map((entry) => entry.kind);
+		const active = (await root.context(context)).entries.map(entry => entry.kind);
 		// The active context lost the run's input to the summary; the run's history did not.
 		expect(active).not.toContain("pi.user");
 		expect(runs).toHaveLength(1);
-		expect(runs[0]!.filter((kind) => kind !== "pi.system")).toEqual([
+		expect(runs[0]!.filter(kind => kind !== "pi.system")).toEqual([
 			"pi.user",
 			"pi.assistant",
 			"pi.tool-result",
@@ -799,7 +799,7 @@ describe("afterRun", () => {
 		const live = (await opened.harness.snapshot(LiveDoc, opened.root.id, context))!;
 		expect(live.run?.afterRun?.tasks).toHaveLength(1);
 		await eventually(async () =>
-			(await opened.harness.inspect(context)).tasks.some((task) => task.state.kind === "blocked"),
+			(await opened.harness.inspect(context)).tasks.some(task => task.state.kind === "blocked"),
 		);
 		expect(await settled(opened.root.waitForIdle(context))).toBe(false);
 		await opened.root.abort(context);
@@ -824,7 +824,7 @@ describe("afterRun", () => {
 				tasks: [Tests],
 				hooks: [
 					hook(GenerationTask, {
-						afterRun: async (run) => {
+						afterRun: async run => {
 							state.asked.push(run);
 							return state.asked.length === 1 ? { tasks: [runEndTask(Tests, { label: "run 1" })] } : undefined;
 						},
@@ -839,7 +839,7 @@ describe("afterRun", () => {
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		await root.waitForIdle(context);
 		const entries = await allEntries(root);
-		expect(entries.filter((entry) => entry.kind !== "pi.system").map((entry) => entry.kind)).toEqual([
+		expect(entries.filter(entry => entry.kind !== "pi.system").map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.assistant",
 			"test.tests",
@@ -870,7 +870,7 @@ describe("afterRun", () => {
 			first: user.id,
 		});
 		expect(state.asked).toEqual([]);
-		await harness.commit((tx) => root.submit(tx, { type: "continue" }), context);
+		await harness.commit(tx => root.submit(tx, { type: "continue" }), context);
 		await root.waitForIdle(context);
 		const answer = kindOf(await allEntries(root), "pi.assistant").at(-1)!;
 		expect(state.asked).toEqual([{ reason: "answer", first: user.id, answer: answer.id, last: answer.id }]);
@@ -930,7 +930,7 @@ describe("afterRun", () => {
 					hook(GenerationTask, {
 						// As a run started before `first` existed.
 						onYield: async () => {
-							await root!.commit(async (tx) => {
+							await root!.commit(async tx => {
 								delete (await tx.doc(LiveDoc, root!.id)).run!.first;
 							}, context);
 							return undefined;
@@ -1000,7 +1000,7 @@ describe("afterRun", () => {
 		setup.registry.install(defineExtension({ name: "worker", tasks: [Worker] }));
 		let opened = await openKillable(path, setup);
 		const id = await opened.root.commit(
-			(tx) => tx.createTask(Worker, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Worker, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		opened.harness.resume();
@@ -1008,7 +1008,7 @@ describe("afterRun", () => {
 		opened.kill();
 		opened = await openKillable(path, setup);
 		expect((await opened.harness.waitForTask(id, context)).state.outcome.status).toBe("completed");
-		expect(setup.infos.filter((info) => info.kind === "task_interrupted")).toEqual([]);
+		expect(setup.infos.filter(info => info.kind === "task_interrupted")).toEqual([]);
 		setup.settings.restartLimit = undefined;
 		await opened.harness.close(context);
 	});
@@ -1035,7 +1035,7 @@ describe("afterRun", () => {
 		rerun.resolve();
 		await opened.root.waitForIdle(context);
 		expect(state.runs).toEqual(["run 2"]);
-		expect(setup.infos.filter((info) => info.kind === "task_interrupted")).toEqual([]);
+		expect(setup.infos.filter(info => info.kind === "task_interrupted")).toEqual([]);
 		await opened.harness.close(context);
 	});
 
@@ -1068,7 +1068,7 @@ describe("afterRun", () => {
 					hook(GenerationTask, {
 						afterRun: async (run, api, ctx) => {
 							const range = { minEntryId: run.first, maxEntryId: run.last, order: "ascending" } as const;
-							kinds.push((await api.entries(range, 100, undefined, ctx)).items.map((entry) => entry.kind));
+							kinds.push((await api.entries(range, 100, undefined, ctx)).items.map(entry => entry.kind));
 							return undefined;
 						},
 					}),
@@ -1129,7 +1129,7 @@ describe("afterRun", () => {
 		const entries = await allEntries(root);
 		// The handoff's reset landed with the answer; the summary, cutting before it, settled stale at the run's end.
 		expect(kindOf(entries, "pi.compaction")).toEqual([]);
-		expect(entries.map((entry) => entry.kind).slice(-2)).toEqual(["pi.reset", "test.tests"]);
+		expect(entries.map(entry => entry.kind).slice(-2)).toEqual(["pi.reset", "test.tests"]);
 		expect(state.asked[0]).toMatchObject({ reason: "terminate", last: kindOf(entries, "pi.reset")[0]!.id });
 		await harness.close(context);
 	});

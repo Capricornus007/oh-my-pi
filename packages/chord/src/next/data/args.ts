@@ -37,9 +37,8 @@ export type CheckedArgs<C extends Contract, M extends string> =
 	| { readonly kind: "method"; readonly args: ArgsOf<C, M>; readonly result?: (current: Value) => Value }
 	| { readonly kind: "call"; readonly args: Value; readonly call: (args: Value, context: Context) => Promise<Value> };
 
-type ArgsOf<C extends Contract, M extends string> = M extends MemberNames<CurrentVariants<C>, "methods">
-	? Static<MethodAt<CurrentVariants<C>, M>["args"]>
-	: Value;
+type ArgsOf<C extends Contract, M extends string> =
+	M extends MemberNames<CurrentVariants<C>, "methods"> ? Static<MethodAt<CurrentVariants<C>, M>["args"]> : Value;
 
 /**
  * Binds a contract and the app's accepts table (validated once, kept as it is) into a provider. Builds the dispatch
@@ -53,7 +52,7 @@ export function bindProvider<C extends Contract>(contract: C, accepts: AcceptsTa
 	const mappings = accepts as CheckedAccepts;
 	const table: Dispatch = new Map([[current.version, dispatchEntries(current, undefined)]]);
 	for (const { version } of accepted) {
-		const data = versions.find((candidate) => candidate.version === version)!;
+		const data = versions.find(candidate => candidate.version === version)!;
 		table.set(version, dispatchEntries(data, mappings[version]?.methods));
 	}
 	const provider = { contract, accepted, accepts };
@@ -68,7 +67,7 @@ export function bindProvider<C extends Contract>(contract: C, accepts: AcceptsTa
 export function binds(provider: Provider<Contract>, version: number, fingerprint: string): boolean {
 	const { contract } = provider;
 	if (version === contract.version) return fingerprint === contract.fingerprint;
-	return provider.accepted.some((accepted) => accepted.version === version && accepted.fingerprint === fingerprint);
+	return provider.accepted.some(accepted => accepted.version === version && accepted.fingerprint === fingerprint);
 }
 
 /** An accepts table after `checkAccepts`, as the binding reads it. */

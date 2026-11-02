@@ -65,17 +65,17 @@ describe("reads outside a transaction", () => {
 	it("page fetches limit + 1 for next, and the cursor continues in order with the key tie-break", async () => {
 		const edits = await filled(10);
 		const q = query(Edits)
-			.where((e) => prefix(e.path, "p/"))
-			.orderBy((e) => e.path, "desc");
+			.where(e => prefix(e.path, "p/"))
+			.orderBy(e => e.path, "desc");
 		const seen: string[] = [];
 		let after: string | undefined;
 		do {
 			const page = await edits.page(q, 3, context, after === undefined ? {} : { after });
 			expect(page.items.length).toBeLessThanOrEqual(3);
-			seen.push(...page.items.map((row) => `${row.path}:${row.id}`));
+			seen.push(...page.items.map(row => `${row.path}:${row.id}`));
 			after = page.next;
 		} while (after !== undefined);
-		const all = (await edits.page(q, 100, context)).items.map((row) => `${row.path}:${row.id}`);
+		const all = (await edits.page(q, 100, context)).items.map(row => `${row.path}:${row.id}`);
 		expect(seen).toEqual(all);
 		expect(all.slice(0, 4)).toEqual(["p/2:e008", "p/2:e005", "p/2:e002", "p/1:e007"]);
 		expect((await edits.page(q, 4, context)).next).toBeDefined();
@@ -86,7 +86,7 @@ describe("reads outside a transaction", () => {
 		const edits = await filled(250);
 		const ids: string[] = [];
 		for await (const row of edits.rows(
-			query(Edits).where((e) => gte(e.at, 10)),
+			query(Edits).where(e => gte(e.at, 10)),
 			context,
 		))
 			ids.push(row.id as string);
@@ -94,13 +94,13 @@ describe("reads outside a transaction", () => {
 		expect(ids[0]).toBe("e010");
 		expect(
 			await edits.count(
-				query(Edits).where((e) => eq(e.path, "p/0")),
+				query(Edits).where(e => eq(e.path, "p/0")),
 				context,
 			),
 		).toBe(84);
 		expect(
 			await edits.count(
-				query(Edits).where((e) => isNull(e.note)),
+				query(Edits).where(e => isNull(e.note)),
 				context,
 			),
 		).toBe(250);
@@ -126,11 +126,11 @@ describe("unreadable cells", () => {
 	it("a json cell of a newer version fails the owner and the read, the data intact", async () => {
 		const owner = tableOwner();
 		const edits = await filled(1, owner);
-		await store.read((executor) => executor.run(`UPDATE "app.store:edits" SET "meta$v" = 2`), context);
+		await store.read(executor => executor.run(`UPDATE "app.store:edits" SET "meta$v" = 2`), context);
 		const error = await rejection(edits.get({ id: "e000" }, context));
 		expect(error).toMatchObject({ code: "unavailable" });
 		expect(owner.failures).toHaveLength(1);
-		expect(await store.read((executor) => executor.get(`SELECT meta FROM "app.store:edits"`), context)).toEqual({
+		expect(await store.read(executor => executor.get(`SELECT meta FROM "app.store:edits"`), context)).toEqual({
 			meta: '{"a":0}',
 		});
 	});
@@ -140,7 +140,7 @@ describe("the version fence of old handles (R15, slice 7b §5)", () => {
 	it("refuses reads through a handle older than the stored table: released/version", async () => {
 		store = await memoryStore();
 		const old = await tableIn(store, Edits);
-		const V2 = evolveTable(Edits, (t) => t.rename("note", "comment"));
+		const V2 = evolveTable(Edits, t => t.rename("note", "comment"));
 		await tableIn(store, V2);
 		const refused = { code: "released", reason: "version" };
 		expect(await rejection(old.get({ id: "e0" }, context))).toMatchObject(refused);
@@ -152,7 +152,7 @@ describe("the version fence of old handles (R15, slice 7b §5)", () => {
 describe("the version fence against a migration in flight (fix round 1, Sol 8)", () => {
 	it("refuses an old handle's read made while the migration's commit runs, rather than issuing obsolete SQL", async () => {
 		const V1 = defineTable("race", { version: 1, columns: { id: str(), old: str() }, key: ["id"] });
-		const V2 = evolveTable(V1, (t) => t.rename("old", "new"));
+		const V2 = evolveTable(V1, t => t.rename("old", "new"));
 		store = await memoryStore();
 		const old = await tableIn(store, V1);
 		const held = holdNextCommit(store);

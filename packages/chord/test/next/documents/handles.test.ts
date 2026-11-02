@@ -34,7 +34,7 @@ describe("keyed handles", () => {
 		for (const key of ["\u{1F600}", "\uFF5E", "b", "a"])
 			await notes!.change(
 				key,
-				(d) => {
+				d => {
 					d.text = key;
 				},
 				context,
@@ -52,12 +52,12 @@ describe("sealed handles", () => {
 			body = self.state(Body);
 			notes = self.state(Notes);
 		});
-		await body!.change((d) => {
+		await body!.change(d => {
 			d.text = "x";
 		}, context);
 		await notes!.change(
 			"k",
-			(d) => {
+			d => {
 				d.text = "y";
 			},
 			context,

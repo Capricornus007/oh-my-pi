@@ -123,7 +123,7 @@ class ConversationImpl<Tool extends ToolRegistration> implements Conversation {
 	}
 
 	configure(change: AgentChange, context: Context): Promise<void> {
-		return this.#host.harness.commitWith((tx) => configure(tx, this.id, change), context);
+		return this.#host.harness.commitWith(tx => configure(tx, this.id, change), context);
 	}
 
 	submit(submission: SubmissionDraft, context: Context): Promise<Submission>;
@@ -137,7 +137,7 @@ class ConversationImpl<Tool extends ToolRegistration> implements Conversation {
 	async compact(instructions: string | undefined, context: Context): Promise<TaskId<CompactionResult>> {
 		this.#host.tasks.resume();
 		const input = { reason: "manual", ...(instructions === undefined ? {} : { instructions }) } as const;
-		return this.#host.harness.commitWith((tx) => createCompaction(tx, this.id, input), context);
+		return this.#host.harness.commitWith(tx => createCompaction(tx, this.id, input), context);
 	}
 
 	async reset(handoff: string | undefined, context: Context): Promise<void> {
@@ -164,7 +164,7 @@ class ConversationImpl<Tool extends ToolRegistration> implements Conversation {
 		context: Context,
 	): Promise<Page<EntryRecord, Cursor>> {
 		const scan = conversationEntries(this.id, query);
-		return this.#host.harness.readOnLine((storage) => storage.scanEntries(scan, limit, cursor, context));
+		return this.#host.harness.readOnLine(storage => storage.scanEntries(scan, limit, cursor, context));
 	}
 
 	fork(at: EntryId, options: ConversationCreateOptions, context: Context): Promise<Conversation> {
@@ -245,14 +245,14 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 			env: (id, callContext) => this.buildEnv(id, callContext),
 			now,
 			onWake: options.onWake,
-			timers: hostTimers(options.setTimer, (error) => report(error, { kind: "host_error", callback: "setTimer" })),
-			writeAtClose: (writes) => this.writeAtClose(writes),
+			timers: hostTimers(options.setTimer, error => report(error, { kind: "host_error", callback: "setTimer" })),
+			writeAtClose: writes => this.writeAtClose(writes),
 			report: this.#report,
-			limitsRestarts: (kind) => LIMITS_RESTARTS.has(kind),
+			limitsRestarts: kind => LIMITS_RESTARTS.has(kind),
 			settleOutcome: settleSchedulerOutcome,
 			withdrawInputs: withdrawQueuedInputs,
 			conversation: async (id, binding, callContext) => {
-				const record = await this.readOnLine((line) => line.conversation(id, callContext));
+				const record = await this.readOnLine(line => line.conversation(id, callContext));
 				return record === undefined ? undefined : boundConversation(id, binding, this.#submissions, this.#tasks);
 			},
 			context: withoutAbortSignal(context),
@@ -260,8 +260,8 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 		});
 		this.#submissions = new Submissions(this, now, settings, () => this.#tasks.resume(), options.telemetry);
 		this.#taskGraph = new TaskGraphView(this, {
-			blocked: (record) => this.#tasks.blockedReason(record),
-			subscribeBlocked: (listener) => this.#tasks.subscribeBlocked(listener),
+			blocked: record => this.#tasks.blockedReason(record),
+			subscribeBlocked: listener => this.#tasks.subscribeBlocked(listener),
 		});
 		this.#host = {
 			harness: this,
@@ -311,7 +311,7 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 	}
 
 	getTask<R>(id: TaskId<R>, context: Context): Promise<TaskRecord<JsonValue, JsonValue, R> | undefined> {
-		return this.readOnLine((storage) => storage.task(id, context)) as Promise<
+		return this.readOnLine(storage => storage.task(id, context)) as Promise<
 			TaskRecord<JsonValue, JsonValue, R> | undefined
 		>;
 	}
@@ -327,10 +327,10 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 	}
 
 	inspect(context: Context): Promise<HarnessInspection> {
-		return this.readOnLine(async (storage) => {
+		return this.readOnLine(async storage => {
 			const { scheduling, tasks } = await this.#tasks.inspect(this.#options.registry.snapshot());
 			const scan = (status: "queued" | "placed") =>
-				scanAll((cursor) => storage.scanSubmissions({ status }, SCAN_PAGE_SIZE, cursor, context));
+				scanAll(cursor => storage.scanSubmissions({ status }, SCAN_PAGE_SIZE, cursor, context));
 			const submissions = [...(await scan("queued")), ...(await scan("placed"))].sort((a, b) => a.id - b.id);
 			return { scheduling, tasks, submissions };
 		});
@@ -364,8 +364,8 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 
 	/** Sum every conversation's committed `pi.usage`. Each document is read at its own point; totals only grow. */
 	async usage(context: Context): Promise<UsageState> {
-		const conversations = await this.readOnLine((storage) =>
-			scanAll((cursor) => storage.scanConversations({}, SCAN_PAGE_SIZE, cursor, context)),
+		const conversations = await this.readOnLine(storage =>
+			scanAll(cursor => storage.scanConversations({}, SCAN_PAGE_SIZE, cursor, context)),
 		);
 		const total = UsageDoc.definition.initial();
 		for (const { id } of conversations) {
@@ -403,7 +403,7 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 
 	async conversation(id: ConversationId, context: Context): Promise<Conversation | undefined> {
 		this.assertUsable();
-		const record = await this.readOnLine((storage) => storage.conversation(id, context));
+		const record = await this.readOnLine(storage => storage.conversation(id, context));
 		return record === undefined ? undefined : new ConversationImpl(record.id, this.#host);
 	}
 
@@ -427,7 +427,7 @@ class HarnessImpl<Tool extends ToolRegistration> extends SessionImpl implements 
 
 	async #create(target: CreateTarget, options: CreateOptions, context: Context): Promise<Conversation> {
 		this.assertUsable();
-		const id = await this.commitWith(async (tx) => {
+		const id = await this.commitWith(async tx => {
 			if (target.kind === "root" && (await tx.conversation(ROOT_CONVERSATION_ID)) !== undefined) {
 				return ROOT_CONVERSATION_ID;
 			}
@@ -564,9 +564,9 @@ function boundConversation(
 		const submission = await submissions.submit(id, first, bind(second as Context));
 		return {
 			id: submission.id,
-			status: bound((callContext) => submission.status(callContext)),
-			wait: bound((callContext) => submission.wait(callContext)),
-			abort: bound((callContext) => submission.abort(callContext)),
+			status: bound(callContext => submission.status(callContext)),
+			wait: bound(callContext => submission.wait(callContext)),
+			abort: bound(callContext => submission.abort(callContext)),
 		};
 	}
 	return {
@@ -576,7 +576,7 @@ function boundConversation(
 			binding.check();
 			return tasks.abortConversation(id, options?.background === true, bind(context));
 		},
-		waitForIdle: bound((callContext) => tasks.waitForIdle(id, callContext)),
+		waitForIdle: bound(callContext => tasks.waitForIdle(id, callContext)),
 	};
 }
 
@@ -592,9 +592,9 @@ export const Harness = {
 	): Promise<Harness> {
 		context.abortSignal?.throwIfAborted();
 		const snapshot = options.registry.snapshot();
-		const missing = BUILTIN_TASKS.filter((task) => snapshot.task(task.definition.name) === undefined);
+		const missing = BUILTIN_TASKS.filter(task => snapshot.task(task.definition.name) === undefined);
 		if (missing.length > 0) {
-			const names = missing.map((task) => task.definition.name).join(", ");
+			const names = missing.map(task => task.definition.name).join(", ");
 			throw new Error(`Registry lacks built-in tasks ${names}; create it with createRegistry()`);
 		}
 		const harness = new HarnessImpl(storage, options, context);

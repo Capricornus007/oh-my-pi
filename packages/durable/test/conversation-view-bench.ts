@@ -92,7 +92,7 @@ function heapMiB(): number {
 
 async function appendEntries(conversation: Conversation, count: number, perCommit: number): Promise<void> {
 	for (let done = 0; done < count; done += perCommit) {
-		await conversation.commit(async (tx) => {
+		await conversation.commit(async tx => {
 			for (let index = done; index < Math.min(count, done + perCommit); index++) {
 				await tx.appendEntry(conversation.id, { kind: "note", data: { text: `${index} ${TEXT}` } });
 			}
@@ -102,10 +102,10 @@ async function appendEntries(conversation: Conversation, count: number, perCommi
 
 /** Resolve once every watch delivered a value whose newest entry is `id`. */
 function delivered(watches: readonly Watch[], id: () => EntryId | undefined): Promise<void> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const check = (): void => {
 			const target = id();
-			if (watches.every((watch) => watch.value.entries.at(-1)?.id === target)) resolve();
+			if (watches.every(watch => watch.value.entries.at(-1)?.id === target)) resolve();
 			else setTimeout(check, 1);
 		};
 		check();
@@ -151,7 +151,7 @@ async function run(scenario: Scenario): Promise<Record<string, number>> {
 			let last: EntryId | undefined;
 			const at = performance.now();
 			for (let index = 0; index < scenario.commits; index++) {
-				const ids = await root.commit(async (tx) => {
+				const ids = await root.commit(async tx => {
 					const appended: EntryId[] = [];
 					for (let n = 0; n < scenario.burst; n++) {
 						appended.push((await tx.appendEntry(root.id, { kind: "note", data: { text: TEXT } })).id);
@@ -174,7 +174,7 @@ async function run(scenario: Scenario): Promise<Record<string, number>> {
 				});
 			const at = performance.now();
 			for (let index = 0; index < scenario.commits; index++) {
-				await root.commit(async (tx) => {
+				await root.commit(async tx => {
 					(await tx.doc(LiveDoc, root.id)).compactionFailure = {
 						taskId: 1 as never,
 						trigger: "manual",
@@ -186,17 +186,17 @@ async function run(scenario: Scenario): Promise<Record<string, number>> {
 			const last = `${scenario.commits - 1}`;
 			const done = () =>
 				watches.every(
-					(watch) =>
+					watch =>
 						(watch.value.docs["pi.live"] as { compactionFailure?: { error: string } } | undefined)
 							?.compactionFailure?.error === last,
 				);
-			while (calls < scenario.watches || !done()) await new Promise((resolve) => setTimeout(resolve, 1));
+			while (calls < scenario.watches || !done()) await new Promise(resolve => setTimeout(resolve, 1));
 			result.perCommitUs = round(((performance.now() - at) * 1000) / scenario.commits);
 			for (const watch of watches) await watch.stop();
 		} else {
 			const watch = await root.watch(context);
 			let first: WeakRef<object> | undefined;
-			watch.start(async (call) => {
+			watch.start(async call => {
 				if (call.kind !== "value") return;
 				const entry = call.value.entries.at(-1);
 				if (first === undefined && entry !== undefined) first = new WeakRef(entry);
@@ -210,7 +210,7 @@ async function run(scenario: Scenario): Promise<Record<string, number>> {
 			result.windowEntries = watch.value.entries.length;
 			result.heapWithWatchMiB = heapMiB();
 			// A WeakRef's target survives the job that created or read it; collect again in a later task.
-			await new Promise((resolve) => setTimeout(resolve, 10));
+			await new Promise(resolve => setTimeout(resolve, 10));
 			gc();
 			result.firstEntryCollected = first?.deref() === undefined ? 1 : 0;
 			await watch.stop();

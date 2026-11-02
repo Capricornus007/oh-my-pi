@@ -19,7 +19,7 @@ export function checkParams<C extends Contract>(
 	check(validatorFor(params, context), raw, "params", context);
 	// The check above establishes the params type.
 	const checked = raw as ParamsOf<C> & { readonly [field: string]: string | number | boolean };
-	return { params: checked, key: joinKey(params.fields.map((field) => String(checked[field]))) };
+	return { params: checked, key: joinKey(params.fields.map(field => String(checked[field]))) };
 }
 
 /** The in-process identity of an object: `name|key|principalKey`, each part escaped; `local` has no principal. */

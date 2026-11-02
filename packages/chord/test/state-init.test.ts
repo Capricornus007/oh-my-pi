@@ -3,7 +3,7 @@ import { arr, bool, num, obj, str } from "@earendil-works/pi-schema";
 import { describe, it } from "vitest";
 import { type Ctx, createHost, type Facet, isChordError, local, method } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 async function until(check: () => boolean): Promise<void> {
 	for (let attempt = 0; attempt < 200 && !check(); attempt++) await tick();
 	assert.ok(check(), "condition not reached");
@@ -11,7 +11,7 @@ async function until(check: () => boolean): Promise<void> {
 
 function latch<T>() {
 	let open: (value: T) => void = () => {};
-	const promise = new Promise<T>((resolve) => {
+	const promise = new Promise<T>(resolve => {
 		open = resolve;
 	});
 	return { promise, open };
@@ -49,8 +49,8 @@ describe("state init", () => {
 					return await db.value.load();
 				},
 			});
-			const count = self.derive([notes], (list) => list.length);
-			self.on("notes", notes, (list) => {
+			const count = self.derive([notes], list => list.length);
+			self.on("notes", notes, list => {
 				log.push(`listener ${list.join(",")}`);
 			});
 			self.task(async () => {
@@ -59,9 +59,9 @@ describe("state init", () => {
 			return {
 				notes,
 				count,
-				has: (note) => notes.value.includes(note),
+				has: note => notes.value.includes(note),
 				add: (note, ctx) => {
-					notes.change(ctx, (draft) => {
+					notes.change(ctx, draft => {
 						draft.push(note);
 					});
 				},
@@ -69,9 +69,9 @@ describe("state init", () => {
 		});
 		const ref = host.hold(Notes, {});
 		const seen: unknown[] = [];
-		ref.notes.subscribe((value) => seen.push(value));
+		ref.notes.subscribe(value => seen.push(value));
 		// A call made while init runs waits until the object is live, then reads the loaded value.
-		const has = host.root((ctx) => ref.has("a", ctx));
+		const has = host.root(ctx => ref.has("a", ctx));
 		await until(() => log.includes("init"));
 		assert.equal(ref.status, "loading");
 		loaded.open(["a", "b"]);
@@ -81,7 +81,7 @@ describe("state init", () => {
 		assert.deepEqual(log, ["open", "init", "listener a,b", "task a,b"]);
 		// Before live, a reference's member has no value (undefined); its first value is the loaded one.
 		assert.deepEqual(
-			seen.filter((value) => value !== undefined),
+			seen.filter(value => value !== undefined),
 			[["a", "b"]],
 		);
 	});
@@ -90,11 +90,11 @@ describe("state init", () => {
 		const host = createHost({ self: { kind: "host" }, onError: () => {} });
 		host.serve(Notes, (_input, _principal, self) => {
 			const notes = self.state("notes", NotesSchema, { init: () => [] });
-			const count = self.derive([notes], (list) => list.length);
+			const count = self.derive([notes], list => list.length);
 			notes.value;
 			return { notes, count, has: () => false, add: () => {} };
 		});
-		await assert.rejects(host.hold(Notes, {}).ready, (error) => isChordError(error) && error.code === "not_ready");
+		await assert.rejects(host.hold(Notes, {}).ready, error => isChordError(error) && error.code === "not_ready");
 	});
 
 	it("a throwing or invalid init fails the activation and closes its resources; the next get tries again", async () => {
@@ -104,15 +104,15 @@ describe("state init", () => {
 		};
 		const closed: string[] = [];
 		host.serve(Notes, (_input, _principal, self) => {
-			self.resource("db", { version: 1, open: () => "db", close: (db) => void closed.push(db) });
+			self.resource("db", { version: 1, open: () => "db", close: db => void closed.push(db) });
 			const notes = self.state("notes", NotesSchema, { init: () => result() as string[] });
-			const count = self.derive([notes], (list) => list.length);
+			const count = self.derive([notes], list => list.length);
 			return { notes, count, has: () => false, add: () => {} };
 		});
 		await assert.rejects(host.hold(Notes, {}).ready, /db down/);
 		assert.deepEqual(closed, ["db"]);
 		result = () => [1];
-		await assert.rejects(host.hold(Notes, {}).ready, (error) => isChordError(error) && error.code === "invalid");
+		await assert.rejects(host.hold(Notes, {}).ready, error => isChordError(error) && error.code === "invalid");
 		assert.deepEqual(closed, ["db", "db"]);
 		result = () => ["ok"];
 		const ref = host.hold(Notes, {});
@@ -132,7 +132,7 @@ describe("state init", () => {
 			const notes = self.state("notes", NotesSchema, {
 				init: async (ctx: Ctx) => (await ctx.get(Source, {})).all(ctx),
 			});
-			const count = self.derive([notes], (list) => list.length);
+			const count = self.derive([notes], list => list.length);
 			return { notes, count, has: () => false, add: () => {} };
 		});
 		const ref = host.hold(Notes, {});
@@ -147,7 +147,7 @@ describe("state init", () => {
 			readonly countVersion?: number;
 		}): Facet => ({
 			name: "notes",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Notes, (_input, _principal, self) => {
 					const notes = self.state("notes", NotesSchema, {
 						init: () => {
@@ -172,9 +172,9 @@ describe("state init", () => {
 					return {
 						notes,
 						count,
-						has: (note) => notes.value.includes(note),
+						has: note => notes.value.includes(note),
 						add: (note, ctx) => {
-							notes.change(ctx, (draft) => {
+							notes.change(ctx, draft => {
 								draft.push(note);
 							});
 						},
@@ -188,7 +188,7 @@ describe("state init", () => {
 			await host.install(facet({ inits }));
 			const ref = host.hold(Notes, {});
 			await ref.ready;
-			await host.root((ctx) => ref.add("written", ctx));
+			await host.root(ctx => ref.add("written", ctx));
 			await host.reload([facet({ inits, extra: () => ["x", "y"] })]);
 			assert.deepEqual(inits, ["notes", "more"]);
 			assert.deepEqual(ref.notes.value, ["loaded", "written"]);
@@ -214,7 +214,7 @@ describe("state init", () => {
 				/cannot load more/,
 			);
 			assert.equal(ref.count.value, 1);
-			assert.equal(await host.root((ctx) => ref.has("loaded", ctx)), true);
+			assert.equal(await host.root(ctx => ref.has("loaded", ctx)), true);
 		});
 
 		it("in a gated reload, an added cell runs init at the gate", async () => {

@@ -19,7 +19,7 @@ const Counter = local("app.counter", { version: 1, params: {}, members: { double
 async function counter(options: Parameters<typeof loaded>[1] = {}) {
 	let writable: Writable<number> | undefined;
 	let self: Self | undefined;
-	const { host, errors } = await loaded((h) => {
+	const { host, errors } = await loaded(h => {
 		h.serve(Counter, (_, made) => {
 			self = made;
 			const value = made.writable(1);
@@ -42,10 +42,10 @@ describe("writable", () => {
 		const { telemetry, counts } = await metered();
 		const { host, reference, writable } = await counter({ telemetry });
 		const calls: NativeWatchCall<number>[] = [];
-		(await writable.watch(context)).start(async (call) => void calls.push(call));
+		(await writable.watch(context)).start(async call => void calls.push(call));
 		const doubled: number[] = [];
 		(await reference.doubled.watch(context)).start(
-			async (call) => void (call.kind === "value" && doubled.push(call.value)),
+			async call => void (call.kind === "value" && doubled.push(call.value)),
 		);
 		const computes = counts()["chord.derive.computes"];
 		writable.set(1);
@@ -69,10 +69,10 @@ describe("writable", () => {
 		const { telemetry, counts } = await metered();
 		const { host, reference, writable } = await counter({ telemetry });
 		const calls: NativeWatchCall<number>[] = [];
-		(await writable.watch(context)).start(async (call) => void calls.push(call));
+		(await writable.watch(context)).start(async call => void calls.push(call));
 		const doubled: number[] = [];
 		(await reference.doubled.watch(context)).start(
-			async (call) => void (call.kind === "value" && doubled.push(call.value)),
+			async call => void (call.kind === "value" && doubled.push(call.value)),
 		);
 		const computes = counts()["chord.derive.computes"]!;
 		(host as unknown as ChordHost).batch.commit(() => {
@@ -91,9 +91,9 @@ describe("writable", () => {
 		let inner: Writable<number> | undefined;
 		const Bad = local("app.bad", { version: 1, params: {}, members: { bad: int() } });
 		const Good = local("app.good", { version: 1, params: {}, members: {} });
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Echo, {
-				compose: (table) => {
+				compose: table => {
 					inner?.set(table.length + 100);
 					return table.length;
 				},
@@ -114,10 +114,10 @@ describe("writable", () => {
 			});
 		});
 		expect((await host.registry(Echo, context)).value).toBe(0);
-		expect(errors.find((error) => error.kind === "registry_failed")).toMatchObject({
+		expect(errors.find(error => error.kind === "registry_failed")).toMatchObject({
 			error: { code: "invalid", reason: "reentrant" },
 		});
-		expect(errors.find((error) => error.kind === "activation_failed")).toMatchObject({
+		expect(errors.find(error => error.kind === "activation_failed")).toMatchObject({
 			object: "app.bad",
 			failure: { kind: "broken", error: { code: "invalid", reason: "reentrant" } },
 		});
@@ -141,8 +141,8 @@ describe("writable", () => {
 		const Values = defineRegistry<number, readonly number[]>("app.values", { version: 1 });
 		const Source = local("app.source", { version: 1, params: {}, members: { set: method(int()), seen: int() } });
 		const seen: number[] = [];
-		const { host } = await loaded((h) => {
-			h.serve(Values, { compose: (table) => table.map(({ value }) => value) });
+		const { host } = await loaded(h => {
+			h.serve(Values, { compose: table => table.map(({ value }) => value) });
 			h.serve(Source, (_, self) => {
 				const value = self.writable(1);
 				self.contribute(Values, value);

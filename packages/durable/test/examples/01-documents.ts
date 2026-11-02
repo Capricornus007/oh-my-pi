@@ -21,17 +21,17 @@ const Notes = defineDoc<{ text: string }>({
 	initial: () => ({ text: "" }),
 });
 
-const chat = await session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
+const chat = await session.commit(tx => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
 
 // tx.doc() returns an editable copy of the document (created on first use).
 // Plain assignments to it are saved when the commit finishes.
-const firstEntry = await session.commit(async (tx) => {
+const firstEntry = await session.commit(async tx => {
 	const entry = await tx.appendEntry(chat.id, { kind: "note", data: "hello" });
 	(await tx.doc(Notes, chat.id)).text = "after hello";
 	return entry;
 }, context);
 
-const secondEntry = await session.commit(async (tx) => {
+const secondEntry = await session.commit(async tx => {
 	const entry = await tx.appendEntry(chat.id, { kind: "note", data: "goodbye" });
 	(await tx.doc(Notes, chat.id)).text = "after goodbye";
 	return entry;

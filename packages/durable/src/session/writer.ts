@@ -105,7 +105,7 @@ export class Writer {
 					part.done = true;
 					outcome.resolve();
 				},
-				reject: (error) => {
+				reject: error => {
 					part.done = true;
 					outcome.reject(error);
 				},
@@ -159,7 +159,7 @@ export class Writer {
 
 	/** Store `parts` in one call, then publish them in order; settles every one of them. */
 	async #send(parts: readonly Admitted[]): Promise<void> {
-		const stored = parts.filter((part) => part.writes !== undefined);
+		const stored = parts.filter(part => part.writes !== undefined);
 		const seqs: (Seq | undefined)[] = [];
 		let result: CommitResult | undefined;
 		let rejected: { readonly error: unknown } | undefined;
@@ -171,7 +171,7 @@ export class Writer {
 		if (stored.length > 0) {
 			try {
 				result = await this.#host.commit(
-					stored.map((part) => part.writes!),
+					stored.map(part => part.writes!),
 					(index, seq) => {
 						seqs[index] = seq;
 					},
@@ -349,9 +349,9 @@ export class Writer {
  * browsers). Microtasks queued before it, such as wait continuations, run first.
  */
 function hop(): Promise<void> {
-	if (typeof setImmediate === "function") return new Promise((resolve) => setImmediate(resolve));
+	if (typeof setImmediate === "function") return new Promise(resolve => setImmediate(resolve));
 	const channel = new MessageChannel();
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		channel.port1.onmessage = () => {
 			channel.port1.close();
 			resolve();

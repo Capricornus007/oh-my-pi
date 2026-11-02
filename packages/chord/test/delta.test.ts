@@ -336,7 +336,7 @@ describe("codec", () => {
 		]);
 		const enc = encoder();
 		const dec = decoder();
-		expect(batches.map((batch) => dec.decode(enc.encode(batch)))).toEqual(batches);
+		expect(batches.map(batch => dec.decode(enc.encode(batch)))).toEqual(batches);
 	});
 });
 

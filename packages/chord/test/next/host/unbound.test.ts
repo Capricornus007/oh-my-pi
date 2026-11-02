@@ -31,7 +31,7 @@ const Missing = local("app.missing", { version: 1, params: { id: int() }, member
 /** A request recording its wakes and ends. */
 function request(principal?: Principal): UnboundRequest & { readonly log: string[] } {
 	const log: string[] = [];
-	return { principal, log, wake: () => log.push("wake"), end: (error) => log.push(`end ${error.message}`) };
+	return { principal, log, wake: () => log.push("wake"), end: error => log.push(`end ${error.message}`) };
 }
 
 describe("the index", () => {
@@ -72,7 +72,7 @@ describe("the index", () => {
 		const own = request();
 		for (const each of [guest, owner, own]) index.add("app.a", each);
 		const revoked = new ChordError({ code: "forbidden", reason: "revoked", message: "revoked" });
-		index.revoke((principal) => principal.kind === "guest", revoked);
+		index.revoke(principal => principal.kind === "guest", revoked);
 		expect([guest.log, owner.log, own.log]).toEqual([["end revoked"], [], []]);
 		index.close(new ChordError({ code: "released", reason: "closed", message: "closed" }));
 		expect([owner.log, own.log]).toEqual([["end closed"], ["end closed"]]);
@@ -86,7 +86,7 @@ describe("references waiting in the index", () => {
 		const missing = host.hold(Missing, { id: 1 }, context);
 		expect([info.state.value, missing.state.value]).toEqual([{ kind: "loading" }, { kind: "loading" }]);
 		await host.load(
-			[{ name: "@test/a", facet: defineFacet((h) => h.serve(Info, () => ({ title: constant("t") }))) }],
+			[{ name: "@test/a", facet: defineFacet(h => h.serve(Info, () => ({ title: constant("t") }))) }],
 			context,
 		);
 		await delivered();
@@ -117,7 +117,7 @@ describe("references waiting in the index", () => {
 		const Core = local("app.core", { version: 1, params: {}, members: { n: int() } });
 		const closeGate = Promise.withResolvers<void>();
 		const host = createHost({ onError: () => {} });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Core, (_, self) => {
 				self.open(
 					async () => 1,
@@ -128,7 +128,7 @@ describe("references waiting in the index", () => {
 		);
 		await host.load([{ name: "@test/a", facet }], context);
 		let outcome: unknown;
-		void rejection(host.get(Missing, { id: 1 }, context)).then((error) => {
+		void rejection(host.get(Missing, { id: 1 }, context)).then(error => {
 			outcome = error;
 		});
 		const held = host.hold(Missing, { id: 2 }, context);

@@ -98,7 +98,7 @@ async function ensureBigFile(): Promise<void> {
 	const file = await open(BIG_FILE, "w");
 	try {
 		let index = 0;
-		for (let written = 0; written < GIB; ) {
+		for (let written = 0; written < GIB;) {
 			let block = "";
 			while (block.length < 64 << 20) block += `Line ${index++}: ${LINE}: ${(index * 7919).toString(16)}\n`;
 			const bytes = Buffer.from(block).subarray(0, GIB - written);
@@ -163,7 +163,7 @@ async function runScenario(scenario: Scenario): Promise<Metrics> {
 							counter += rate.lines;
 							api.output(chunk);
 							written += chunk.length;
-							await new Promise((resolve) =>
+							await new Promise(resolve =>
 								rate.pauseMs === 0 ? setImmediate(resolve) : setTimeout(resolve, rate.pauseMs),
 							);
 						}
@@ -197,7 +197,7 @@ async function runScenario(scenario: Scenario): Promise<Metrics> {
 		let outputSets = 0;
 		const observe = (target: Harness): void => {
 			target.observeCommits({
-				advance: (publication) => {
+				advance: publication => {
 					for (const change of publication.changes) {
 						if (change.type !== "document" || change.kind !== "change" || change.record.kind !== "pi.live")
 							continue;
@@ -214,11 +214,11 @@ async function runScenario(scenario: Scenario): Promise<Metrics> {
 		const submission = await root.submit({ type: "input", content: "go" }, context);
 		const metrics: Partial<Metrics> = {};
 		if (scenario.kind === "rate") {
-			await new Promise((resolve) => setTimeout(resolve, (scenario.seconds ?? RATE_SECONDS) * 1000));
+			await new Promise(resolve => setTimeout(resolve, (scenario.seconds ?? RATE_SECONDS) * 1000));
 			stop = true;
 			if (scenario.backend !== "memory") {
 				// Let the last progress commit land, then close mid-round and time replay on reopen.
-				await new Promise((resolve) => setTimeout(resolve, 600));
+				await new Promise(resolve => setTimeout(resolve, 600));
 				metrics.midRoundKiB = await footprint(scenario.backend, path);
 				await harness.close(context);
 				const reopened = performance.now();

@@ -43,7 +43,7 @@ const List = defineState("example.list", {
 });
 
 /** The notes plugin's server facet. */
-const notesPlugin = defineFacet<Principal>((host) => {
+const notesPlugin = defineFacet<Principal>(host => {
 	host.serve(Notes, (_params, _principal, self) => {
 		const list = self.state(List);
 		return {
@@ -51,7 +51,7 @@ const notesPlugin = defineFacet<Principal>((host) => {
 			members: {
 				list: self.derive([list], ([l]) => l.list),
 				add: async ({ text }, ctx) => {
-					await list.change((draft) => void draft.list.push(text), ctx);
+					await list.change(draft => void draft.list.push(text), ctx);
 					return null;
 				},
 			},
@@ -70,12 +70,12 @@ async function startServer(plugins: { readonly name: string; readonly facet: typ
 
 // The tab: its panel declares the notes (a dependency); its header a theme nobody serves.
 let panels = 0;
-const tab = createHost<Principal>({ onError: (error) => console.log(`${at()}: reported ${error.kind}`) });
+const tab = createHost<Principal>({ onError: error => console.log(`${at()}: reported ${error.kind}`) });
 await tab.load(
 	[
 		{
 			name: "@example/panel",
-			facet: defineFacet<Principal>((host) => {
+			facet: defineFacet<Principal>(host => {
 				host.serve(Panel, (_, self) => {
 					panels++;
 					const notes = self.get(Notes, {});
@@ -91,7 +91,7 @@ await tab.load(
 /** Prints every state of `state` as it changes. */
 async function follow(label: string, state: NativeWatchable<RefState>): Promise<void> {
 	const watch = await state.watch(context);
-	watch.start(async (call) => {
+	watch.start(async call => {
 		if (call.kind === "value") console.log(`${at()}: ${label} ${describe(call.value)}`);
 	});
 }
@@ -106,12 +106,12 @@ const first = await startServer([]);
 tab.connect(first.tabLink, { principal: { kind: "server" } }, context);
 const panel = tab.hold(Panel, { id: 1 }, context);
 await follow("panel:", panel.state);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log(`${at()}: panel now ${describe(panel.state.value)}`);
 
 // 2. A local type nobody serves here is the same answer: the request waits unbound, indexed under the type's name.
 const header = tab.hold(Header, { id: 1 }, context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log(`${at()}: header ${describe(header.state.value)}`);
 
 // 3. A getter waits through `waiting` up to its readyTimeout, then rejects with the cause (a hold just shows it).
@@ -122,13 +122,13 @@ try {
 }
 
 // 4. Time passes: no timer runs for the parked panel, its factory is not run again.
-await new Promise((resolve) => setTimeout(resolve, 1500));
+await new Promise(resolve => setTimeout(resolve, 1500));
 console.log(`${at()}: still ${panel.state.value.kind}, factory runs: ${panels}`);
 
 // 5. The server restarts with the notes plugin (the link drop shows as loading); the tab reconnects: its request is
 // held again and binds, and the parked panel goes on.
 first.close();
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 const second = await startServer([{ name: "@example/notes", facet: notesPlugin }]);
 tab.connect(second.tabLink, { principal: { kind: "server" } }, context);
 const live = await tab.get(Panel, { id: 1 }, context);
@@ -136,7 +136,7 @@ console.log(`${at()}: panel live, count ${live.count.value}, factory runs: ${pan
 // The panel's notes are the owner's object on the server (a remote object per principal): the tab adds through its own.
 const notes = await tab.get(Notes, {}, context);
 await notes.add({ text: "first" }, context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log(`${at()}: panel count ${live.count.value}`);
 
 header.release();

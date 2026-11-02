@@ -30,7 +30,7 @@ async function measure(runs: number, operation: (i: number) => void): Promise<st
 		const started = performance.now();
 		for (let i = 0; i < runs; i++) operation(i);
 		// The watches' listeners run on microtasks: their work counts too.
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		const elapsed = performance.now() - started;
 		const after = process.memoryUsage().heapUsed;
 		let freed = 0;
@@ -55,9 +55,9 @@ async function registryOf(contributors: number) {
 	const types = Array.from({ length: contributors }, (_, i) =>
 		local(`bench.contributor-${i}`, { version: 1, params: {}, members: { n: int() } }),
 	);
-	const host = createHost({ telemetry, onError: (error) => console.log("onError", error.kind) });
-	const facet = defineFacet((h) => {
-		h.serve(Sum, { compose: (table) => table.reduce((sum, { value }) => sum + value, 0) });
+	const host = createHost({ telemetry, onError: error => console.log("onError", error.kind) });
+	const facet = defineFacet(h => {
+		h.serve(Sum, { compose: table => table.reduce((sum, { value }) => sum + value, 0) });
 		for (const Type of types) {
 			h.serve(Type, (_, self) => {
 				const value = self.writable(0);
@@ -83,7 +83,7 @@ const one = await registryOf(1);
 const writable = one.writables[0]!;
 const watch = await writable.watch(context);
 watch.start(async () => {});
-console.log("writable.set, one watch:", await measure(20_000, (i) => writable.set(i + 1)));
+console.log("writable.set, one watch:", await measure(20_000, i => writable.set(i + 1)));
 // The listeners' backlogs dropped first: what follows measures the set alone.
 await watch.stop();
 await one.watch.stop();
@@ -97,7 +97,7 @@ for (const contributors of [10, 100]) {
 	const before = composes();
 	const target = writables[Math.floor(contributors / 2)]!;
 	const sets = 5_000;
-	const result = await measure(sets, (i) => target.set(i + 1));
+	const result = await measure(sets, i => target.set(i + 1));
 	console.log(
 		`one of ${contributors} contributions set, registry watched:`,
 		result,

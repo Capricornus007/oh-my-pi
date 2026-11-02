@@ -28,44 +28,44 @@ const Counts = defineState("counts", { schema: map(int()), version: 1, initial: 
 /** The worker's host, set once made: a timer reaches its objects through it. */
 let host: ReturnType<typeof createHost>;
 
-const core = defineFacet((facet) => {
+const core = defineFacet(facet => {
 	facet.serve(Busy, (_, self) => {
 		const counts = self.state(Counts);
 		return {
 			counts: self.derive([counts], ([value]) => value),
 			set: async (n, ctx) => {
-				await counts.change((draft) => {
+				await counts.change(draft => {
 					draft.tasks = n;
 				}, ctx);
 				return null;
 			},
 		};
 	});
-	facet.serve(Echo, () => ({ echo: async (n) => n }));
+	facet.serve(Echo, () => ({ echo: async n => n }));
 	facet.serve(Control, (_params, _principal, self) => {
 		const busy = self.get(Busy, {});
 		const echo = self.get(Echo, {});
 		return {
 			variant: "main",
 			members: {
-				crash: async (code) => {
+				crash: async code => {
 					setTimeout(() => process.exit(code), 10);
 					return null;
 				},
-				fatal: async (message) => {
+				fatal: async message => {
 					setTimeout(() => {
 						throw new Error(message);
 					}, 10);
 					return null;
 				},
-				block: async (ms) => {
+				block: async ms => {
 					setTimeout(() => {
 						const until = Date.now() + ms;
 						while (Date.now() < until) {}
 					}, 10);
 					return null;
 				},
-				blockThenCrash: async (ms) => {
+				blockThenCrash: async ms => {
 					setTimeout(() => {
 						const until = Date.now() + ms;
 						while (Date.now() < until) {}
@@ -137,10 +137,10 @@ workerMain(
 	},
 	{
 		hostPackages: { "@earendil-works/chord/next": chordNext },
-		redact: (error) => ({
+		redact: error => ({
 			message: String(error instanceof Error ? error.message : error).replace(/secret\S*/g, "[redacted]"),
 		}),
 		// Its errors on stderr, as an app logs them: the server keeps the tail private.
-		onError: (error) => console.error(error),
+		onError: error => console.error(error),
 	},
 );

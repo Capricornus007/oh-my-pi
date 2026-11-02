@@ -44,7 +44,7 @@ const at = () => `${Math.round((Date.now() - started) / 100) / 10}s`;
 
 // 1. The host reports background failures: a routine call that threw arrives as `routine_failed`.
 const host = createHost({
-	onError: (error) => {
+	onError: error => {
 		if (error.kind === "routine_failed") {
 			const { kind, position } = error.routine;
 			console.log(`  [${at()}] ${error.object} ${kind} #${position} failed: ${(error.error as Error).message}`);
@@ -53,13 +53,13 @@ const host = createHost({
 });
 
 let flaky = true;
-const facet = defineFacet((h) => {
+const facet = defineFacet(h => {
 	h.serve(Catalog, (_, self) => {
 		const doc = self.state(Sessions);
 		return {
 			sessions: self.derive([doc], ([d]) => d.sessions),
 			archive: async ({ session }, ctx) => {
-				await doc.change((d) => {
+				await doc.change(d => {
 					d.sessions[session] = { archived: true };
 				}, ctx);
 				return null;
@@ -79,17 +79,17 @@ const facet = defineFacet((h) => {
 					flaky = false;
 					throw new Error(`closing the forward of ${session} timed out`);
 				}
-				await forwards.change((d) => {
-					d.open = d.open.filter((open) => open !== session);
+				await forwards.change(d => {
+					d.open = d.open.filter(open => open !== session);
 				}, ctx);
 				console.log(`  [${at()}] closed the forward of ${session}`);
 			}
 		});
 		// 3. A periodic task: a loop with `sleep`, ended by the object's end (the abort rejects `sleep`).
-		self.onLive(async (ctx) => {
+		self.onLive(async ctx => {
 			for (;;) {
 				await sleep(400, ctx);
-				await forwards.change((d) => void d.cleanups.push(at()), ctx);
+				await forwards.change(d => void d.cleanups.push(at()), ctx);
 			}
 		});
 		return {

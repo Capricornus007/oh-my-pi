@@ -8,7 +8,7 @@ function formatAttributes(attributes: Readonly<SpanAttributes> = {}): string {
 
 /** Render stored spans as a chronological forest, treating absent parents as roots. */
 export function renderTrace(spans: readonly StoredSpan[]): string {
-	const byId = new Map(spans.map((span) => [span.id, span]));
+	const byId = new Map(spans.map(span => [span.id, span]));
 	const roots: StoredSpan[] = [];
 	const children = new Map<string, StoredSpan[]>();
 	for (const span of [...byId.values()].sort((left, right) => left.startedMs - right.startedMs)) {
@@ -22,7 +22,7 @@ export function renderTrace(spans: readonly StoredSpan[]): string {
 	}
 
 	const lines: string[] = [];
-	const pending = roots.reverse().map((span) => ({ span, depth: 0 }));
+	const pending = roots.reverse().map(span => ({ span, depth: 0 }));
 	while (pending.length > 0) {
 		const { span, depth } = pending.pop()!;
 		const indent = "  ".repeat(depth);

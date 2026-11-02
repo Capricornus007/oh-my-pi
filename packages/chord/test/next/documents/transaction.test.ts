@@ -39,7 +39,7 @@ type Handles = {
 async function objects(telemetry?: Awaited<ReturnType<typeof metered>>["telemetry"]) {
 	const handles = new Map<number, Handles>();
 	const { host } = await loaded(
-		(h) => {
+		h => {
 			h.serve(Owner, ({ id }, self) => {
 				const a = self.state(A);
 				const b = self.state(B);
@@ -59,14 +59,14 @@ describe("transactions", () => {
 		const { one } = await objects();
 		const order: string[] = [];
 		const gate = Promise.withResolvers<void>();
-		const first = one.self.tx(async (tx) => {
+		const first = one.self.tx(async tx => {
 			order.push("first");
 			await gate.promise;
 			(await tx.draft(one.a)).n = 1;
 			order.push("first done");
 			return "one";
 		}, context);
-		const second = one.self.tx(async (tx) => {
+		const second = one.self.tx(async tx => {
 			order.push(`second sees ${one.a.value.n}`);
 			(await tx.draft(one.a)).n++;
 			return "two";
@@ -80,15 +80,15 @@ describe("transactions", () => {
 
 	it("give the same draft for the same document", async () => {
 		const { one } = await objects();
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			expect(await tx.draft(one.a)).toBe(await tx.draft(one.a));
 		}, context);
 	});
 
 	it("settle a warm draft at once: a continuation the callback did not await runs before the commit (rule 3)", async () => {
 		const { one } = await objects();
-		await one.self.tx((tx) => {
-			void tx.draft(one.a).then((draft) => {
+		await one.self.tx(tx => {
+			void tx.draft(one.a).then(draft => {
 				draft.n = 7;
 			});
 		}, context);
@@ -97,7 +97,7 @@ describe("transactions", () => {
 
 	it("reject a draft of a handle a transaction cannot use instead of throwing", async () => {
 		const { one, two } = await objects();
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			const draft = tx.draft(two.a);
 			expect(draft).toBeInstanceOf(Promise);
 			await expect(draft).rejects.toThrow("drafts only its own object's documents");
@@ -110,7 +110,7 @@ describe("transactions", () => {
 		const frames = framesOf(await reference.sum.watch(context));
 		const value = one.a.value;
 		const computes = telemetry.counts()["chord.derive.computes"];
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			void (await tx.draft(one.a)).n;
 		}, context);
 		await delivered();
@@ -125,14 +125,14 @@ describe("transactions", () => {
 			(await tx.draft(one.a)).n = 5;
 		};
 		await expect(
-			one.self.tx(async (tx) => {
+			one.self.tx(async tx => {
 				await change(tx);
 				throw new Error("no");
 			}, context),
 		).rejects.toThrow("no");
 		const { context: cancelled, cancel } = withCancel(context);
 		await expect(
-			one.self.tx(async (tx) => {
+			one.self.tx(async tx => {
 				await change(tx);
 				cancel(new Error("cancelled"));
 			}, cancelled),
@@ -143,19 +143,19 @@ describe("transactions", () => {
 	it("revoke their drafts when they settle", async () => {
 		const { one } = await objects();
 		let kept: Draft<{ n: number }> | undefined;
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			kept = await tx.draft(one.a);
 			kept.n = 1;
 		}, context);
 		expect(() => kept!.n).toThrow();
-		await expect(one.self.tx(async (tx) => tx, context).then((tx) => tx.draft(one.a))).rejects.toThrow(
+		await expect(one.self.tx(async tx => tx, context).then(tx => tx.draft(one.a))).rejects.toThrow(
 			"app.owner(1): the transaction has settled",
 		);
 	});
 
 	it("refuse another object's documents", async () => {
 		const { one, two } = await objects();
-		expect(await rejection(one.self.tx((tx) => tx.draft(two.a), context))).toEqual(
+		expect(await rejection(one.self.tx(tx => tx.draft(two.a), context))).toEqual(
 			new Error("app.owner(1): a transaction drafts only its own object's documents"),
 		);
 	});
@@ -165,7 +165,7 @@ describe("transactions", () => {
 		const { one, reference } = await objects(telemetry.telemetry);
 		const frames = framesOf(await reference.sum.watch(context));
 		const computes = telemetry.counts()["chord.derive.computes"]!;
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			(await tx.draft(one.a)).n = 1;
 			(await tx.draft(one.b)).s = "b";
 		}, context);
@@ -176,7 +176,7 @@ describe("transactions", () => {
 
 	it("commit their other changes when they retire an absent document (R13)", async () => {
 		const { one } = await objects();
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			await tx.retire(one.b);
 			(await tx.draft(one.a)).n = 7;
 		}, context);
@@ -185,11 +185,11 @@ describe("transactions", () => {
 
 	it("draft a retired document anew: watches get a root replacement", async () => {
 		const { one } = await objects();
-		await one.a.change((draft) => {
+		await one.a.change(draft => {
 			draft.n = 3;
 		}, context);
 		const frames = framesOf(await one.a.watch(context));
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			await tx.retire(one.a);
 			(await tx.draft(one.a)).n += 1;
 		}, context);
@@ -204,7 +204,7 @@ describe("the in-memory change's cost", () => {
 		for (let run = 0; run < 3; run++) {
 			let turns = 0;
 			let running = true;
-			const change = one.a.change((draft) => {
+			const change = one.a.change(draft => {
 				draft.n++;
 			}, context);
 			void change.then(() => {
@@ -235,7 +235,7 @@ describe("staged changes", () => {
 		const { one } = await objects();
 		const events: string[] = [];
 		const owner = {};
-		await one.self.tx(async (tx) => {
+		await one.self.tx(async tx => {
 			(await tx.draft(one.a)).n = 7;
 			const transaction = tx as Transaction;
 			const staged = transaction.stage(owner, () => recorder(events, one.a));
@@ -249,9 +249,9 @@ describe("staged changes", () => {
 	it("adopt without any document change, and hear of a discard instead when the transaction throws", async () => {
 		const { one } = await objects();
 		const events: string[] = [];
-		await one.self.tx((tx) => void (tx as Transaction).stage({}, () => recorder(events, one.a)), context);
+		await one.self.tx(tx => void (tx as Transaction).stage({}, () => recorder(events, one.a)), context);
 		await rejection(
-			one.self.tx((tx) => {
+			one.self.tx(tx => {
 				(tx as Transaction).stage({}, () => recorder(events, one.a));
 				throw new Error("no");
 			}, context),
@@ -276,7 +276,7 @@ describe("the seal fence", () => {
 		const { attempts, handles, restart } = await sealable();
 		const gate = Promise.withResolvers<void>();
 		let held: Tx | undefined;
-		const first = attempts[0]!.tx(async (tx) => {
+		const first = attempts[0]!.tx(async tx => {
 			(await tx.draft(handles[0]!)).n = 1;
 			held = tx;
 			await gate.promise;
@@ -285,7 +285,7 @@ describe("the seal fence", () => {
 		await delivered();
 		await restart();
 		// The next attempt's transaction runs while the cut one's callback still waits.
-		await handles[1]!.change((draft) => {
+		await handles[1]!.change(draft => {
 			draft.n = 2;
 		}, context);
 		gate.resolve();
@@ -301,7 +301,7 @@ describe("the seal fence", () => {
 		const { attempts, handles, fail } = await sealable();
 		const gate = Promise.withResolvers<void>();
 		const first = attempts[0]!.tx(() => gate.promise, context);
-		const queued = handles[0]!.change((draft) => {
+		const queued = handles[0]!.change(draft => {
 			draft.n = 1;
 		}, context);
 		await delivered();
@@ -342,7 +342,7 @@ describe("tables in a transaction", () => {
 		});
 		await delivered();
 		const before = store.lastSeq;
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			tx.put(edits, { id: "e1", at: 1 });
 			(await tx.draft(n)).n = 1;
 		}, context);
@@ -361,7 +361,7 @@ describe("tables in a transaction", () => {
 		const { self, n, store, host } = await stored(telemetry);
 		const commits = counts()["chord.store.commits"] ?? 0;
 		const seq = store.lastSeq;
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(n)).n = 5;
 		}, counting);
 		expect(store.lastSeq).toBe(seq);
@@ -372,10 +372,10 @@ describe("tables in a transaction", () => {
 
 	it("read committed rows with tx.page and tx.rows, overlay own writes with tx.get", async () => {
 		const { self, edits, store, host } = await stored();
-		await self.tx((tx) => tx.put(edits, { id: "e1", at: 1 }), context);
-		await self.tx(async (tx) => {
+		await self.tx(tx => tx.put(edits, { id: "e1", at: 1 }), context);
+		await self.tx(async tx => {
 			tx.put(edits, { id: "e2", at: 2 });
-			expect((await tx.page(edits, query(Edits), 10)).items.map((row) => row.id)).toEqual(["e1"]);
+			expect((await tx.page(edits, query(Edits), 10)).items.map(row => row.id)).toEqual(["e1"]);
 			const all: string[] = [];
 			for await (const row of tx.rows(edits, query(Edits))) all.push(row.id);
 			expect(all).toEqual(["e1"]);
@@ -390,19 +390,19 @@ describe("tables in a transaction", () => {
 		const { self, edits, store, host } = await stored();
 		const seq = store.lastSeq;
 		await expect(
-			self.tx((tx) => {
+			self.tx(tx => {
 				tx.put(edits, { id: "e1", at: 1 });
 				throw new Error("no");
 			}, context),
 		).rejects.toThrow("no");
 		const { context: cancelled, cancel } = withCancel(context);
-		const aborted = self.tx(async (tx) => {
+		const aborted = self.tx(async tx => {
 			tx.put(edits, { id: "e1", at: 1 });
 			cancel();
 		}, cancelled);
 		await expect(aborted).rejects.toThrow();
 		await expect(
-			self.tx((tx) => {
+			self.tx(tx => {
 				void tx.get(edits, { id: "e1" });
 				tx.put(edits, { id: "e1", at: 1 });
 			}, context),
@@ -416,7 +416,7 @@ describe("tables in a transaction", () => {
 	it("refuse another object's table", async () => {
 		const { self, store, host } = await stored();
 		const other = await stored();
-		await expect(self.tx((tx) => tx.put(other.edits, { id: "e1", at: 1 }), context)).rejects.toThrow(
+		await expect(self.tx(tx => tx.put(other.edits, { id: "e1", at: 1 }), context)).rejects.toThrow(
 			"writes only its own object's tables",
 		);
 		await host.close(context);
@@ -442,7 +442,7 @@ describe("tables in a transaction", () => {
 			{ admit: () => true, adopt: () => {} },
 			context,
 		);
-		const queued = attempts[0]!.tx(async (tx) => {
+		const queued = attempts[0]!.tx(async tx => {
 			tx.put(handles[0]!.edits, { id: "e1", at: 1 });
 			(await tx.draft(handles[0]!.n)).n = 1;
 		}, context);
@@ -462,7 +462,7 @@ describe("tables in a transaction", () => {
 			if (admitted) fail();
 			return admitted;
 		};
-		const admitted = await attempts[1]!.tx(async (tx) => {
+		const admitted = await attempts[1]!.tx(async tx => {
 			tx.put(handles[1]!.edits, { id: "e2", at: 2 });
 			(await tx.draft(handles[1]!.n)).n = 2;
 			return "done";
@@ -516,13 +516,13 @@ describe("persisted documents in a transaction", () => {
 	it("commit persisted and in-memory documents in one step; a delta commit takes three statements", async () => {
 		const { telemetry, context: counting, counts } = await metered();
 		const { self, n, p, store, host } = await stored(telemetry);
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(n)).n = 1;
 			(await tx.draft(p)).n = 1;
 		}, counting);
 		expect(store.lastSeq).toBe(1);
 		const before = { ...counts() };
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(p)).n = 2;
 		}, counting);
 		expect(counts()["chord.store.commits"]! - before["chord.store.commits"]!).toBe(1);
@@ -536,11 +536,11 @@ describe("persisted documents in a transaction", () => {
 	it("a keyed retirement takes 6a's statements: the counted DELETE, the revisions, lastSeq (cost guard)", async () => {
 		const { telemetry, context: counting, counts } = await metered();
 		const { self, k, store, host } = await stored(telemetry);
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(k, "a")).n = 1;
 		}, counting);
 		const before = { ...counts() };
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			await tx.retire(k, "a");
 		}, counting);
 		// No read of the record first, no second DELETE of its row; plus the outbox commit.
@@ -551,17 +551,17 @@ describe("persisted documents in a transaction", () => {
 
 	it("assign the created documents' ids by their order in the commit; retire and recreate in one commit", async () => {
 		const { self, k, store, host } = await stored();
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(k, "b")).n = 1;
 			(await tx.draft(k, "a")).n = 2;
 		}, context);
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			await tx.retire(k, "b");
 			(await tx.draft(k, "b")).n = 3;
 		}, context);
 		const commits = await store.outbox!.read(0, 10, context);
 		const created = commits.flatMap(({ writes }) =>
-			writes.flatMap((write) => (write.kind === "document.create" ? [[write.record.key, write.record.id]] : [])),
+			writes.flatMap(write => (write.kind === "document.create" ? [[write.record.key, write.record.id]] : [])),
 		);
 		expect(created).toEqual([
 			["b", 2],
@@ -572,7 +572,7 @@ describe("persisted documents in a transaction", () => {
 		// What is stored of `b` is the new record's: the next change is a delta on it.
 		await k.change(
 			"b",
-			(draft) => {
+			draft => {
 				draft.n = 4;
 			},
 			context,
@@ -587,19 +587,19 @@ describe("persisted documents in a transaction", () => {
 		const { store } = first;
 		await first.k.change(
 			"a",
-			(draft) => {
+			draft => {
 				draft.n = 1;
 			},
 			context,
 		);
 		await first.host.close(context);
 		const { self, k, host } = await stored(undefined, store);
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(k, "a")).n += 1;
 		}, context);
 		expect(await k.get("a", context)).toEqual({ n: 2 });
 		await expect(
-			self.tx(async (tx) => {
+			self.tx(async tx => {
 				// Not awaited: the draft is still loading when the callback returns (it rejects later, settled).
 				tx.draft(k, "b").catch(() => {});
 			}, context),
@@ -610,11 +610,11 @@ describe("persisted documents in a transaction", () => {
 
 	it("settle a warm keyed draft at once: a continuation the callback did not await runs before the commit", async () => {
 		const { self, k, host, store } = await stored();
-		await self.tx(async (tx) => {
+		await self.tx(async tx => {
 			(await tx.draft(k, "a")).n = 1;
 		}, context);
-		await self.tx((tx) => {
-			void tx.draft(k, "a").then((draft) => {
+		await self.tx(tx => {
+			void tx.draft(k, "a").then(draft => {
 				draft.n = 7;
 			});
 		}, context);
@@ -629,7 +629,7 @@ describe("persisted documents in a transaction", () => {
 		const parts = store.export(context);
 		await parts.next();
 		const change = rejection(
-			p.change((draft) => {
+			p.change(draft => {
 				draft.n = 5;
 			}, context),
 		);
@@ -640,7 +640,7 @@ describe("persisted documents in a transaction", () => {
 		expect(store.lastSeq).toBe(0);
 		const next = await stored(undefined, store);
 		expect(next.p.value).toEqual({ n: 0 });
-		await next.p.change((draft) => {
+		await next.p.change(draft => {
 			draft.n = 6;
 		}, context);
 		expect(store.lastSeq).toBe(1);
@@ -666,7 +666,7 @@ describe("persisted documents in a transaction", () => {
 			return commit([...writes, held], fence, ctx);
 		};
 		// Not from a method handler: the drain does not wait for it.
-		const change = p.change((draft) => {
+		const change = p.change(draft => {
 			draft.n = 5;
 		}, context);
 		await inStep.promise;
@@ -683,7 +683,7 @@ describe("persisted documents in a transaction", () => {
 		expect(store.lastSeq).toBe(1);
 		const next = await stored(undefined, store);
 		expect(next.p.value).toEqual({ n: 5 });
-		await next.p.change((draft) => {
+		await next.p.change(draft => {
 			draft.n = 6;
 		}, context);
 		expect(store.lastSeq).toBe(2);
@@ -698,8 +698,8 @@ describe("persisted documents in a transaction", () => {
 			h.serve(Writer, (_, self) => {
 				const p = self.state(P);
 				return {
-					write: async (ctx) => {
-						await p.change((draft) => {
+					write: async ctx => {
+						await p.change(draft => {
 							draft.n++;
 						}, ctx);
 						return null;
@@ -727,7 +727,7 @@ describe("persisted documents in a transaction", () => {
 		const closing = host.close(context).then(() => {
 			closed = true;
 		});
-		await new Promise((resolve) => setTimeout(resolve, 60));
+		await new Promise(resolve => setTimeout(resolve, 60));
 		// The drain gave up on the handler; the object's teardown still waits for the admitted step.
 		expect(errors.map(({ kind }) => kind)).toEqual(["drain_timeout"]);
 		expect(closed).toBe(false);

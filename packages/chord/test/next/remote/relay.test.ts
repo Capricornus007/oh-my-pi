@@ -33,7 +33,7 @@ import {
 /** How often a part was parsed in this file, by anyone. */
 const parses = vi.hoisted(() => ({ count: 0 }));
 
-vi.mock("../../../src/next/link/values.ts", async (importOriginal) => {
+vi.mock("../../../src/next/link/values.ts", async importOriginal => {
 	const original = await importOriginal<typeof Values>();
 	return {
 		...original,
@@ -191,7 +191,7 @@ forEachCodec(() => {
 			await transported();
 			expect(raw.kinds()).toEqual(["hello"]);
 			// Its windowed messages, left empty, are acknowledged to it at once.
-			expect(two.kinds().filter((kind) => kind === "ack")).toEqual(["ack", "ack"]);
+			expect(two.kinds().filter(kind => kind === "ack")).toEqual(["ack", "ack"]);
 			// A message with its own hold and the other's: only its own entry is forwarded.
 			bindPlaced(two, y);
 			await raw.next("bound");
@@ -253,7 +253,7 @@ forEachCodec(() => {
 			await transported();
 			// The relay holds nothing back: the worker's window for this origin is the limit.
 			expect(tab.kinds()).toEqual(["hello", "bound", "state", "state", "state"]);
-			expect(worker.kinds().filter((kind) => kind === "ack")).toEqual([]);
+			expect(worker.kinds().filter(kind => kind === "ack")).toEqual([]);
 			tab.ack();
 			tab.ack();
 			await transported();
@@ -281,11 +281,11 @@ forEachCodec(() => {
 			await transported();
 			tab.ack();
 			await transported();
-			expect(one.kinds().filter((kind) => kind === "ack")).toEqual(["ack"]);
-			expect(two.kinds().filter((kind) => kind === "ack")).toEqual([]);
+			expect(one.kinds().filter(kind => kind === "ack")).toEqual(["ack"]);
+			expect(two.kinds().filter(kind => kind === "ack")).toEqual([]);
 			tab.ack();
 			await transported();
-			expect(two.kinds().filter((kind) => kind === "ack")).toEqual(["ack"]);
+			expect(two.kinds().filter(kind => kind === "ack")).toEqual(["ack"]);
 		});
 
 		it("never tears a commit: a slow tab's states fold at the worker, a derive over two holds sees both at one moment (race 21)", async () => {
@@ -301,7 +301,7 @@ forEachCodec(() => {
 				[
 					{
 						name: "@test/pair",
-						facet: defineFacet<TestPrincipal>((h) =>
+						facet: defineFacet<TestPrincipal>(h =>
 							h.serve(Pair, (_, self) => {
 								const one = self.get(PlacedNotes, { session: "S1" });
 								const two = self.get(PlacedNotes, { session: "S1" });
@@ -332,7 +332,7 @@ forEachCodec(() => {
 			await transported();
 			expect(view.pair.value).toBe("5/5");
 			expect(slow.kinds).toEqual(["state", "state", "state"]);
-			expect(seen.every((pair) => pair.split("/")[0] === pair.split("/")[1])).toBe(true);
+			expect(seen.every(pair => pair.split("/")[0] === pair.split("/")[1])).toBe(true);
 			expect(relay.errors.server).toEqual([]);
 		});
 	});
@@ -371,7 +371,7 @@ forEachCodec(() => {
 			const workers: RawPeer[] = [];
 			const resolve = rawWorkers(workers);
 			const relay = await relayed({
-				resolve: (address) => (workers.length === 0 ? resolve(address) : new Promise<never>(() => {})),
+				resolve: address => (workers.length === 0 ? resolve(address) : new Promise<never>(() => {})),
 			});
 			const raw = rawTab(relay.server);
 			holdPlaced(raw, 0);
@@ -418,7 +418,7 @@ forEachCodec(() => {
 				context,
 			);
 			await server.load(
-				[{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }],
+				[{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }],
 				context,
 			);
 			// The server holds something at the middle's address: its route link exists while it does.
@@ -426,7 +426,7 @@ forEachCodec(() => {
 			await transported();
 			// The next resolve waits: the middle's parent path is down meanwhile.
 			let admit: () => void = () => {};
-			gate = new Promise<void>((resolve) => {
+			gate = new Promise<void>(resolve => {
 				admit = resolve;
 			});
 			links[0]!.close();
@@ -453,8 +453,8 @@ forEachCodec(() => {
 			const workers: RawPeer[] = [];
 			const make = rawWorkers(workers);
 			const { server } = await relayed({
-				resolve: async (address) => {
-					await new Promise<void>((resolve) => {
+				resolve: async address => {
+					await new Promise<void>(resolve => {
 						finish = resolve;
 					});
 					return make(address);
@@ -564,11 +564,11 @@ describe("received buffers at a relay", () => {
 		const [a, b] = memoryLinkPair();
 		const buffers: WeakRef<ArrayBufferLike>[] = [];
 		const listening: Link = {
-			send: (message) => a.send(message),
+			send: message => a.send(message),
 			close: () => a.close(),
-			onClose: (listener) => a.onClose(listener),
-			onMessage: (listener) =>
-				a.onMessage((message) => {
+			onClose: listener => a.onClose(listener),
+			onMessage: listener =>
+				a.onMessage(message => {
 					buffers.push(new WeakRef(message.buffer));
 					listener(message);
 				}),
@@ -613,7 +613,7 @@ function pausable(link: Link): { readonly link: Link; readonly kinds: string[]; 
 	const held: Uint8Array[] = [];
 	const kinds: string[] = [];
 	let listener: (message: Uint8Array) => void = () => {};
-	link.onMessage((message) => {
+	link.onMessage(message => {
 		kinds.push(testCodec().decode(message).kind);
 		if (paused) held.push(message);
 		else listener(message);
@@ -621,10 +621,10 @@ function pausable(link: Link): { readonly link: Link; readonly kinds: string[]; 
 	return {
 		kinds,
 		link: {
-			send: (message) => link.send(message),
+			send: message => link.send(message),
 			close: () => link.close(),
-			onClose: (close) => link.onClose(close),
-			onMessage: (next) => {
+			onClose: close => link.onClose(close),
+			onMessage: next => {
 				listener = next;
 			},
 		},
@@ -764,7 +764,7 @@ forEachCodec(() => {
 
 		it.each([0, 1200])(
 			"detach a reference failed too_large from its route; retry %i ms after the drop places it anew, a new hold",
-			async (wait) => {
+			async wait => {
 				const workers: RawPeer[] = [];
 				const relay = await relayed({ resolve: rawWorkers(workers, { limits: { part: 50 } }) });
 				const notes = relay.server.hold(PlacedNotes, { session: "S1" }, context);
@@ -779,13 +779,13 @@ forEachCodec(() => {
 				expect(notes.state.value).toMatchObject({ kind: "failed", cause: { error: { code: "too_large" } } });
 				// The worker's link drops: nothing holds the address, so nothing resolves it again for this reference.
 				first.close();
-				await new Promise((resolve) => setTimeout(resolve, wait));
+				await new Promise(resolve => setTimeout(resolve, wait));
 				await transported();
 				expect(workers).toHaveLength(1);
 				// The route forgot the address: the retry places the reference anew, resolves it and holds it.
 				notes.retry();
 				expect(notes.state.value.kind).toBe("loading");
-				for (let tries = 0; workers.length < 2 && tries < 30; tries++) await new Promise((r) => setTimeout(r, 100));
+				for (let tries = 0; workers.length < 2 && tries < 30; tries++) await new Promise(r => setTimeout(r, 100));
 				const second = await workerAt(workers, 1);
 				bindPlaced(second, await second.next("hold"), 2);
 				await transported();
@@ -800,7 +800,7 @@ forEachCodec(() => {
 			if (notes.variant !== "editor") throw new Error("bound as the editor");
 			const text = "lorem ipsum ".repeat(3000);
 			for (let i = 0; i < 3; i++) await notes.add({ text }, context);
-			for (let i = 0; i < 100 && notes.count.value < 3; i++) await new Promise((resolve) => setTimeout(resolve, 5));
+			for (let i = 0; i < 100 && notes.count.value < 3; i++) await new Promise(resolve => setTimeout(resolve, 5));
 			expect(notes.notes.value).toEqual([{ text }, { text }, { text }]);
 		});
 	});

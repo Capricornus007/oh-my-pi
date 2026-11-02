@@ -4,4 +4,4 @@ import { constant, defineFacet, int, local } from "@earendil-works/chord/next";
 
 const Counter = local("example.counter", { version: 1, params: {}, members: { start: int() } });
 
-export default defineFacet((host) => host.serve(Counter, () => ({ start: constant(1) })));
+export default defineFacet(host => host.serve(Counter, () => ({ start: constant(1) })));

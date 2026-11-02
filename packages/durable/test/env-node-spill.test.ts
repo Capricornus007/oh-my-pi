@@ -12,7 +12,7 @@ const SPILL_WRITE_DELAY_MS = 600;
 const spill = vi.hoisted(() => ({ rejectedWrites: 0 }));
 
 // Make the spill stream deterministically slow and immediately backpressured.
-vi.mock("node:fs", async (importOriginal) => {
+vi.mock("node:fs", async importOriginal => {
 	const actual = await importOriginal<typeof Fs>();
 	return {
 		...actual,
@@ -68,7 +68,7 @@ describe("NodeExecutionEnv spill backpressure", () => {
 					command,
 					{
 						spill: { afterBytes: 10, afterLines: 10 },
-						onOutput: (text) => {
+						onOutput: text => {
 							output += text;
 						},
 					},

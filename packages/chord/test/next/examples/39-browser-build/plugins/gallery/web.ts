@@ -7,4 +7,4 @@ import logo from "./assets/logo.svg?url";
 
 const Gallery = local("example.gallery", { version: 1, params: {}, members: { logo: str() } });
 
-export default defineFacet((host) => host.serve(Gallery, () => ({ logo: constant(logo) })));
+export default defineFacet(host => host.serve(Gallery, () => ({ logo: constant(logo) })));

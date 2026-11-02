@@ -54,7 +54,7 @@ describe("claims", () => {
 		const Edits = defineTable("edits", { version: 1, columns: { id: str() }, key: ["id"] });
 		const Notes = local("notes.store", { version: 1, params: {}, members: {} });
 		const { host } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Notes, (_, self) => {
 					self.state(Note);
 					self.table(Edits);

@@ -451,7 +451,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 	/** Node's `readFile`, with or without UTF-8 decoding, over a file opened like `open(path, "r")`. */
 	async #readFile(path: string, encoding: boolean, context: Context): Promise<Result<Uint8Array | string, FileError>> {
 		const signal = context.abortSignal;
-		return this.#fileOp(path, context, async (resolved) => {
+		return this.#fileOp(path, context, async resolved => {
 			const { handle, json } = await this.#open(resolved, { mode: "read" });
 			const aborted = () => signal?.aborted === true;
 			const abort = () => new FileError("aborted", "The operation was aborted", resolved);
@@ -536,7 +536,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		options: { noFollow?: boolean } | undefined,
 		context: Context,
 	): Promise<Result<BinaryReader, FileError>> {
-		const opened = await this.#fileOp(path, context, async (resolved) => {
+		const opened = await this.#fileOp(path, context, async resolved => {
 			return (await this.#open(resolved, { noFollow: options?.noFollow === true })).handle;
 		});
 		if (!opened.ok) return opened;
@@ -549,7 +549,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 	}
 
 	async openTextLineReader(path: string, context: Context): Promise<Result<TextLineReader, FileError>> {
-		const opened = await this.#fileOp(path, context, async (resolved) => {
+		const opened = await this.#fileOp(path, context, async resolved => {
 			return (await this.#open(resolved, { mode: "read" })).handle;
 		});
 		if (!opened.ok) return opened;
@@ -593,7 +593,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		return this.#fileOp(
 			path,
 			context,
-			async (resolved) => {
+			async resolved => {
 				const first = bytes.subarray(0, WRITE_CHUNK);
 				const keep = bytes.length > WRITE_CHUNK;
 				const reply = await this.connection.request("write", { path: resolved, append, keep }, { payload: first });
@@ -604,7 +604,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 					for (let offset = WRITE_CHUNK; offset < bytes.length; offset += WRITE_CHUNK) {
 						if (signal?.aborted) {
 							// A chunk that failed before this check fails the write, as it would have in sequence.
-							const failed = (await Promise.allSettled(inFlight)).find((result) => result.status === "rejected");
+							const failed = (await Promise.allSettled(inFlight)).find(result => result.status === "rejected");
 							if (failed !== undefined) throw failed.reason;
 							throw new FileError("aborted", "The operation was aborted", resolved);
 						}
@@ -640,7 +640,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		return this.#fileOp(
 			path,
 			context,
-			async (resolved) => {
+			async resolved => {
 				if (!Number.isSafeInteger(size) || size < 0) {
 					throw new FileError("invalid", "File size must be a non-negative safe integer", resolved);
 				}
@@ -654,7 +654,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		return this.#fileOp(
 			path,
 			context,
-			async (resolved) => {
+			async resolved => {
 				await this.connection.request("fsync", { path: resolved });
 			},
 			"both",
@@ -681,7 +681,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 	}
 
 	async fileInfo(path: string, context: Context): Promise<Result<FileInfo, FileError>> {
-		const result = await this.#fileOp(path, context, async (resolved) => {
+		const result = await this.#fileOp(path, context, async resolved => {
 			const { json } = await this.connection.request("lstat", { path: resolved });
 			return toInfo(resolved, json as unknown as RemoteFileInfo, await remotePath(this.connection));
 		});
@@ -689,11 +689,11 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 	}
 
 	listDir(path: string, context: Context): Promise<Result<FileInfo[], FileError>> {
-		return this.#fileOp(path, context, async (resolved) => {
+		return this.#fileOp(path, context, async resolved => {
 			const { handle } = await this.#openDir(resolved);
 			const entries: RemoteDirEntry[] = [];
 			try {
-				for (let done = false; !done; ) {
+				for (let done = false; !done;) {
 					const { json } = await handle.request("readdir", { max: 1000 });
 					entries.push(...(json.entries as RemoteDirEntry[]));
 					done = json.done === true;
@@ -741,7 +741,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 	}
 
 	async openDirReader(path: string, context: Context): Promise<Result<DirReader, FileError>> {
-		const opened = await this.#fileOp(path, context, async (resolved) => (await this.#openDir(resolved)).handle);
+		const opened = await this.#fileOp(path, context, async resolved => (await this.#openDir(resolved)).handle);
 		if (!opened.ok) return opened;
 		const aborted = abortResult<DirReader>(context.abortSignal, opened.value.path);
 		if (aborted) {
@@ -752,7 +752,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 	}
 
 	canonicalPath(path: string, context: Context): Promise<Result<string, FileError>> {
-		return this.#fileOp(path, context, async (resolved) => {
+		return this.#fileOp(path, context, async resolved => {
 			const { json } = await this.connection.request("realpath", { path: resolved });
 			return json.path as string;
 		});
@@ -770,7 +770,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		options: { recursive?: boolean } | undefined,
 		context: Context,
 	): Promise<Result<void, FileError>> {
-		return this.#fileOp(path, context, async (resolved) => {
+		return this.#fileOp(path, context, async resolved => {
 			await this.connection.request("mkdir", { path: resolved, recursive: options?.recursive ?? true });
 		});
 	}
@@ -780,7 +780,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		options: { recursive?: boolean; force?: boolean } | undefined,
 		context: Context,
 	): Promise<Result<void, FileError>> {
-		return this.#fileOp(path, context, async (resolved) => {
+		return this.#fileOp(path, context, async resolved => {
 			await this.connection.request("rm", {
 				path: resolved,
 				recursive: options?.recursive ?? false,
@@ -833,7 +833,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		if (aborted) return aborted;
 		try {
 			const resolved = await Promise.all(
-				targets.map(async (target) => ({ ...target, path: await this.#resolve(target.path) })),
+				targets.map(async target => ({ ...target, path: await this.#resolve(target.path) })),
 			);
 			const afterResolve = abortResult<FileWatcher>(context.abortSignal);
 			if (afterResolve) return afterResolve;

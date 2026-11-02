@@ -165,9 +165,9 @@ function readEnv(onRead?: (offset: number, length: number) => void) {
 		return {
 			ok: true,
 			value: {
-				info: (c) => reader.info(c),
+				info: c => reader.info(c),
 				scanLines: (o, c) => reader.scanLines(o, c),
-				close: (c) => reader.close(c),
+				close: c => reader.close(c),
 				read: async (offset, length, c) => {
 					reads.largest = Math.max(reads.largest, length);
 					const result = await reader.read(offset, length, c);
@@ -367,7 +367,7 @@ describe("read of images, with the Photon image processor", () => {
 	});
 
 	it("is what createCodingTools({ images }) gives read", async () => {
-		const tool = createCodingTools({ images: processor }).tools?.find((candidate) => candidate.name === "read");
+		const tool = createCodingTools({ images: processor }).tools?.find(candidate => candidate.name === "read");
 		const result = await read("b.bmp", bmp(4, 4), { tool: tool as ReturnType<typeof createReadTool> });
 		expect(result.output).toMatchObject([{ type: "image", mimeType: "image/png" }]);
 	});
@@ -384,13 +384,13 @@ describe("EXIF orientation", () => {
 		[R, G, B],
 		[W, K, Y],
 	];
-	const mirror = <T>(grid: readonly (readonly T[])[]): T[][] => grid.map((row) => [...row].reverse());
+	const mirror = <T>(grid: readonly (readonly T[])[]): T[][] => grid.map(row => [...row].reverse());
 	// A quarter turn clockwise: the left column, read bottom to top, becomes the top row.
 	const turn = <T>(grid: readonly (readonly T[])[]): T[][] =>
-		grid[0]!.map((_, x) => grid.map((row) => row[x]!).reverse());
+		grid[0]!.map((_, x) => grid.map(row => row[x]!).reverse());
 	// What each orientation shows, from its EXIF definition: mirror, then turn clockwise.
 	const upright: Record<number, Rgb[][]> = {
-		1: stored.map((row) => [...row]),
+		1: stored.map(row => [...row]),
 		2: mirror(stored),
 		3: turn(turn(stored)),
 		4: turn(turn(mirror(stored))),
@@ -415,7 +415,7 @@ describe("EXIF orientation", () => {
 			const seen = expected.map((row, by) =>
 				row.map((_, bx) => {
 					const at = ((by * 16 + 8) * image.width + bx * 16 + 8) * 4;
-					return [...image.rgba.subarray(at, at + 3)].map((channel) => (channel > 127 ? 255 : 0));
+					return [...image.rgba.subarray(at, at + 3)].map(channel => (channel > 127 ? 255 : 0));
 				}),
 			);
 			expect(seen).toEqual(expected);
@@ -540,11 +540,9 @@ describe("createNodePhotonImages", () => {
 		const png = noisyPng(1100, 1100);
 		const copy = png.slice();
 		const threaded = await processor.prepare(png, "image/png", DEFAULT_IMAGE_LIMITS);
-		const inline = await (await createNodePhotonImages({ worker: false })).prepare(
-			png,
-			"image/png",
-			DEFAULT_IMAGE_LIMITS,
-		);
+		const inline = await (
+			await createNodePhotonImages({ worker: false })
+		).prepare(png, "image/png", DEFAULT_IMAGE_LIMITS);
 		expect(threaded).toEqual(inline);
 		expect(png).toEqual(copy);
 	}, 60_000);
@@ -559,7 +557,7 @@ describe("createNodePhotonImages", () => {
 		expect(results[0]?.mimeType).toBe("image/png");
 		expect(results[1]?.resized?.to).toEqual({ width: 2000, height: 500 });
 		expect(results[2]).toBeUndefined();
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		expect((await images.prepare(bmp(2, 2), "image/bmp", DEFAULT_IMAGE_LIMITS))?.mimeType).toBe("image/png");
 	});
 });

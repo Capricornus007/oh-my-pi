@@ -18,7 +18,7 @@ const Setter = local("app.setter", { version: 1, params: {}, members: { set: met
 /** Serves `Count` (a sum that throws when negative) and `Setter`, which contributes a writable number. */
 function serveCount(h: Parameters<Parameters<typeof loaded>[0]>[0]): void {
 	h.serve(Count, {
-		compose: (table) => {
+		compose: table => {
 			const sum = table.reduce((n, { value }) => n + value, 0);
 			if (sum < 0) throw new Error(`negative: ${sum}`);
 			return sum;
@@ -39,7 +39,7 @@ function serveCount(h: Parameters<Parameters<typeof loaded>[0]>[0]): void {
 describe("native sources as derive sources", () => {
 	it("a derive reads JSON and native sources alike, marked when a native one changes", async () => {
 		const Mixed = local("app.mixed", { version: 1, params: {}, members: { label: str(), name: method(str()) } });
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveCount(h);
 			h.serve(Mixed, (_, self) => {
 				const name = self.writable("a");
@@ -64,7 +64,7 @@ describe("native sources as derive sources", () => {
 		const Flaky = local("app.flaky", { version: 1, params: { id: int() }, members: {} });
 		const Watcher = local("app.watcher", { version: 1, params: {}, members: { flaky: str() } });
 		let flakySelf: Self | undefined;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Flaky, (_, self) => {
 				flakySelf = self;
 				return {};
@@ -76,9 +76,7 @@ describe("native sources as derive sources", () => {
 		});
 		const watcher = await host.get(Watcher, {}, context);
 		const kinds: string[] = [];
-		(await watcher.flaky.watch(context)).start(
-			async (call) => void (call.kind === "value" && kinds.push(call.value)),
-		);
+		(await watcher.flaky.watch(context)).start(async call => void (call.kind === "value" && kinds.push(call.value)));
 		expect(watcher.flaky.value).toBe("live");
 		failLive(objects, flakySelf!, new ChordError({ code: "unavailable", message: "down" }));
 		expect(watcher.flaky.value).toBe("failed");
@@ -104,7 +102,7 @@ describe("native sources as derive sources", () => {
 
 	it("refuses a native source as a state member (Q14)", async () => {
 		const Bad = local("app.bad", { version: 1, params: {}, members: { n: int() } });
-		const { host } = await loaded((h) => h.serve(Bad, (_, self) => ({ n: self.writable(1) as never })));
+		const { host } = await loaded(h => h.serve(Bad, (_, self) => ({ n: self.writable(1) as never })));
 		expect(await rejection(host.get(Bad, {}, context))).toMatchObject({
 			message: "app.bad: n: a state member is a JSON watchable",
 		});
@@ -120,7 +118,7 @@ describe("watching a native source that fails", () => {
 		const calls: NativeWatchCall<number>[] = [];
 		const watch = await count.watch(context);
 		expect(watch.value).toBe(1);
-		watch.start(async (call) => void calls.push(call));
+		watch.start(async call => void calls.push(call));
 		await delivered();
 		expect(calls).toEqual([{ kind: "failed", error: new Error("negative: -1") }]);
 		await host.close(context);
@@ -129,7 +127,7 @@ describe("watching a native source that fails", () => {
 	it("an `on` routine started while its source is failed waits for its next good value, never calls with the stale one", async () => {
 		const Follower = local("app.follower", { version: 1, params: { id: int() }, members: {} });
 		const seen: number[] = [];
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveCount(h);
 			h.serve(Follower, (_, self) => {
 				self.on(self.registry(Count), ({ value }) => void seen.push(value));

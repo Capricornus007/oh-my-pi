@@ -253,7 +253,7 @@ class OnRoutine {
 			return;
 		}
 		this.#native = watch instanceof NativeWatch;
-		void watch.closed.then((end) => this.#end(end));
+		void watch.closed.then(end => this.#end(end));
 		try {
 			// Both listeners return at once.
 			watch.start((call: WatchCall<unknown> | NativeWatchCall<unknown>) => {
@@ -307,7 +307,7 @@ class OnRoutine {
 	 */
 	#firstValue(source: Source): Promise<boolean> {
 		const signal = this.#owner.context.abortSignal;
-		return new Promise((resolve) => {
+		return new Promise(resolve => {
 			const done = (got: boolean): void => {
 				source.unsubscribe(subscriber);
 				signal?.removeEventListener("abort", aborted);
@@ -374,7 +374,7 @@ class OnRoutine {
 		const { value } = pending;
 		this.#state = { kind: "calling" };
 		this.#last = value;
-		void call(this.#owner, this.#invocation(value)).then((called) => this.#called(called));
+		void call(this.#owner, this.#invocation(value)).then(called => this.#called(called));
 	}
 
 	/**
@@ -384,7 +384,7 @@ class OnRoutine {
 	#invocation(value: unknown): (ctx: Ctx) => void | Promise<void> {
 		const { fn } = this.#declaration;
 		// The overloads typed `fn` for its source's kind, which the watch decided.
-		if (this.#native) return (ctx) => (fn as OnNativeHandler<unknown>)({ kind: "value", value }, ctx);
+		if (this.#native) return ctx => (fn as OnNativeHandler<unknown>)({ kind: "value", value }, ctx);
 		const taken = this.#ops.take();
 		// A JSON source's values are JSON.
 		const ops: readonly Op[] =
@@ -392,7 +392,7 @@ class OnRoutine {
 		const retired = this.#retired;
 		this.#retired = false;
 		this.#lastRetired = retired;
-		return (ctx) => (fn as OnHandler<unknown>)({ kind: "value", value, ops, retired }, ctx);
+		return ctx => (fn as OnHandler<unknown>)({ kind: "value", value, ops, retired }, ctx);
 	}
 
 	/**

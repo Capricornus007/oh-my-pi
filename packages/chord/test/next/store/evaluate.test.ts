@@ -124,7 +124,7 @@ describe("one semantics: the evaluator agrees with SQLite", () => {
 			const params: SqliteValue[] = [];
 			const text = whereSql(node, params);
 			const rows = await db.all<{ id: string }>(`SELECT id FROM t WHERE ${text} ORDER BY id`, ...params);
-			const expected = ROWS.filter((row) => matches(node, row)).map(({ id }) => id);
+			const expected = ROWS.filter(row => matches(node, row)).map(({ id }) => id);
 			expect([JSON.stringify(node), rows.map(({ id }) => id)]).toEqual([JSON.stringify(node), expected]);
 		}
 		await db.close();
@@ -144,7 +144,7 @@ describe("one semantics: the evaluator agrees with SQLite", () => {
 			prefix(refs.note, ""),
 			isNull(refs.count),
 		];
-		const WRAPPED = PREDICATES.flatMap((p) => [
+		const WRAPPED = PREDICATES.flatMap(p => [
 			p,
 			not(p),
 			and(p, eq(refs.b, true)),
@@ -158,7 +158,7 @@ describe("one semantics: the evaluator agrees with SQLite", () => {
 			const params: SqliteValue[] = [];
 			const text = whereSql(node, params);
 			const rows = await db.all<{ id: string }>(`SELECT id FROM t WHERE ${text} ORDER BY id`, ...params);
-			const expected = ROWS.filter((row) => matches(node, row)).map(({ id }) => id);
+			const expected = ROWS.filter(row => matches(node, row)).map(({ id }) => id);
 			expect([JSON.stringify(node), rows.map(({ id }) => id)]).toEqual([JSON.stringify(node), expected]);
 		}
 		await db.close();
@@ -168,10 +168,10 @@ describe("one semantics: the evaluator agrees with SQLite", () => {
 			const statement = sql.updateWhere({ and: [] } as WhereNode, node, new Map());
 			await db.run(statement.sql, ...statement.params);
 			const stored = await db.all<{ [column: string]: SqliteValue }>(`SELECT * FROM t ORDER BY id`);
-			const read = stored.map((row) => T.rows.decode(row, context));
+			const read = stored.map(row => T.rows.decode(row, context));
 			expect([JSON.stringify(node), read]).toEqual([
 				JSON.stringify(node),
-				ROWS.map((row) => applySet(node, row, "t")),
+				ROWS.map(row => applySet(node, row, "t")),
 			]);
 			await db.close();
 		}
@@ -203,8 +203,8 @@ describe("one semantics: the evaluator agrees with SQLite", () => {
 			const statement = sql.updateWhere({ and: [] } as WhereNode, node, new Map());
 			await db.run(statement.sql, ...statement.params);
 			const stored = await db.all<{ [column: string]: SqliteValue }>(`SELECT * FROM t ORDER BY id`);
-			const read = stored.map((row) => T.rows.decode(row, context));
-			expect(read).toEqual(ROWS.map((row) => applySet(node, row, "t")));
+			const read = stored.map(row => T.rows.decode(row, context));
+			expect(read).toEqual(ROWS.map(row => applySet(node, row, "t")));
 			await db.close();
 		}
 	});

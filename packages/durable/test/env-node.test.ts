@@ -32,7 +32,7 @@ async function removeTempDir(dir: string): Promise<void> {
 		} catch (error) {
 			const code = (error as NodeJS.ErrnoException).code;
 			if (attempt >= 80 || (code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY")) throw error;
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise(resolve => setTimeout(resolve, 100));
 		}
 	}
 }
@@ -53,7 +53,7 @@ async function waitFor(condition: () => Promise<boolean>, timeoutMs: number): Pr
 	const deadline = Date.now() + timeoutMs;
 	while (!(await condition())) {
 		if (Date.now() > deadline) throw new Error(`Condition not met within ${timeoutMs}ms`);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 	}
 }
 
@@ -64,7 +64,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void)
 			reject(new Error(`Timed out after ${ms}ms`));
 		}, ms);
 		promise.then(
-			(value) => {
+			value => {
 				clearTimeout(timeoutId);
 				resolve(value);
 			},
@@ -87,7 +87,7 @@ async function collectShellOutput(
 		command,
 		{
 			...options,
-			onOutput: (text) => {
+			onOutput: text => {
 				output += text;
 			},
 		},
@@ -234,7 +234,7 @@ describe("NodeExecutionEnv filesystem", () => {
 
 		const entries = getOrThrow(await env.listDir(".", BACKGROUND_CONTEXT));
 		expect(
-			entries.map((entry) => ({ name: entry.name, kind: entry.kind })).sort((a, b) => a.name.localeCompare(b.name)),
+			entries.map(entry => ({ name: entry.name, kind: entry.kind })).sort((a, b) => a.name.localeCompare(b.name)),
 		).toEqual([
 			{ name: "link.txt", kind: "symlink" },
 			{ name: "target.txt", kind: "file" },
@@ -373,7 +373,7 @@ describe("NodeExecutionEnv filesystem", () => {
 			expect(result).toMatchObject({ ok: false, error: { code: "aborted" } });
 		}
 		expect(getOrThrow(await env.readTextFile("file.txt", BACKGROUND_CONTEXT))).toBe("hello");
-		expect(getOrThrow(await env.listDir(".", BACKGROUND_CONTEXT)).map((entry) => entry.name)).toEqual(["file.txt"]);
+		expect(getOrThrow(await env.listDir(".", BACKGROUND_CONTEXT)).map(entry => entry.name)).toEqual(["file.txt"]);
 	});
 
 	it("truncates and extends files to exact byte sizes", async () => {
@@ -475,7 +475,7 @@ describe("NodeExecutionEnv text line reader", () => {
 		const reader = getOrThrow(await env.openTextLineReader("lines.txt", BACKGROUND_CONTEXT));
 		try {
 			const lines = [];
-			for (let line = getOrThrow(await reader.readLine(BACKGROUND_CONTEXT)); line !== undefined; ) {
+			for (let line = getOrThrow(await reader.readLine(BACKGROUND_CONTEXT)); line !== undefined;) {
 				lines.push(line);
 				line = getOrThrow(await reader.readLine(BACKGROUND_CONTEXT));
 			}
@@ -531,11 +531,11 @@ describe("NodeExecutionEnv text line reader", () => {
 		const prototype = await fileHandlePrototype(join(root, "lines.txt"));
 		const read = prototype.read;
 		let markStarted: () => void = () => {};
-		const started = new Promise<void>((resolve) => {
+		const started = new Promise<void>(resolve => {
 			markStarted = resolve;
 		});
 		let release: () => void = () => {};
-		const gate = new Promise<void>((resolve) => {
+		const gate = new Promise<void>(resolve => {
 			release = resolve;
 		});
 		vi.spyOn(prototype, "read").mockImplementationOnce(async function (this: FileHandle, ...args: unknown[]) {
@@ -883,12 +883,12 @@ describe("NodeExecutionEnv shell", () => {
 				withAbortSignal(controller.signal, BACKGROUND_CONTEXT),
 			);
 			for (let attempt = 0; attempt < 100 && !existsSync(pidFile); attempt++) {
-				await new Promise((resolve) => setTimeout(resolve, 10));
+				await new Promise(resolve => setTimeout(resolve, 10));
 			}
 			expect(existsSync(pidFile)).toBe(true);
 
 			controller.abort();
-			await new Promise((resolve) => setTimeout(resolve, 0));
+			await new Promise(resolve => setTimeout(resolve, 0));
 			pid = Number.parseInt(readFileSync(pidFile, "utf8"), 10);
 			process.kill(pid, "SIGKILL");
 

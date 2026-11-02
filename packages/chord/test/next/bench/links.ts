@@ -58,23 +58,23 @@ const Doc = defineState("doc", { schema: Shape, version: 1, initial: () => ({ en
 /** The `n` of every `ping` in the order the provider ran them. */
 const pings: number[] = [];
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(Store, (_, self) => {
 		const doc = self.state(Doc);
 		const change = (
 			fn: (draft: { entries: { id: number; text: string; author: string; at: number }[] }) => void,
 			ctx: Context,
-		) => doc.change((draft) => void fn(draft), ctx).then(() => null);
+		) => doc.change(draft => void fn(draft), ctx).then(() => null);
 		return {
 			doc,
-			append: (entry, ctx) => change((d) => void d.entries.push(entry), ctx),
+			append: (entry, ctx) => change(d => void d.entries.push(entry), ctx),
 			edit: ({ index, text }, ctx) =>
-				change((d) => {
+				change(d => {
 					d.entries[index]!.text = text;
 				}, ctx),
-			remove: (index, ctx) => change((d) => void d.entries.splice(index, 1), ctx),
+			remove: (index, ctx) => change(d => void d.entries.splice(index, 1), ctx),
 			stream: (token, ctx) =>
-				change((d) => {
+				change(d => {
 					d.entries[d.entries.length - 1]!.text += token;
 				}, ctx),
 		};
@@ -115,7 +115,7 @@ function counted(link: Link): Link & { bytes: number; messages: number; last: Ui
 }
 
 const telemetry = new InMemoryTelemetryContext();
-const span = await telemetry.startSpan({ name: "bench" }, (s) => s);
+const span = await telemetry.startSpan({ name: "bench" }, s => s);
 const counting = withTelemetry(span, BACKGROUND_CONTEXT);
 
 /** The encodes counted so far (the in-memory adapter records each add). */
@@ -172,7 +172,7 @@ type Memory = { readonly heap: number; readonly arrayBuffers: number };
 /** Waits until queued deliveries ran and collects garbage, repeatedly, then returns the memory in use. */
 async function settledMemory(): Promise<Memory> {
 	for (let i = 0; i < 5; i++) {
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		gc();
 	}
 	const { heapUsed, arrayBuffers } = process.memoryUsage();
@@ -297,7 +297,7 @@ async function commits(
 	const runs = 1_000;
 	/** One commit and its frame; its time in milliseconds. */
 	const commit = async (i: number): Promise<number> => {
-		const arrived = new Promise<void>((resolve) => {
+		const arrived = new Promise<void>(resolve => {
 			frame = resolve;
 		});
 		const start = performance.now();
@@ -360,7 +360,7 @@ async function holdTrial(
 	const after = await settledMemory();
 	const messages0 = down.messages;
 	await store.edit({ index: 2, text: "changed" }, BACKGROUND_CONTEXT);
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	await new Promise(resolve => setTimeout(resolve, 0));
 	const messages = down.messages - messages0;
 	await close();
 	const perHold = {
@@ -407,7 +407,7 @@ async function calls(codec: Codec): Promise<void> {
  */
 async function relink(server: Host<P>, client: Host<P>, down: Link, codec: Codec) {
 	down.close();
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	await new Promise(resolve => setTimeout(resolve, 0));
 	const [a, b] = memoryLinkPair();
 	const next = { down: counted(a), up: counted(b) };
 	const start = performance.now();
@@ -421,7 +421,7 @@ async function live(state: NativeWatchable<RefState>): Promise<void> {
 	if (state.value.kind === "live") return;
 	const watch = await state.watch(BACKGROUND_CONTEXT);
 	const done = Promise.withResolvers<void>();
-	watch.start(async (call) => {
+	watch.start(async call => {
 		if (call.kind === "value" && call.value.kind === "live") done.resolve();
 	});
 	await done.promise;
@@ -442,7 +442,7 @@ async function reconnects(codec: Codec, references: number, runs: number): Promi
 	let bytes = { down: 0, up: 0 };
 	for (let run = 0; run < runs; run++) {
 		const next = await relink(server, client, link, codec);
-		await Promise.all(views.map((view) => live(view.state)));
+		await Promise.all(views.map(view => live(view.state)));
 		time += performance.now() - next.start;
 		bytes = { down: next.down.bytes, up: next.up.bytes };
 		link = next.down;
@@ -482,7 +482,7 @@ for (const codec of CODECS) {
 	await snapshot("500 KB document", codec, document());
 	await commits("one appended item", codec, (store, i) => store.append(entry(10_000 + i, 80), counting));
 	await commits("one changed field", codec, (store, i) => store.edit({ index: 500, text: `edit ${i}` }, counting));
-	await commits("one removed item", codec, (store) => store.remove(0, counting), WARM_UP_COMMITS);
+	await commits("one removed item", codec, store => store.remove(0, counting), WARM_UP_COMMITS);
 	await stream(codec);
 	for (const holds of [1, 10]) {
 		// The median of seven trials: a single hold is small next to the collector's noise.

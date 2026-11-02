@@ -204,7 +204,7 @@ async function runDriver(): Promise<void> {
 
 	console.log("Storage footprint after deterministic synthetic workloads; values are process deltas, not limits.");
 	console.table(
-		results.map((result) => ({
+		results.map(result => ({
 			backend: result.backend,
 			scale: result.scale,
 			"heap after seed MiB": mebibytes(delta(result.postSeed, result.baseline, "heapUsed")),
@@ -231,9 +231,9 @@ async function runDriver(): Promise<void> {
 
 const [mode, backendName, scaleName] = process.argv.slice(2);
 if (mode === "--worker") {
-	const backend = STORAGE_BENCHMARK_BACKENDS.find((candidate) => candidate === backendName);
+	const backend = STORAGE_BENCHMARK_BACKENDS.find(candidate => candidate === backendName);
 	if (backend === undefined) throw new Error(`Unknown storage benchmark backend: ${backendName}`);
-	const scale = STORAGE_MEMORY_SCALES.find((candidate) => candidate.name === scaleName);
+	const scale = STORAGE_MEMORY_SCALES.find(candidate => candidate.name === scaleName);
 	if (scale === undefined) throw new Error(`Unknown storage benchmark scale: ${scaleName}`);
 	await runWorker(backend, scale);
 } else {

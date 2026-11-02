@@ -54,10 +54,10 @@ describe("SQLite telemetry reads", () => {
 		await f.flush();
 		let queries = 0;
 		const original = f.db.transaction.bind(f.db);
-		vi.spyOn(f.db, "transaction").mockImplementation((callback) =>
-			original((tx) => {
+		vi.spyOn(f.db, "transaction").mockImplementation(callback =>
+			original(tx => {
 				const counted: SqliteExecutor = {
-					exec: (sql) => tx.exec(sql),
+					exec: sql => tx.exec(sql),
 					run: (sql, ...params) => tx.run(sql, ...params),
 					runCounted: (sql, ...params) => tx.runCounted(sql, ...params),
 					get: <T extends object>(sql: string, ...params: SqliteValue[]) => tx.get<T>(sql, ...params),
@@ -90,10 +90,10 @@ describe("SQLite telemetry reads", () => {
 
 	it("keeps surviving descendants discoverable after a stored parent is removed", async () => {
 		await using f = await fixture();
-		await f.context.startSpan({ name: "root" }, (root) => root.startSpan({ name: "child" }, () => {}));
+		await f.context.startSpan({ name: "root" }, root => root.startSpan({ name: "child" }, () => {}));
 		await f.flush();
 		const original = (await f.context.findTraces()).traces[0]!;
-		const parent = original.spans.find((span) => span.name === "root")!;
+		const parent = original.spans.find(span => span.name === "root")!;
 		await f.db.run("DELETE FROM telemetry_spans WHERE id = ?", parent.id);
 		const trace = (await f.context.findTraces()).traces[0]!;
 		expect(trace.traceId).toBe(original.traceId);

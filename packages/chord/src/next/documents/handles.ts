@@ -43,11 +43,12 @@ export interface KeyedHandle<T extends JsonObject> {
 }
 
 /** The handle `self.state(definition)` returns. */
-export type HandleOf<D> = D extends StateDefinition<infer T, infer K, boolean>
-	? K extends true
-		? KeyedHandle<T>
-		: SingletonHandle<T>
-	: never;
+export type HandleOf<D> =
+	D extends StateDefinition<infer T, infer K, boolean>
+		? K extends true
+			? KeyedHandle<T>
+			: SingletonHandle<T>
+		: never;
 
 /**
  * A singleton's handle. Reads go to the slot (allowed after the seal); `change` and `retire` take the line under the
@@ -77,11 +78,11 @@ export class Singleton implements SingletonHandle<JsonObject> {
 	}
 
 	change<R>(fn: (draft: Draft<JsonObject>) => R, context: Context): Promise<R> {
-		return this.slot.owner.tx(async (tx) => fn(await tx.draft(this)), this.token, context);
+		return this.slot.owner.tx(async tx => fn(await tx.draft(this)), this.token, context);
 	}
 
 	retire(context: Context): Promise<void> {
-		return this.slot.owner.tx((tx) => tx.retire(this), this.token, context);
+		return this.slot.owner.tx(tx => tx.retire(this), this.token, context);
 	}
 }
 
@@ -124,10 +125,10 @@ export class Keyed implements KeyedHandle<JsonObject> {
 	}
 
 	change<R>(key: string, fn: (draft: Draft<JsonObject>) => R, context: Context): Promise<R> {
-		return this.slot.owner.tx(async (tx) => fn(await tx.draft(this, key)), this.token, context);
+		return this.slot.owner.tx(async tx => fn(await tx.draft(this, key)), this.token, context);
 	}
 
 	retire(key: string, context: Context): Promise<void> {
-		return this.slot.owner.tx((tx) => tx.retire(this, key), this.token, context);
+		return this.slot.owner.tx(tx => tx.retire(this, key), this.token, context);
 	}
 }

@@ -157,7 +157,7 @@ async function applyCounted(
 /** The recorded key as parameters in key order: exactly the key columns, each of its type. */
 function keyParams(record: TableRecord, key: StoredKey, what: string): SqliteValue[] {
 	if (Object.keys(key).length !== record.key.length) throw invalid("args", `${what}: not a key of ${record.table}`);
-	return record.key.map((name) => {
+	return record.key.map(name => {
 		if (!Object.hasOwn(key, name)) throw invalid("args", `${what}: key column ${JSON.stringify(name)} is missing`);
 		return toSqlite(checkScalar(scalarType(record.columns[name]!), key[name], `${what}: key`));
 	});
@@ -309,9 +309,9 @@ function checkAlter(record: TableRecord, write: Extract<TableWrite, { readonly k
 	const { edit } = write;
 	const has = (name: string): boolean => Object.hasOwn(record.columns, name);
 	const fresh = (name: string): boolean =>
-		COLUMN_NAME.test(name) && !Object.keys(record.columns).some((each) => each.toLowerCase() === name.toLowerCase());
+		COLUMN_NAME.test(name) && !Object.keys(record.columns).some(each => each.toLowerCase() === name.toLowerCase());
 	const indexed = (name: string): boolean =>
-		record.key.includes(name) || Object.values(record.indexes).some((columns) => columns.includes(name));
+		record.key.includes(name) || Object.values(record.indexes).some(columns => columns.includes(name));
 	const valid =
 		edit.kind === "rename"
 			? has(edit.from) && fresh(edit.to)
@@ -400,5 +400,5 @@ function putParams(
 		cells.set(name, json(value, where));
 		cells.set(versionColumn(name), version);
 	}
-	return physical.map((name) => (name === ROW_VERSION ? version : (cells.get(name) ?? null)));
+	return physical.map(name => (name === ROW_VERSION ? version : (cells.get(name) ?? null)));
 }

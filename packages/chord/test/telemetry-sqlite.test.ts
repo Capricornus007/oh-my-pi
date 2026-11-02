@@ -49,7 +49,7 @@ async function fixture(options?: SqliteTelemetryOptions) {
 			await telemetry.flush();
 			const rows = await db.all<SpanRow>("SELECT rowid, * FROM telemetry_spans");
 			return rows
-				.map((row) => ({
+				.map(row => ({
 					id: Number(row.id.split(":")[1]),
 					parentId:
 						row.parent_id?.split(":")[0] === row.id.split(":")[0] ? Number(row.parent_id?.split(":")[1]) : null,
@@ -64,7 +64,7 @@ async function fixture(options?: SqliteTelemetryOptions) {
 					),
 					links: (
 						JSON.parse(row.links) as { trace_id: string; span_id: string; attributes: SpanAttributes }[]
-					).map((link) => ({
+					).map(link => ({
 						context: { "pi-sqlite-span": link.span_id, "pi-sqlite-trace": link.trace_id },
 						attributes: link.attributes,
 					})),
@@ -90,7 +90,7 @@ afterEach(() => {
 });
 
 describe("SQLite telemetry span and propagation conformance", () => {
-	for (const test of createTelemetryAdapterConformance(fixture).filter((test) => test.group !== "metrics"))
+	for (const test of createTelemetryAdapterConformance(fixture).filter(test => test.group !== "metrics"))
 		it(`${test.group}: ${test.name}`, test.run);
 });
 
@@ -100,7 +100,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		const transaction = vi.spyOn(f.db, "transaction");
 		const gate = Promise.withResolvers<void>();
 		let active!: TelemetrySpan;
-		const pending = f.telemetry.startSpan({ name: "active" }, (span) => {
+		const pending = f.telemetry.startSpan({ name: "active" }, span => {
 			active = span;
 			span.addEvent("begin");
 			f.telemetry.metrics.counter("calls").add(1);
@@ -174,7 +174,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		await f.telemetry.close();
 		const rows = await f.db.all<MetricRow>("SELECT * FROM telemetry_metrics");
 		expect(rows).toHaveLength(6);
-		expect(rows.find((row) => row.kind === "histogram")).toMatchObject({ count: 2, sum: 13, min: 6, max: 7 });
+		expect(rows.find(row => row.kind === "histogram")).toMatchObject({ count: 2, sum: 13, min: 6, max: 7 });
 	});
 
 	it("strictly bounds queued spans including the in-flight batch and bounds pending metric series", async () => {
@@ -186,7 +186,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		const entered = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
 		const original = f.db.transaction.bind(f.db);
-		vi.spyOn(f.db, "transaction").mockImplementation(async (callback) => {
+		vi.spyOn(f.db, "transaction").mockImplementation(async callback => {
 			entered.resolve();
 			await release.promise;
 			return original(callback);
@@ -217,7 +217,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		const entered = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
 		const original = f.db.transaction.bind(f.db);
-		vi.spyOn(f.db, "transaction").mockImplementation(async (callback) => {
+		vi.spyOn(f.db, "transaction").mockImplementation(async callback => {
 			entered.resolve();
 			await release.promise;
 			return original(callback);
@@ -264,7 +264,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		const release = Promise.withResolvers<void>();
 		let active = 0;
 		let maximum = 0;
-		vi.spyOn(f.db, "transaction").mockImplementation(async (callback) => {
+		vi.spyOn(f.db, "transaction").mockImplementation(async callback => {
 			maximum = Math.max(maximum, ++active);
 			entered.resolve();
 			await release.promise;
@@ -293,7 +293,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		await using f = await fixture();
 		const release = Promise.withResolvers<void>();
 		let active!: TelemetrySpan;
-		const pending = f.telemetry.startSpan({ name: "active" }, (span) => {
+		const pending = f.telemetry.startSpan({ name: "active" }, span => {
 			active = span;
 			return release.promise;
 		});
@@ -366,7 +366,7 @@ describe("SQLite telemetry buffering and aggregation", () => {
 		try {
 			const first = await createSqliteTelemetry(db);
 			let carrier: TelemetryCarrier | undefined;
-			await first.startSpan({ name: "parent" }, (span) => {
+			await first.startSpan({ name: "parent" }, span => {
 				carrier = first.propagation.inject(span);
 			});
 			first.metrics.counter("shared").add(2);

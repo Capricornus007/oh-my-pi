@@ -95,7 +95,7 @@ export class Channel {
 	 */
 	start(): void {
 		this.#link.send(this.#hello);
-		this.#link.onMessage((bytes) => this.#receive(bytes));
+		this.#link.onMessage(bytes => this.#receive(bytes));
 		this.#link.onClose(() => this.#closed());
 	}
 

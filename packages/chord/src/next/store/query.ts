@@ -74,7 +74,7 @@ export class Query<C extends Columns = Columns, K extends readonly string[] = re
 
 	/** The order of its rows: the `orderBy` columns, then the key columns not among them. */
 	get order(): Order {
-		const columns = [...this.#orderBy, ...this.table.key.filter((column) => !this.#orderBy.includes(column))];
+		const columns = [...this.#orderBy, ...this.table.key.filter(column => !this.#orderBy.includes(column))];
 		return { columns, direction: this.#direction ?? "asc" };
 	}
 }
@@ -101,7 +101,7 @@ export function decodeCursor(table: TableDefinition, sqlName: string, order: Ord
 	try {
 		const binary = atob(cursor.replaceAll("-", "+").replaceAll("_", "/"));
 		decoded = JSON.parse(
-			new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))),
+			new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(binary, c => c.charCodeAt(0))),
 		);
 	} catch {
 		return refuse();

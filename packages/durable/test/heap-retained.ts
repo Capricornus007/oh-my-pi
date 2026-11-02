@@ -7,7 +7,7 @@ export async function retainedBytes(): Promise<number> {
 	const inspector = new Session();
 	inspector.connect();
 	const chunks: string[] = [];
-	inspector.on("HeapProfiler.addHeapSnapshotChunk", (message) => chunks.push(message.params.chunk));
+	inspector.on("HeapProfiler.addHeapSnapshotChunk", message => chunks.push(message.params.chunk));
 	try {
 		await inspector.post("HeapProfiler.takeHeapSnapshot", { reportProgress: false });
 	} finally {

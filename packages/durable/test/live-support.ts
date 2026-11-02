@@ -23,13 +23,13 @@ export async function viewHistory(harness: Harness, conversationId: Conversation
 	const views: ConversationView[] = [];
 	const observation = await harness.observeConversation(
 		conversationId,
-		{ advance: (call) => call.kind === "value" && views.push(call.value), end: () => {} },
+		{ advance: call => call.kind === "value" && views.push(call.value), end: () => {} },
 		context,
 	);
 	views.push(observation.value);
 	return {
 		views,
-		live: (): LiveState[] => views.map((view) => (view.docs["pi.live"] ?? {}) as LiveState),
+		live: (): LiveState[] => views.map(view => (view.docs["pi.live"] ?? {}) as LiveState),
 		detach: () => observation.detach(),
 	};
 }
@@ -40,14 +40,14 @@ type Slot = ToolSlot & Partial<Pick<NestedToolSlot, "parentCallId" | "parentTask
 /** The slots of tool call `callId`, model-issued or nested, in each `pi.live` value; `undefined` where it is absent. */
 export function slotsOf(history: readonly LiveState[], callId: string): (Slot | undefined)[] {
 	return history.map(
-		(live) => [...(live.tools ?? []), ...(live.nestedTools ?? [])].find((slot) => slot.callId === callId) as Slot,
+		live => [...(live.tools ?? []), ...(live.nestedTools ?? [])].find(slot => slot.callId === callId) as Slot,
 	);
 }
 
 /** The index of the first value where call `callId` ended: its slot is done, or gone after it was listed. */
 export function endedAt(history: readonly LiveState[], callId: string): number {
 	const slots = slotsOf(history, callId);
-	const listed = slots.findIndex((slot) => slot !== undefined);
+	const listed = slots.findIndex(slot => slot !== undefined);
 	if (listed < 0) return -1;
 	return slots.findIndex((slot, index) => index >= listed && (slot === undefined || slot.status === "done"));
 }
@@ -69,7 +69,7 @@ export function startOrder(history: readonly LiveState[]): string[] {
  */
 export function nestedResults(harness: Harness): Map<TaskId, NestedToolExecutionResult> {
 	const results = new Map<TaskId, NestedToolExecutionResult>();
-	followCommits(harness, (publication) => {
+	followCommits(harness, publication => {
 		for (const change of documentChanges(publication)) {
 			if (change.record.kind !== NestedCallDoc.definition.kind || change.kind === "retire") continue;
 			const state = change.value as NestedCallState;
@@ -87,7 +87,7 @@ export function nestedResultOf(
 	results: ReadonlyMap<TaskId, NestedToolExecutionResult>,
 	callId: string,
 ): NestedToolExecutionResult | undefined {
-	const slot = slotsOf(history, callId).find((each) => each?.taskId !== undefined);
+	const slot = slotsOf(history, callId).find(each => each?.taskId !== undefined);
 	return slot?.taskId === undefined ? undefined : results.get(slot.taskId);
 }
 
@@ -95,7 +95,7 @@ export function nestedResultOf(
 export async function graphHistory(harness: Harness) {
 	const graphs: TaskGraph[] = [];
 	const observation = await harness.observeTaskGraph(
-		{ advance: (call) => call.kind === "value" && graphs.push(call.value), end: () => {} },
+		{ advance: call => call.kind === "value" && graphs.push(call.value), end: () => {} },
 		context,
 	);
 	graphs.push(observation.value);
@@ -105,6 +105,6 @@ export async function graphHistory(harness: Harness) {
 /** The live `pi.generation` nodes of `graph`, in task ID order. */
 export function generations(graph: TaskGraph): TaskGraphNode[] {
 	return Object.values(graph.tasks)
-		.filter((node) => node.kind === "pi.generation")
+		.filter(node => node.kind === "pi.generation")
 		.sort((a, b) => a.id - b.id);
 }

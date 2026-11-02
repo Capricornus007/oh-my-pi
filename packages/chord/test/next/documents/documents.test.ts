@@ -20,7 +20,7 @@ const Owner = local("app.owner", {
 /** Serves `Owner` and hands out its handles. */
 async function owner() {
 	const handles: { list?: SingletonHandle<{ items: string[] }>; drafts?: KeyedHandle<{ body: string }> } = {};
-	const { host } = await loaded((h) =>
+	const { host } = await loaded(h =>
 		h.serve(Owner, (_, self) => {
 			handles.list = self.state(List);
 			handles.drafts = self.state(Drafts);
@@ -44,7 +44,7 @@ describe("singleton documents", () => {
 		const initial = list.value;
 		expect(initial).toEqual({ items: [] });
 		const frames = framesOf(await list.watch(context));
-		await list.change((draft) => draft.items.push("a"), context);
+		await list.change(draft => draft.items.push("a"), context);
 		expect(list.value).toEqual({ items: ["a"] });
 		await list.retire(context);
 		expect(list.value).toBe(initial);
@@ -57,7 +57,7 @@ describe("singleton documents", () => {
 	});
 
 	it("throw not_ready when read in the factory", async () => {
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Owner, (_, self) => {
 				const list = self.state(List);
 				void list.value;
@@ -74,14 +74,14 @@ describe("keyed documents", () => {
 		expect(await drafts.get("a", context)).toBeUndefined();
 		await drafts.change(
 			"a",
-			(draft) => {
+			draft => {
 				draft.body = "x";
 			},
 			context,
 		);
 		await drafts.change(
 			"b",
-			(draft) => {
+			draft => {
 				draft.body = "y";
 			},
 			context,

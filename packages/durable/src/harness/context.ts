@@ -90,7 +90,7 @@ export async function readContextFrom(
 	previous: ContextRange | undefined,
 ): Promise<{ readonly view: ContextView; readonly range: ContextRange | undefined }> {
 	const visible = at !== undefined && previous !== undefined && rangeEntry(previous, at) !== undefined;
-	const bounds = await session.readOnLine((line) =>
+	const bounds = await session.readOnLine(line =>
 		captureContextBounds(session, line, conversationId, context, at, visible),
 	);
 	if (bounds === undefined) return { view: emptyView(), range: undefined };
@@ -105,7 +105,7 @@ export async function readContextFrom(
 	} else if (bounds.tail < previous.bounds.tail) {
 		range = deriveRange(
 			bounds,
-			previous.entries.filter((entry) => entry.id <= bounds.tail),
+			previous.entries.filter(entry => entry.id <= bounds.tail),
 			false,
 		);
 	} else {
@@ -137,7 +137,7 @@ export async function readContext(
 	context: Context,
 	at?: EntryId,
 ): Promise<ContextView> {
-	const bounds = await session.readOnLine((line) => captureContextBounds(session, line, conversationId, context, at));
+	const bounds = await session.readOnLine(line => captureContextBounds(session, line, conversationId, context, at));
 	return deriveContext(storage, conversationId, bounds, context);
 }
 
@@ -191,7 +191,7 @@ export function advanceRange(range: ContextRange, appended: readonly EntryRecord
 	const start = head!.head;
 	// Heads only move forward: compaction keeps a later entry, a reset starts at itself, an older head is stale.
 	if (range.bounds.head !== undefined && start < range.bounds.head.head) return undefined;
-	const entries = [...range.entries, ...added].filter((entry) => entry.id >= start);
+	const entries = [...range.entries, ...added].filter(entry => entry.id >= start);
 	return deriveRange(bounds, entries, true);
 }
 
@@ -201,7 +201,7 @@ function deriveRange(bounds: ContextBounds, entries: readonly EntryRecord[], cur
 	// Edits of every entry in the range count, including older head markers that `selectActive()` drops.
 	for (const entry of entries) for (const edit of entry.edits ?? []) edits.set(edit.target, edit);
 	const active = selectActive(bounds.head, entries);
-	const contributions = active.map((entry) => contribute(entry, edits.get(entry.id)));
+	const contributions = active.map(entry => contribute(entry, edits.get(entry.id)));
 	const { settled, open } = settle([], contributions.flat());
 	const baseline = findBaseline(bounds.head, active);
 	const messages = leadWithSystem([...settled, ...orderToolResults(open)], baseline);
@@ -220,10 +220,10 @@ function extendRange(
 	current: boolean,
 ): ContextRange {
 	const entries = [...previous.entries, ...added];
-	if (added.some((entry) => entry.edits !== undefined || entry.head !== undefined || previous.edited.has(entry.id))) {
+	if (added.some(entry => entry.edits !== undefined || entry.head !== undefined || previous.edited.has(entry.id))) {
 		return deriveRange(bounds, entries, current);
 	}
-	const contributions = added.map((entry) => contribute(entry, undefined));
+	const contributions = added.map(entry => contribute(entry, undefined));
 	const { settled, open } = settle(previous.settled, [...previous.open, ...contributions.flat()]);
 	const baseline = previous.baseline !== undefined ? previous.baseline : findBaseline(bounds.head, added);
 	const view = {
@@ -245,7 +245,7 @@ function extendRange(
 function findBaseline(head: ContextBounds["head"], entries: readonly EntryRecord[]): Baseline {
 	for (const entry of entries) {
 		if (head !== undefined && entry.id <= head.id) continue;
-		if (SystemEntry.is(entry)) return entry.model?.find((message) => message.role === "system") ?? null;
+		if (SystemEntry.is(entry)) return entry.model?.find(message => message.role === "system") ?? null;
 		if (head === undefined && carriesSystemMessage(entry)) return null;
 	}
 	return undefined;
@@ -256,7 +256,7 @@ function carriesSystemMessage(entry: EntryRecord): boolean {
 	const isSystem = (message: Message) => message.role === "system";
 	return (
 		(entry.model?.some(isSystem) ?? false) ||
-		(entry.edits?.some((edit) => edit.action === "replace" && edit.messages.some(isSystem)) ?? false)
+		(entry.edits?.some(edit => edit.action === "replace" && edit.messages.some(isSystem)) ?? false)
 	);
 }
 
@@ -270,10 +270,10 @@ function carriesSystemMessage(entry: EntryRecord): boolean {
  * stays where it was committed: moving it would change what it means to the model.
  */
 function leadWithSystem(messages: Message[], baseline: Baseline): Message[] {
-	const index = messages.findIndex((message) => message.role === "system");
+	const index = messages.findIndex(message => message.role === "system");
 	if (index <= 0) return messages;
 	const system = messages[index]!;
-	if (system !== baseline && messages.slice(0, index).some((message) => message.role !== "user")) {
+	if (system !== baseline && messages.slice(0, index).some(message => message.role !== "user")) {
 		return messages;
 	}
 	return [system, ...messages.slice(0, index), ...messages.slice(index + 1)];
@@ -284,7 +284,7 @@ function contribute(entry: EntryRecord, edit: ContextEdit | undefined): readonly
 	if (edit?.action === "omit") return Object.freeze([]);
 	const contributed = edit?.action === "replace" ? edit.messages : (entry.model ?? []);
 	return Object.freeze(
-		contributed.filter((message) => message.role !== "assistant" || !EXCLUDED_STOP_REASONS.has(message.stopReason)),
+		contributed.filter(message => message.role !== "assistant" || !EXCLUDED_STOP_REASONS.has(message.stopReason)),
 	);
 }
 
@@ -308,7 +308,7 @@ function settle(
 	settled: readonly Message[],
 	open: readonly Message[],
 ): { readonly settled: readonly Message[]; readonly open: readonly Message[] } {
-	const last = open.findLastIndex((message) => message.role === "assistant");
+	const last = open.findLastIndex(message => message.role === "assistant");
 	if (last <= 0) return { settled, open };
 	return { settled: [...settled, ...orderToolResults(open.slice(0, last))], open: open.slice(last) };
 }
@@ -338,7 +338,7 @@ async function scanRange(
 
 /** The head marker followed by the range's non-head entries, or the whole range without a marker. */
 function selectActive(head: ContextBounds["head"], range: readonly EntryRecord[]): readonly EntryRecord[] {
-	return head === undefined ? range : [head, ...range.filter((entry) => entry.head === undefined)];
+	return head === undefined ? range : [head, ...range.filter(entry => entry.head === undefined)];
 }
 
 /**

@@ -36,7 +36,7 @@ export class NodeListener {
 	private constructor(server: Server, address: ListenAddress) {
 		this.#server = server;
 		this.address = address;
-		this.#closed = new Promise((resolve) => server.once("close", () => resolve()));
+		this.#closed = new Promise(resolve => server.once("close", () => resolve()));
 	}
 
 	/** A Node server for `handler` listening at `listen`; rejects with the listen error (a port in use). */
@@ -158,7 +158,7 @@ export function nodeRequest(message: IncomingMessage, res: ServerResponse): Node
 	const incoming = NodeIncoming.of(message, res);
 	if (!(incoming instanceof NodeIncoming)) return incoming;
 	const gone = new AbortController();
-	incoming.cancelled((reason) => gone.abort(reason));
+	incoming.cancelled(reason => gone.abort(reason));
 	let request: Request;
 	try {
 		request = webRequestOf(message, incoming.url, gone.signal);
@@ -246,7 +246,7 @@ async function pump(body: ReadableStream<Uint8Array>, res: ServerResponse): Prom
 
 /** Resolves once `res` drained or closed. */
 function drained(res: ServerResponse): Promise<void> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const done = (): void => {
 			res.removeListener("drain", done);
 			res.removeListener("close", done);
@@ -263,7 +263,7 @@ function bodyOf(message: IncomingMessage): ReadableStream<Uint8Array> {
 	let open = true;
 	return new ReadableStream<Uint8Array>(
 		{
-			start: (controller) => {
+			start: controller => {
 				message.on("data", (chunk: Buffer) => {
 					if (!open) return;
 					controller.enqueue(chunk);

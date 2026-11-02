@@ -78,8 +78,8 @@ describe("Context", () => {
 	it("derives telemetry independently from values and cancellation", async () => {
 		const telemetry = new InMemoryTelemetryContext();
 		const other = new InMemoryTelemetryContext();
-		await telemetry.startSpan({ name: "caller" }, (parent) =>
-			other.startSpan({ name: "other" }, async (otherSpan) => {
+		await telemetry.startSpan({ name: "caller" }, parent =>
+			other.startSpan({ name: "other" }, async otherSpan => {
 				const key = createContextKey<string>("principal");
 				const controller = new AbortController();
 				const base = withContextValue(key, "owner", withAbortSignal(controller.signal, BACKGROUND_CONTEXT));
@@ -93,13 +93,13 @@ describe("Context", () => {
 				expect(withoutAbortSignal(context).telemetry).toBe(parent);
 				await traceIn(
 					{ name: "outer" },
-					async (child) => {
+					async child => {
 						expect(child.value(key)).toBe("owner");
 						expect(child.abortSignal).toBe(context.abortSignal);
 						child.telemetry.addEvent("started");
 						await traceIn(
 							{ name: "inner" },
-							(nested) => {
+							nested => {
 								nested.telemetry.addLink({ context: child.telemetry });
 								return 42;
 							},
@@ -121,15 +121,15 @@ describe("Context", () => {
 
 	it("isolates concurrent traceIn branches and preserves callback results and errors", async () => {
 		const telemetry = new InMemoryTelemetryContext();
-		await telemetry.startSpan({ name: "caller" }, async (parent) => {
+		await telemetry.startSpan({ name: "caller" }, async parent => {
 			const context = withTelemetry(parent, BACKGROUND_CONTEXT);
 			let release: (() => void) | undefined;
-			const gate = new Promise<void>((resolve) => {
+			const gate = new Promise<void>(resolve => {
 				release = resolve;
 			});
 			const first = traceIn(
 				{ name: "first" },
-				async (child) => {
+				async child => {
 					await gate;
 					return traceIn({ name: "first.child" }, () => "first", child);
 				},
@@ -137,7 +137,7 @@ describe("Context", () => {
 			);
 			const second = traceIn(
 				{ name: "second" },
-				async (child) => {
+				async child => {
 					const result = await traceIn({ name: "second.child" }, () => "second", child);
 					release?.();
 					return result;
@@ -147,8 +147,8 @@ describe("Context", () => {
 			expect(await Promise.all([first, second])).toEqual(["first", "second"]);
 			const spans = telemetry.getSpans();
 			for (const name of ["first", "second"]) {
-				const parent = spans.find((span) => span.name === name);
-				expect(spans.find((span) => span.name === `${name}.child`)?.parentId).toBe(parent?.id);
+				const parent = spans.find(span => span.name === name);
+				expect(spans.find(span => span.name === `${name}.child`)?.parentId).toBe(parent?.id);
 			}
 			const failure = { reason: "same value" };
 			await expect(
@@ -164,7 +164,7 @@ describe("Context", () => {
 			expect(
 				await traceIn(
 					{ name: "noop" },
-					(child) => {
+					child => {
 						child.telemetry.addLink({ context: parent });
 						return 42;
 					},
@@ -178,7 +178,7 @@ describe("Context", () => {
 		const controller = new AbortController();
 		const context = withAbortSignal(controller.signal, BACKGROUND_CONTEXT);
 		let resolveWork!: (value: string) => void;
-		const work = new Promise<string>((resolve) => {
+		const work = new Promise<string>(resolve => {
 			resolveWork = resolve;
 		});
 		const waiting = awaitWithContext(work, context);

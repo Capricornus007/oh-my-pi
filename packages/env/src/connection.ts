@@ -147,8 +147,8 @@ function withStderr(message: string, stderr: string): string {
 	}
 	const lines = text
 		.split("\n")
-		.map((line) => line.trimEnd())
-		.filter((line) => line !== "");
+		.map(line => line.trimEnd())
+		.filter(line => line !== "");
 	if (lines.length === 0) return message;
 	return `${message}\nremote stderr:\n${lines.slice(-STDERR_TAIL_LINES).join("\n")}`;
 }
@@ -267,11 +267,11 @@ export class Connection {
 			const onAbort = () => this.#write(session, frame(CANCEL, id, {}));
 			const done = () => options.signal?.removeEventListener("abort", onAbort);
 			session.pending.set(id, {
-				resolve: (value) => {
+				resolve: value => {
 					done();
 					resolve(value);
 				},
-				reject: (error) => {
+				reject: error => {
 					done();
 					reject(error);
 				},
@@ -311,10 +311,10 @@ export class Connection {
 				() => reject(lost(`pi-env did not answer within ${START_TIMEOUT_MS / 1000} s`)),
 				START_TIMEOUT_MS,
 			);
-			child.once("error", (error) =>
+			child.once("error", error =>
 				reject(new RemoteError({ code: "spawn_error", message: error.message, lost: true })),
 			);
-			child.once("close", (code) => reject(lost(`pi-env exited with code ${code} before it was ready`)));
+			child.once("close", code => reject(lost(`pi-env exited with code ${code} before it was ready`)));
 		});
 		failed.catch(() => {});
 		child.stdout.on("data", (chunk: Buffer) => this.#onData(session, chunk));

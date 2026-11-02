@@ -39,5 +39,5 @@ export function untilAborted(context: Context): Promise<void> {
 	const signal = context.abortSignal;
 	if (signal === undefined) return new Promise(() => {});
 	if (signal.aborted) return Promise.resolve();
-	return new Promise((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+	return new Promise(resolve => signal.addEventListener("abort", () => resolve(), { once: true }));
 }

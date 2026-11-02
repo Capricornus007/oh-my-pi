@@ -6,4 +6,4 @@ import { Clock } from "@example/contracts/contract";
 
 const evaluatedAt = new Date().toISOString();
 
-export default defineFacet((host) => host.serve(Clock, () => ({ evaluatedAt: constant(evaluatedAt) })));
+export default defineFacet(host => host.serve(Clock, () => ({ evaluatedAt: constant(evaluatedAt) })));

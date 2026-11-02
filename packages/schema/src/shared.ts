@@ -23,7 +23,7 @@ export function sharedRegex(source: string): RegExp {
 
 const regexes = new Map<string, WeakRef<RegExp>>();
 
-const regexCleanup = new FinalizationRegistry<string>((source) => {
+const regexCleanup = new FinalizationRegistry<string>(source => {
 	if (regexes.get(source)?.deref() === undefined) regexes.delete(source);
 });
 

@@ -207,7 +207,7 @@ export class JobRecords {
 	async retryBlocked(context: Context): Promise<void> {
 		if (!this.#declared || this.#ended !== undefined) return;
 		const retried = [...this.#runs.values()].filter(
-			(run) => run.phase === "blocked" && (run.blocked === "finish_failed" || this.#takes(run)),
+			run => run.phase === "blocked" && (run.blocked === "finish_failed" || this.#takes(run)),
 		);
 		if (retried.length === 0) return;
 		try {
@@ -219,7 +219,7 @@ export class JobRecords {
 		const { documents } = this.#owner;
 		try {
 			await documents.tx(
-				(tx) => {
+				tx => {
 					for (const run of retried) {
 						if (this.#runs.get(run.id) !== run || run.phase !== "blocked") continue;
 						const phase =
@@ -333,7 +333,7 @@ export class JobRecords {
 		const staged = tx.staged<Staging>(this);
 		const { key } = options;
 		if (key !== undefined) {
-			const known = staged?.started.find((run) => run.key === key) ?? this.#keys.get(key);
+			const known = staged?.started.find(run => run.key === key) ?? this.#keys.get(key);
 			if (known !== undefined && known !== staged?.finishing) return known.handle;
 		}
 		const { concurrency } = definition;
@@ -433,7 +433,7 @@ export class JobRecords {
 			for (const loaded of await persisted.load(context)) restored.push(await this.#restored(loaded, context));
 			if (restored.length > 0) {
 				const { documents } = this.#owner;
-				await documents.tx((tx) => this.#restoreAll(tx, restored), documents.own, context);
+				await documents.tx(tx => this.#restoreAll(tx, restored), documents.own, context);
 			}
 		} catch (error) {
 			persisted.drop();
@@ -535,7 +535,7 @@ export class JobRecords {
 		const { documents, context } = this.#owner;
 		try {
 			await documents.tx(
-				(tx) => {
+				tx => {
 					if (this.#runs.get(run.id) === run) this.change(tx, change);
 				},
 				documents.own,
@@ -580,7 +580,7 @@ export class JobRecords {
 		const { documents, context } = this.#owner;
 		try {
 			await documents.tx(
-				(tx) => {
+				tx => {
 					const staging = this.staging(tx);
 					for (const id of states.heldIds) {
 						if (states.deadline(id) > now) continue;
@@ -600,7 +600,7 @@ export class JobRecords {
 	nextDeadline(): number {
 		const states = this.#states;
 		if (states === undefined) return Number.POSITIVE_INFINITY;
-		return Math.min(Number.POSITIVE_INFINITY, ...states.heldIds.map((id) => states.deadline(id)));
+		return Math.min(Number.POSITIVE_INFINITY, ...states.heldIds.map(id => states.deadline(id)));
 	}
 
 	/** The value of run `id`'s state document, `undefined` without one or once retired. */
@@ -727,7 +727,7 @@ export class JobRecords {
 		const { documents, context } = this.#owner;
 		try {
 			await documents.tx(
-				(tx) => {
+				tx => {
 					const outcome = this.#outcome(run, ended);
 					this.change(tx, { kind: "outcome", run, outcome });
 					// What its state holds is stored before the outcome is recorded (D8).

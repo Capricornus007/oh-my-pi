@@ -56,9 +56,9 @@ describe("WebSocket links over a fake socket", () => {
 		link.send(new Uint8Array([2]));
 		expect(socket.sent).toEqual([]);
 		socket.emit("open");
-		expect(socket.sent.map((message) => message[0])).toEqual([1, 2]);
+		expect(socket.sent.map(message => message[0])).toEqual([1, 2]);
 		const received: number[] = [];
-		link.onMessage((message) => received.push(message[0]!));
+		link.onMessage(message => received.push(message[0]!));
 		socket.emit("message", new Uint8Array([7]).buffer);
 		expect(received).toEqual([7]);
 	});
@@ -94,10 +94,10 @@ describe("WebSocket links over a fake socket", () => {
 /** A `ws` server on a free loopback port whose connections a server host accepts, and a URL to it. */
 async function loopback(options: { readonly maxPayload?: number } = {}) {
 	const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-	await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }], context);
+	await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }], context);
 	const wss = new WebSocketServer({ port: 0, host: "127.0.0.1", maxPayload: options.maxPayload });
-	await new Promise<void>((resolve) => wss.once("listening", resolve));
-	wss.on("connection", (socket) => server.accept(webSocketLink(socket), { principal: { kind: "owner" } }, context));
+	await new Promise<void>(resolve => wss.once("listening", resolve));
+	wss.on("connection", socket => server.accept(webSocketLink(socket), { principal: { kind: "owner" } }, context));
 	const url = `ws://127.0.0.1:${(wss.address() as AddressInfo).port}`;
 	return { server, wss, url };
 }
@@ -116,7 +116,7 @@ describe("WebSocket links over a loopback ws server", () => {
 			});
 			link.close();
 			expect(closed).toBe(true);
-			await new Promise<void>((resolve) => socket.once("close", () => resolve()));
+			await new Promise<void>(resolve => socket.once("close", () => resolve()));
 			expect(errors).toEqual([]);
 			expect(socket.listenerCount("error")).toBe(0);
 		} finally {
@@ -136,7 +136,7 @@ describe("WebSocket links over a loopback ws server", () => {
 		expect(notes.notes.value).toEqual([{ text: "over ws" }]);
 		await tab.close(context);
 		await server.close(context);
-		await new Promise((resolve) => wss.close(resolve));
+		await new Promise(resolve => wss.close(resolve));
 	});
 
 	it("close the connection on a frame above maxPayload (1009): references go loading (race 28)", async () => {
@@ -144,7 +144,7 @@ describe("WebSocket links over a loopback ws server", () => {
 		const tab = createHost<TestPrincipal>({ onError: () => {} });
 		await tab.load([], context);
 		const socket = new WebSocket(url);
-		const code = new Promise<number>((resolve) => socket.once("close", resolve));
+		const code = new Promise<number>(resolve => socket.once("close", resolve));
 		tab.connect(webSocketLink(socket), { principal: { kind: "server" } }, context);
 		const notes = await tab.get(Notes, { session: "S1" }, context);
 		if (notes.variant !== "editor") throw new Error("expected the editor");
@@ -154,6 +154,6 @@ describe("WebSocket links over a loopback ws server", () => {
 		expect(notes.state.value).toEqual({ kind: "loading" });
 		await tab.close(context);
 		await server.close(context);
-		await new Promise((resolve) => wss.close(resolve));
+		await new Promise(resolve => wss.close(resolve));
 	});
 });

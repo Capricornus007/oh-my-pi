@@ -122,5 +122,5 @@ function base64(bytes: Uint8Array): string {
 /** Bytes from base64. Throws on text that is no base64 (a protocol error). */
 function fromBase64(text: string): Uint8Array {
 	const binary = atob(text);
-	return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+	return Uint8Array.from(binary, char => char.charCodeAt(0));
 }

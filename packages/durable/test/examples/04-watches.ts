@@ -16,7 +16,7 @@ const Notes = defineDoc<{ text: string }>({
 	fork: "asOf",
 	initial: () => ({ text: "" }),
 });
-const chat = await session.commit(async (tx) => {
+const chat = await session.commit(async tx => {
 	const conversation = await tx.createConversation({ ownership: { kind: "ownerless" } });
 	(await tx.doc(Notes, conversation.id)).text = "first";
 	return conversation;
@@ -42,11 +42,11 @@ notesWatch.start(async (call, _deliveryContext) => {
 	if (++calls === 1) await busy.promise;
 	else done.resolve();
 });
-await session.commit(async (tx) => {
+await session.commit(async tx => {
 	(await tx.doc(Notes, chat.id)).text = "observed";
 }, context);
 for (const more of [" asynchronously", ", folded", "!"]) {
-	await session.commit(async (tx) => {
+	await session.commit(async tx => {
 		(await tx.doc(Notes, chat.id)).text += more;
 	}, context);
 }

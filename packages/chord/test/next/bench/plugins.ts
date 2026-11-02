@@ -74,14 +74,14 @@ function median(values: number[]): number {
 const root = await pluginSet();
 const { plugins } = await discoverPlugins([root], { kinds: KINDS }, context);
 const options = { hostPackages: Object.keys(HOST_PACKAGES), platform: "node", plugins } as const;
-const facets = plugins.filter((plugin) => plugin.facets.worker !== undefined);
+const facets = plugins.filter(plugin => plugin.facets.worker !== undefined);
 
 // A cold build of every worker facet (each its own esbuild build, all at once as the component runs them).
 const cold: number[] = [];
 let scripts: BuiltScript[] = [];
 for (let run = 0; run < RUNS; run++) {
 	const started = performance.now();
-	const built = await Promise.all(facets.map((plugin) => buildFacet(plugin, "worker", options, context)));
+	const built = await Promise.all(facets.map(plugin => buildFacet(plugin, "worker", options, context)));
 	cold.push(performance.now() - started);
 	scripts = built.filter((each): each is BuiltScript => each.kind === "script");
 }
@@ -121,7 +121,7 @@ await writeFile(join(root, "p0", "worker.ts"), worker(0, "b"));
 const second = await component.build(["@bench/p0"], context);
 const settled = async (): Promise<number> => {
 	for (let round = 0; round < 5; round++) {
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		gc();
 	}
 	return process.memoryUsage().heapUsed;

@@ -93,7 +93,7 @@ export function createIndexSql(
 	columns: readonly string[],
 	key: readonly string[],
 ): string {
-	const all = [...columns, ...key.filter((column) => !columns.includes(column))];
+	const all = [...columns, ...key.filter(column => !columns.includes(column))];
 	return `CREATE INDEX ${quote(`${table}:${index}`)} ON ${quote(table)} (${all.map(quote).join(", ")})`;
 }
 
@@ -128,7 +128,7 @@ export class TableSql {
 			...columns.map(({ name }) => quote(name)),
 			...columns.filter(({ type }) => type === "json").map(({ name }) => quote(versionColumn(name))),
 		].join(", ");
-		this.#byKey = key.map((column) => `${quote(column)} = ?`).join(" AND ");
+		this.#byKey = key.map(column => `${quote(column)} = ?`).join(" AND ");
 		this.put = putSql(table, physical);
 		this.get = `SELECT ${this.#select} FROM ${id} WHERE ${this.#byKey}`;
 		this.delete = `DELETE FROM ${id} WHERE ${this.#byKey}`;
@@ -182,7 +182,7 @@ export class TableSql {
 		}
 		const filter = conditions.length === 0 ? "" : ` WHERE ${conditions.join(" AND ")}`;
 		const direction = order.direction === "asc" ? "ASC" : "DESC";
-		const sorting = order.columns.map((column) => `${quote(column)} ${direction}`).join(", ");
+		const sorting = order.columns.map(column => `${quote(column)} ${direction}`).join(", ");
 		params.push(limit);
 		const select = columns === undefined ? this.#select : columns.map(quote).join(", ");
 		return { sql: `SELECT ${select} FROM ${quote(this.table)}${filter} ORDER BY ${sorting} LIMIT ?`, params };
@@ -252,9 +252,9 @@ const COMPARISONS = { eq: "=", ne: "<>", lt: "<", lte: "<=", gt: ">", gte: ">=" 
 /** A condition with its operands bound; SQL's `NULL` rules are the vocabulary's. */
 export function whereSql(node: WhereNode, params: SqliteValue[]): string {
 	if ("and" in node)
-		return node.and.length === 0 ? "1" : `(${node.and.map((each) => whereSql(each, params)).join(" AND ")})`;
+		return node.and.length === 0 ? "1" : `(${node.and.map(each => whereSql(each, params)).join(" AND ")})`;
 	if ("or" in node)
-		return node.or.length === 0 ? "0" : `(${node.or.map((each) => whereSql(each, params)).join(" OR ")})`;
+		return node.or.length === 0 ? "0" : `(${node.or.map(each => whereSql(each, params)).join(" OR ")})`;
 	if ("not" in node) return `(NOT ${whereSql(node.not, params)})`;
 	if ("isNull" in node) return `${quote(node.isNull)} IS NULL`;
 	if ("inArray" in node) {

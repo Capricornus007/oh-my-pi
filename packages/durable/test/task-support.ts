@@ -118,7 +118,7 @@ export function countingReader(registry: Registry): RegistryReader & { subscript
 	let count = 0;
 	return {
 		snapshot: () => registry.snapshot(),
-		subscribe: (listener) => {
+		subscribe: listener => {
 			count++;
 			const unsubscribe = registry.subscribe(listener);
 			let active = true;

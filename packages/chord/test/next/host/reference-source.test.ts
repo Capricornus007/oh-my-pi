@@ -44,7 +44,7 @@ const Viewer = local("app.count-viewer", { version: 1, params: {}, members: { te
 async function served(options: Parameters<typeof loaded>[1] = {}) {
 	const attempts: Self[] = [];
 	const lists: SingletonHandle<{ items: string[] }>[] = [];
-	const { host, errors } = await loaded((h) => {
+	const { host, errors } = await loaded(h => {
 		h.serve(Store, (_, self) => {
 			attempts.push(self);
 			const list = self.state(List);
@@ -53,7 +53,7 @@ async function served(options: Parameters<typeof loaded>[1] = {}) {
 				list,
 				count: self.derive([list], ([l]) => l.items.length),
 				add: async ({ text }: { text: string }, ctx: Context) => {
-					await list.change((draft) => void draft.items.push(text), ctx);
+					await list.change(draft => void draft.items.push(text), ctx);
 					return null;
 				},
 			};
@@ -134,7 +134,7 @@ describe("a failed object's members", () => {
 		});
 		const Exposer = local("app.exposer", { version: 1, params: {}, members: { n: int(), note: Note } });
 		let exposer: Self | undefined;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Provider, (_, self) => {
 				const memos = self.state(Memo);
 				const n = self.derive([memos.at("a")], ([note]) => note.title.length);
@@ -144,7 +144,7 @@ describe("a failed object's members", () => {
 					set: async (length, ctx) => {
 						await memos.change(
 							"a",
-							(draft) => {
+							draft => {
 								draft.title = "x".repeat(length);
 							},
 							ctx,
@@ -172,7 +172,7 @@ describe("a failed object's members", () => {
 		await delivered();
 		expect(exposed.state.value.kind).toBe("failed");
 		expect([exposed.n.value, exposed.note.value]).toEqual([1, { title: "x" }]);
-		expect([exposedN, exposedNote].map((calls) => calls.map((call) => call.kind))).toEqual([["failed"], ["failed"]]);
+		expect([exposedN, exposedNote].map(calls => calls.map(call => call.kind))).toEqual([["failed"], ["failed"]]);
 		expect(provider.n.value).toBe(7);
 		expect(valuesOf(providerN)).toEqual([7]);
 		await host.close(context);
@@ -195,13 +195,13 @@ describe("the window of a live failure", () => {
 		let exposer: StoreSelf | undefined;
 		let own: SingletonHandle<{ n: number }> | undefined;
 		const { host } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Provider, (_, self) => {
 					const doc = self.state(Counter);
 					return {
 						n: self.derive([doc], ([d]) => d.n),
 						set: async (n, ctx) => {
-							await doc.change((draft) => {
+							await doc.change(draft => {
 								draft.n = n;
 							}, ctx);
 							return null;
@@ -222,7 +222,7 @@ describe("the window of a live failure", () => {
 		const frames = changesOf(await exposed.n.watch(context));
 		const owned = changesOf(await exposed.own.watch(context));
 		const held = holdNextCommit(store);
-		const change = own!.change((draft) => {
+		const change = own!.change(draft => {
 			draft.n = 5;
 		}, context);
 		await held.entered;
@@ -230,13 +230,13 @@ describe("the window of a live failure", () => {
 		await provider.set(9, context);
 		await delivered();
 		// A re-exposed member shows one more change of its provider in the window.
-		expect([exposed.n.value, frames.map((call) => call.kind)]).toEqual([9, ["value"]]);
+		expect([exposed.n.value, frames.map(call => call.kind)]).toEqual([9, ["value"]]);
 		held.release();
 		await change;
 		await delivered();
 		// The object's own admitted commit still publishes once; then every member holds (the failure once).
 		expect(valuesOf(owned)).toEqual([{ n: 5 }, { failed: "boom" }]);
-		expect([exposed.n.value, frames.map((call) => call.kind)]).toEqual([9, ["value", "failed"]]);
+		expect([exposed.n.value, frames.map(call => call.kind)]).toEqual([9, ["value", "failed"]]);
 		await host.close(context);
 		await store.close(context);
 	});
@@ -247,7 +247,7 @@ describe("re-binding when a new attempt goes live", () => {
 		const Counted = local("app.counted", { version: 1, params: {}, members: { count: int(), add: method(str()) } });
 		const Tens = local("app.tens", { version: 1, params: {}, members: { tens: int(), hundreds: int() } });
 		const selves: Self[] = [];
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Counted, (_, self) => {
 				selves.push(self);
 				const first = selves.length === 1;
@@ -258,7 +258,7 @@ describe("re-binding when a new attempt goes live", () => {
 						return l.items.length;
 					}),
 					add: async (text, ctx) => {
-						await list.change((draft) => void draft.items.push(text), ctx);
+						await list.change(draft => void draft.items.push(text), ctx);
 						return null;
 					},
 				};
@@ -310,7 +310,7 @@ describe("re-binding when a new attempt goes live", () => {
 		const labels = ["old", "new"];
 		let attempt = 0;
 		const selves: Self[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Shown, (_, self) => {
 				selves.push(self);
 				self.state(List);
@@ -341,14 +341,14 @@ describe("subscribers", () => {
 		});
 		const Counter = defineState("counter", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 0 }) });
 		const selves: Self[] = [];
-		const { server, client } = await linked((h) => {
+		const { server, client } = await linked(h => {
 			h.serve(Count, (_, self) => {
 				selves.push(self);
 				const counter = self.state(Counter);
 				return {
 					n: self.derive([counter], ([c]) => ({ n: c.n * 10 })),
 					add: async (ctx: Context) => {
-						await counter.change((draft) => void draft.n++, ctx);
+						await counter.change(draft => void draft.n++, ctx);
 						return null;
 					},
 				};
@@ -376,7 +376,7 @@ describe("subscribers, directly", () => {
 	it("are fed the member's calls: a failure, then its recovery at the re-bind as a root replacement", async () => {
 		const Counted = local("app.counted", { version: 1, params: {}, members: { count: int(), add: method(str()) } });
 		const selves: Self[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Counted, (_, self) => {
 				selves.push(self);
 				const first = selves.length === 1;
@@ -387,7 +387,7 @@ describe("subscribers, directly", () => {
 						return l.items.length;
 					}),
 					add: async (text, ctx) => {
-						await list.change((draft) => void draft.items.push(text), ctx);
+						await list.change(draft => void draft.items.push(text), ctx);
 						return null;
 					},
 				};
@@ -397,9 +397,9 @@ describe("subscribers, directly", () => {
 		const source = resolveWatchable(counted.count) as Source;
 		const events: unknown[] = [];
 		const subscriber: Subscriber = {
-			advance: (call) =>
+			advance: call =>
 				void events.push(call.kind === "value" ? [call.value, call.ops] : (call.error as Error).message),
-			end: (end) => void events.push(end.kind),
+			end: end => void events.push(end.kind),
 			endAfterDelivery: () => void events.push("ended"),
 		};
 		expect(source.value).toBe(0);
@@ -426,7 +426,7 @@ describe("a member the new attempt's variant lacks", () => {
 		const owner = { kind: "owner" } as const;
 		const host = createHost<typeof owner>({ address: Server(), principal: owner, onError: () => {} });
 		const selves: Self[] = [];
-		const facet = defineFacet<typeof owner>((h) =>
+		const facet = defineFacet<typeof owner>(h =>
 			h.serve(Two, (_, _principal, self) => {
 				selves.push(self);
 				self.state(List);
@@ -466,7 +466,7 @@ describe("an ended object's members", () => {
 	it("mark the derives over them: a consumer's derive keeps no cached value, its read throws released", async () => {
 		const Paged = local("app.paged", { version: 1, params: { id: int() }, members: { n: int() } });
 		const Reader = local("app.reader", { version: 1, params: {}, members: { twice: int() } });
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Paged, () => ({ n: constant(4) }));
 			h.serve(Reader, (_, self) => ({ twice: self.derive([self.get(Paged, { id: 1 }).n], ([n]) => n * 2) }));
 		});
@@ -484,7 +484,7 @@ describe("an ended object's members", () => {
 describe("member sources and memory", () => {
 	it("a failed attempt is collected after a retry while the object, its member source and a retained watch live", async () => {
 		const attempts: WeakRef<Self>[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Store, (_, self) => {
 				attempts.push(new WeakRef(self));
 				const list = self.state(List);
@@ -492,7 +492,7 @@ describe("member sources and memory", () => {
 					list,
 					count: self.derive([list], ([l]) => l.items.length),
 					add: async ({ text }, ctx) => {
-						await list.change((draft) => void draft.items.push(text), ctx);
+						await list.change(draft => void draft.items.push(text), ctx);
 						return null;
 					},
 				};
@@ -529,7 +529,7 @@ describe('what a reference keeps (decision "References are the only indirection"
 		const Count = local("app.kept", { version: 1, params: {}, members: { n: int() } });
 		const Doc = defineState("kept", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 5 }) });
 		const selves: WeakRef<object>[] = [];
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Count, (_, self) => {
 				selves.push(new WeakRef(self));
 				const doc = self.state(Doc);
@@ -543,7 +543,7 @@ describe('what a reference keeps (decision "References are the only indirection"
 		const watch = await ref.n.watch(context);
 		const calls = changesOf(watch);
 		const objects = attempted.slice(from);
-		const documents = objects.map((object) => new WeakRef(object.deref()!.documents));
+		const documents = objects.map(object => new WeakRef(object.deref()!.documents));
 		// Removed: the reference waits with its last value and its failure; the instance ends.
 		await host.reload([], context);
 		await delivered();
@@ -604,7 +604,7 @@ describe("a reference keeps the last values of its attached instance's variant (
 			variants: { full: { state: { n: int() } } },
 		});
 		const owner = { kind: "owner" } as const;
-		const facet = defineFacet<typeof owner>((h) =>
+		const facet = defineFacet<typeof owner>(h =>
 			h.serve(Type, () => ({ variant: "full", members: { n: constant(7) } })),
 		);
 		const host = createHost<typeof owner>({ address: Server(), principal: owner, onError: () => {} });
@@ -623,7 +623,7 @@ describe("a failed object lets its ended instance go (final review)", () => {
 	it("collects the instance while a reference keeps its last value with an open watch (Astra, GC)", async () => {
 		const Type = local("app.failed-gc", { version: 1, params: {}, members: { n: int() } });
 		let self: Self | undefined;
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Type, (_, declared) => {
 				self = declared;
 				return { n: constant(7) };

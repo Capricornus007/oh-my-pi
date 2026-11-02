@@ -118,7 +118,7 @@ export function serveCodemodeRemote(
 				: Math.min(requestedMemory, maxMemory);
 	const data: VmStartData = { ...request.data, memoryLimitBytes };
 
-	return new Promise<void>((resolve) => {
+	return new Promise<void>(resolve => {
 		let channel: VmChannel | undefined;
 		let ended = false;
 		let buffered: CodemodeRemoteMessage[] = [];
@@ -180,10 +180,10 @@ export function serveCodemodeRemote(
 		Promise.resolve(
 			launch(data, {
 				message: onMessage,
-				failure: (error) => end({ type: "failure", error }),
+				failure: error => end({ type: "failure", error }),
 			}),
 		).then(
-			(started) => {
+			started => {
 				channel = started;
 				if (ended) {
 					void started.stop().catch(() => undefined);
@@ -202,15 +202,15 @@ function remoteLauncher(remote: () => CodemodeRemote, interruptBudget: number | 
 		let settled = false;
 		const waiting = new Map<number, (reply: CodemodeRemoteReply) => void>();
 
-		const exchange: CodemodeRemoteExchange = (messages) =>
-			new Promise<CodemodeRemoteReply>((resolve) => {
+		const exchange: CodemodeRemoteExchange = messages =>
+			new Promise<CodemodeRemoteReply>(resolve => {
 				if (stopped || !Array.isArray(messages)) {
 					resolve({ type: "stop" });
 					return;
 				}
 				// Register the waiter first: the host may answer a call synchronously, for example when the
 				// tool throws before returning a promise.
-				const call = messages.find((message) => isWorkerToHostMessage(message) && message.type === "call");
+				const call = messages.find(message => isWorkerToHostMessage(message) && message.type === "call");
 				if (call?.type === "call") waiting.set(call.id, resolve);
 				else resolve(null);
 				for (const message of messages) {
@@ -248,7 +248,7 @@ function remoteLauncher(remote: () => CodemodeRemote, interruptBudget: number | 
 			);
 
 		return {
-			post: (message) => {
+			post: message => {
 				const resolve = waiting.get(message.id);
 				if (!resolve) return;
 				waiting.delete(message.id);

@@ -11,7 +11,7 @@ const Info = local("app.info", { version: 1, params: {}, members: { n: int() } }
 describe("facets", () => {
 	it("declare only while their setup runs", async () => {
 		let later: FacetHost | undefined;
-		await loaded((host) => {
+		await loaded(host => {
 			later = host;
 		});
 		expect(() => later!.serve(Info, () => ({ n: constant(1) }))).toThrow(
@@ -41,7 +41,7 @@ describe("facets", () => {
 		await twice.host.close(context);
 		let later: FacetSelf | undefined;
 		const { host } = await loaded((host, self) => {
-			host.serve(Names, { compose: (table) => table.length });
+			host.serve(Names, { compose: table => table.length });
 			later = self;
 		});
 		expect(() => later!.contribute(Names, "late")).toThrow(

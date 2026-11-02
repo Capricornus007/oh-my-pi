@@ -77,7 +77,7 @@ const { add, fail, wait } = EDITOR.methods as { add: number; fail: number; wait:
 async function notesServer(child: TestPrincipal = { kind: "owner" }, role: "child" | "parent" = "child") {
 	let probe: NotesProbe | undefined;
 	const linked = await rawLinked(
-		(h) => {
+		h => {
 			probe = serveNotes(h);
 		},
 		{ child, role },
@@ -148,7 +148,7 @@ forEachCodec(() => {
 			await transported();
 			expect(peer.kinds()).toEqual(["hello"]);
 			await server.load(
-				[{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }],
+				[{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }],
 				context,
 			);
 			expect((await peer.next("bound")).holds[0]).toMatchObject({ hold: 0, variant: EDITOR.variant });
@@ -203,7 +203,7 @@ forEachCodec(() => {
 				hostAddress: () => Server(),
 				variants: { v: { state: { n: int() } } },
 			});
-			const { peer } = await rawLinked((h) =>
+			const { peer } = await rawLinked(h =>
 				h.serve(Slow, (_, _principal, self) => {
 					self.open(
 						() => new Promise(() => {}),
@@ -281,7 +281,7 @@ forEachCodec(() => {
 			const store = await server.get(Notes, { session: "S1" }, context);
 			if (store.variant === "editor") await store.add({ text: "a" }, counting);
 			await transported();
-			const states = peer.received.filter((message) => message.kind === "state");
+			const states = peer.received.filter(message => message.kind === "state");
 			expect(states).toHaveLength(1);
 			expect(states[0]).toMatchObject({ holds: [{ hold: 0 }, { hold: 1 }, { hold: 2 }] });
 			expect(counts()["chord.link.encodes"]).toBe(3);
@@ -334,7 +334,7 @@ forEachCodec(() => {
 
 		it("a new hold and the old one's release in one turn hand the object over without ending it (R18)", async () => {
 			const events: string[] = [];
-			const { peer } = await rawLinked((h) => serveKept(h, events));
+			const { peer } = await rawLinked(h => serveKept(h, events));
 			hold(peer, 0, Kept, { id: 1 });
 			await peer.next("bound");
 			hold(peer, 1, Kept, { id: 1 });
@@ -345,7 +345,7 @@ forEachCodec(() => {
 
 		it("a hold released right after it was sent keeps no object", async () => {
 			const events: string[] = [];
-			const { peer } = await rawLinked((h) => serveKept(h, events));
+			const { peer } = await rawLinked(h => serveKept(h, events));
 			hold(peer, 0, Kept, { id: 1 });
 			await Promise.resolve();
 			peer.send({ kind: "release", hold: 0 });
@@ -353,7 +353,7 @@ forEachCodec(() => {
 			// The object ended: a new hold makes a new one.
 			hold(peer, 1, Kept, { id: 1 });
 			await peer.next("bound");
-			expect(events.filter((event) => event.startsWith("factory"))).toEqual(["factory 1", "factory 1"]);
+			expect(events.filter(event => event.startsWith("factory"))).toEqual(["factory 1", "factory 1"]);
 		});
 
 		it("a hold released while it waits for load takes nothing once load resolves", async () => {
@@ -372,7 +372,7 @@ forEachCodec(() => {
 			peer.send({ kind: "release", hold: 0 });
 			await transported();
 			await server.load(
-				[{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => serveKept(h, events)) }],
+				[{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => serveKept(h, events)) }],
 				context,
 			);
 			await transported();
@@ -387,11 +387,11 @@ forEachCodec(() => {
 				variants: { v: { state: { n: int() } } },
 			});
 			const aborted: string[] = [];
-			const { peer } = await rawLinked((h) =>
+			const { peer } = await rawLinked(h =>
 				h.serve(Slow, ({ id }, _principal, self) => {
 					self.open(
-						(ctx) =>
-							new Promise((resolve) =>
+						ctx =>
+							new Promise(resolve =>
 								ctx.abortSignal?.addEventListener("abort", () => resolve(aborted.push(`${id}`))),
 							),
 						() => {},
@@ -416,12 +416,12 @@ forEachCodec(() => {
 			});
 			const events: string[] = [];
 			let finish: () => void = () => {};
-			const { peer } = await rawLinked((h) =>
+			const { peer } = await rawLinked(h =>
 				h.serve(Closing, ({ id }, _principal, self) => {
 					self.open(
 						async () => void events.push("open"),
 						() =>
-							new Promise<void>((resolve) => {
+							new Promise<void>(resolve => {
 								events.push("closing");
 								finish = () => {
 									events.push("closed");
@@ -451,8 +451,8 @@ forEachCodec(() => {
 			await adding;
 			await transported();
 			const snapshot = EDITOR.named(bound!.members) as { notes: unknown[] };
-			const states = peer.received.filter((message) => message.kind === "state");
-			const added = states.flatMap((message) => (EDITOR.named(message.holds[0]!.members).notes ?? []) as unknown[]);
+			const states = peer.received.filter(message => message.kind === "state");
+			const added = states.flatMap(message => (EDITOR.named(message.holds[0]!.members).notes ?? []) as unknown[]);
 			expect(snapshot.notes.length + added.length).toBe(1);
 		});
 
@@ -467,7 +467,7 @@ forEachCodec(() => {
 			// Called inside the batch, from a derive the hold follows.
 			let during: () => void = () => {};
 			const ends: string[] = [];
-			const { server, errors } = await rawLinked((h) =>
+			const { server, errors } = await rawLinked(h =>
 				h.serve(Counter, ({ id }, _principal, self) => {
 					const n = self.state(N);
 					self.open(
@@ -482,8 +482,8 @@ forEachCodec(() => {
 								if (n > 0) during();
 								return n;
 							}),
-							bump: async (ctx) => {
-								await n.change((draft) => void draft.n++, ctx);
+							bump: async ctx => {
+								await n.change(draft => void draft.n++, ctx);
 								return null;
 							},
 						},
@@ -507,7 +507,7 @@ forEachCodec(() => {
 	describe("local types over a link", () => {
 		it("never cross one: a hold naming one is not served (failed { waiting })", async () => {
 			const Store = local("app.store", { version: 1, params: {}, members: { n: int() } });
-			const { peer } = await rawLinked((h) => h.serve(Store, () => ({ n: constant(1) })));
+			const { peer } = await rawLinked(h => h.serve(Store, () => ({ n: constant(1) })));
 			hold(peer, 0, Store, {});
 			expect(await peer.next("failed")).toMatchObject({
 				cause: { kind: "waiting", error: { kind: "chord", error: { code: "unavailable" } } },
@@ -540,7 +540,7 @@ function serveGrid(h: FacetHost<TestPrincipal>): void {
 				grid,
 				one: constant(1),
 				fill: async ({ n, value }, ctx) => {
-					await grid.change((draft) => {
+					await grid.change(draft => {
 						for (let cell = 0; cell < n; cell++) draft.cells[`c${cell}`] = value;
 					}, ctx);
 					return null;
@@ -558,7 +558,7 @@ async function slowConsumer(role: "child" | "parent" = "child") {
 		[
 			{
 				name: "@test/app",
-				facet: defineFacet<TestPrincipal>((h) => {
+				facet: defineFacet<TestPrincipal>(h => {
 					serveNotes(h);
 					serveGrid(h);
 				}),
@@ -577,12 +577,12 @@ async function slowConsumer(role: "child" | "parent" = "child") {
 
 /** The `state` messages received and not taken. */
 function statesOf(peer: RawPeer): Extract<Message, { kind: "state" }>[] {
-	return peer.received.filter((message) => message.kind === "state");
+	return peer.received.filter(message => message.kind === "state");
 }
 
 /** The `bound` and `state` messages received and not taken, by kind. */
 function windowed(peer: RawPeer): string[] {
-	return peer.kinds().filter((kind) => kind === "bound" || kind === "state");
+	return peer.kinds().filter(kind => kind === "bound" || kind === "state");
 }
 
 const GRID = wireNames(Grid, "v");
@@ -759,7 +759,7 @@ forEachCodec(() => {
 			call(peer, 1, 0, add, { text: "x" }, 2);
 			await addNote(server, "S1", "a");
 			await transported();
-			expect(peer.kinds().filter((kind) => kind === "result" || kind === "error")).toEqual([]);
+			expect(peer.kinds().filter(kind => kind === "result" || kind === "error")).toEqual([]);
 			expect(statesOf(peer).map(({ origin }) => origin)).toEqual([undefined]);
 		});
 
@@ -771,7 +771,7 @@ forEachCodec(() => {
 				variants: { v: {} },
 			});
 			const N = defineState("n", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 0 }) });
-			const { peer } = await rawLinked((h) => {
+			const { peer } = await rawLinked(h => {
 				h.serve(Empty, () => ({ variant: "v", members: {} }));
 				h.serve(Halves, (_, _principal, self) => {
 					const n = self.state(N);
@@ -784,7 +784,7 @@ forEachCodec(() => {
 								return n / 2;
 							}),
 							set: async (value, ctx) => {
-								await n.change((draft) => {
+								await n.change(draft => {
 									draft.n = value;
 								}, ctx);
 								return null;
@@ -800,7 +800,7 @@ forEachCodec(() => {
 			hold(peer, 1, Empty, {});
 			hold(peer, 2, Halves, {});
 			const bounds = [await peer.next("bound"), await peer.next("bound")];
-			const [empty, halves] = [1, 2].map((id) => bounds.find(({ holds }) => holds[0]!.hold === id)!);
+			const [empty, halves] = [1, 2].map(id => bounds.find(({ holds }) => holds[0]!.hold === id)!);
 			expect(empty.holds).toEqual([{ hold: 1, variant: 0, members: [], failed: [] }]);
 			expect(halves.holds).toEqual([
 				{
@@ -889,7 +889,7 @@ forEachCodec(() => {
 		 * peer is its child, or its parent (only a parent may send compressed arguments).
 		 */
 		async function limited(limits: PartLimits, compression?: Compression, role?: "child" | "parent") {
-			return rawLinked((h) => void serveNotes(h), { limits, compression, role });
+			return rawLinked(h => void serveNotes(h), { limits, compression, role });
 		}
 
 		/** Deflated JSON of `{ text }` with `length` characters. */

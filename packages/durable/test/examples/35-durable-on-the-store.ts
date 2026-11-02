@@ -34,13 +34,13 @@ const Chat = local("example.chat", {
 	members: { note: method(str()), say: method(str()) },
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Chat, (_, self) => {
 		// Its own table, under its type name ...
 		const notes = self.table(Notes);
 		// ... and Durable's records under the same owner name: claims per table and per document namespace.
 		const harness = self.open(
-			async (open) => {
+			async open => {
 				const opened = await Harness.open(
 					await StoreStorage.open(store, Chat.name, open),
 					{ models: createModels(), registry: createRegistry() },
@@ -53,7 +53,7 @@ const facet = defineFacet((host) => {
 		);
 		return {
 			note: async (text, ctx) => {
-				await self.tx(async (tx) => tx.put(notes, { id: `n${text.length}`, text }), ctx);
+				await self.tx(async tx => tx.put(notes, { id: `n${text.length}`, text }), ctx);
 				return null;
 			},
 			say: async (text, ctx) => {
@@ -69,7 +69,7 @@ const directory = await mkdtemp(join(tmpdir(), "chord-example-26-"));
 const path = join(directory, "session.sqlite");
 // 1. The worker's start code opens the store and gives it to its host.
 const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(path)), context);
-const host = createHost({ store, onError: (error) => console.log("onError", error.kind) });
+const host = createHost({ store, onError: error => console.log("onError", error.kind) });
 await host.load([{ name: "@example/core", facet }], context);
 const chat = await host.get(Chat, {}, context);
 
@@ -101,7 +101,7 @@ const storage = await StoreStorage.open(reopened, Chat.name, context);
 const page = await storage.scanEntries({ conversationId: ROOT_CONVERSATION_ID }, 10, undefined, context);
 console.log(
 	"Durable entries after reopen:",
-	page.items.map((entry) => entry.kind),
+	page.items.map(entry => entry.kind),
 );
 await storage.close(context);
 await reopened.close(context);

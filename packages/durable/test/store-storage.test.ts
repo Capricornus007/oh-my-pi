@@ -106,7 +106,7 @@ class ReopeningStorage implements Storage {
 	}
 }
 
-registerStorageConformance({ describe, expect, it }, "StoreStorage", async (use) => {
+registerStorageConformance({ describe, expect, it }, "StoreStorage", async use => {
 	const storage = await openStoreStorage(":memory:");
 	try {
 		await use(storage);
@@ -115,7 +115,7 @@ registerStorageConformance({ describe, expect, it }, "StoreStorage", async (use)
 	}
 });
 
-registerStorageConformance({ describe, expect, it }, "StoreStorage across reopen", async (use) => {
+registerStorageConformance({ describe, expect, it }, "StoreStorage across reopen", async use => {
 	const directory = await mkdtemp(join(tmpdir(), "pi-durable-store-conformance-"));
 	const path = join(directory, "store.sqlite");
 	const storage = new ReopeningStorage(await openStoreStorage(path), path);
@@ -270,13 +270,13 @@ describe("archives and batches of Durable data", () => {
 		const { rewindable, seqs } = await history(storage);
 		// Chord's own data in the same store: an object's persisted document.
 		const host = createHost({ store, onError: () => {} });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Memo, (_, self) => {
 				const memo = self.state(MemoDoc);
 				return {
 					memo,
-					set: async (ctx) => {
-						await memo.change((draft) => {
+					set: async ctx => {
+						await memo.change(draft => {
 							draft.m = 2;
 						}, ctx);
 						return null;
@@ -289,7 +289,7 @@ describe("archives and batches of Durable data", () => {
 		await host.close(context);
 		const parts = [];
 		for await (const part of store.export(context)) parts.push(part);
-		expect(parts.filter((part) => part.kind === "document.create").map(({ record }) => record.owner)).toContain(
+		expect(parts.filter(part => part.kind === "document.create").map(({ record }) => record.owner)).toContain(
 			"app.memo",
 		);
 		const copy = await importStore(sqliteBackend(await openNodeSqliteDatabase(":memory:")), parts, context);
@@ -360,7 +360,7 @@ describe("head markers (the entry_heads table)", () => {
 		expect(await heads(storage)).toEqual([marker, undefined]);
 		const parts = [];
 		for await (const part of store.export(context)) parts.push(part);
-		expect(parts.filter((part) => part.kind === "put" && part.table === "harness:entry_heads")).toEqual([
+		expect(parts.filter(part => part.kind === "put" && part.table === "harness:entry_heads")).toEqual([
 			expect.objectContaining({ row: { id: marker, conversation_id: ROOT_CONVERSATION_ID } }),
 		]);
 		const copy = await importStore(sqliteBackend(await openNodeSqliteDatabase(":memory:")), parts, context);
@@ -398,10 +398,10 @@ describe("commits (slice 6b §1.3, §2.5)", () => {
 		session.followCommits(() => {
 			running.push(store.batch!.running);
 		});
-		await session.commitWith((tx) => tx.createRootConversation(), context);
+		await session.commitWith(tx => tx.createRootConversation(), context);
 		await Promise.all([
-			session.commit((tx) => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "a" }), context),
-			session.commit((tx) => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "b" }), context),
+			session.commit(tx => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "a" }), context),
+			session.commit(tx => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "b" }), context),
 		]);
 		expect(running).toEqual([true, true, true]);
 		await session.close(context);
@@ -411,7 +411,7 @@ describe("commits (slice 6b §1.3, §2.5)", () => {
 
 	it("counts four statements for an entry append and for a delta, with a host attached", async () => {
 		const telemetry = new InMemoryTelemetryContext();
-		const span = await telemetry.startSpan({ name: "test" }, (each) => each);
+		const span = await telemetry.startSpan({ name: "test" }, each => each);
 		const metered = withTelemetry(span, context);
 		const counts = (): number =>
 			telemetry
@@ -460,10 +460,10 @@ describe("Durable's views as Chord sources on the store (slice 6b §3)", () => {
 		const store = await memoryStore();
 		const host = createHost({ store, onError: () => {} });
 		let computes = 0;
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Chat, (_, self) => {
 				const harness = self.open(
-					async (open) => {
+					async open => {
 						const opened = await Harness.open(
 							await StoreStorage.open(store, Chat.name, open),
 							{ models: createModels(), registry: createRegistry() },
@@ -496,10 +496,10 @@ describe("Durable's views as Chord sources on the store (slice 6b §3)", () => {
 		const chat = await host.get(Chat, {}, context);
 		const calls: unknown[] = [];
 		const watch = await chat.entries.watch(context);
-		watch.start(async (call) => void calls.push(call.kind === "value" ? call.value : call.kind));
+		watch.start(async call => void calls.push(call.kind === "value" ? call.value : call.kind));
 		const before = computes;
 		await chat.note({ kind: "test.note" }, context);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect(chat.entries.value).toBeGreaterThan(0);
 		expect(calls).toEqual([chat.entries.value]);
 		expect(computes - before).toBe(1);
@@ -523,10 +523,10 @@ describe("Durable's views as Chord sources on the store (slice 6b §3)", () => {
 				error: String(value),
 			};
 		};
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Live, (_, self) => {
 				const harness = self.open(
-					async (open) => {
+					async open => {
 						const opened = await Harness.open(
 							await StoreStorage.open(store, Live.name, open),
 							{ models: createModels(), registry: createRegistry() },
@@ -542,7 +542,7 @@ describe("Durable's views as Chord sources on the store (slice 6b §3)", () => {
 				);
 				return {
 					n: self.derive([live], ([value]) => Number(value.compactionFailure?.error ?? -1)),
-					bump: async (ctx) => {
+					bump: async ctx => {
 						const root = (await harness.value.conversation(ROOT_CONVERSATION_ID, ctx))!;
 						await root.commit(set(1), ctx, { persistence: { kind: "deferred", withinMs: 10_000 } });
 						await root.commit(set(2), ctx);
@@ -555,9 +555,9 @@ describe("Durable's views as Chord sources on the store (slice 6b §3)", () => {
 		const live = await host.get(Live, {}, context);
 		const seen: unknown[] = [];
 		const watch = await live.n.watch(context);
-		watch.start(async (call) => void seen.push(call.kind === "value" ? call.value : call.kind));
+		watch.start(async call => void seen.push(call.kind === "value" ? call.value : call.kind));
 		await live.bump(context);
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(live.n.value).toBe(2);
 		expect(seen.at(-1)).toBe(2);
 		await host.close(context);
@@ -602,7 +602,7 @@ describe("GC", () => {
 		};
 		const ref = await opened();
 		for (let round = 0; round < 10 && ref.deref() !== undefined; round++) {
-			await new Promise((resolve) => setImmediate(resolve));
+			await new Promise(resolve => setImmediate(resolve));
 			gc();
 		}
 		expect(ref.deref()).toBeUndefined();

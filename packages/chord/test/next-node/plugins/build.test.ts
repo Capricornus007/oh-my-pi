@@ -25,7 +25,7 @@ const BROWSER: BuildOptions = {
 /** The plugins under `root`, and the one named `name`. */
 async function discovered(root: string, name: string): Promise<{ plugins: readonly Plugin[]; plugin: Plugin }> {
 	const { plugins } = await discoverPlugins([root], { kinds: KINDS }, context);
-	return { plugins, plugin: plugins.find((each) => each.name === name)! };
+	return { plugins, plugin: plugins.find(each => each.name === name)! };
 }
 
 /** `built`'s script, failing the test with its errors when it failed. */
@@ -87,7 +87,7 @@ describe("building a facet: the import table", () => {
 		const first = await tempRoot(["contracts", "notes"]);
 		const second = await tempRoot(["contracts", "notes"]);
 		const builds = await Promise.all(
-			[first, second].map(async (root) => {
+			[first, second].map(async root => {
 				const { plugins, plugin } = await discovered(root, "@test/notes");
 				return script(await buildFacet(plugin, "worker", { ...NODE, plugins }, context));
 			}),
@@ -261,10 +261,15 @@ describe("building a facet: the import table", () => {
 		});
 		const { plugins } = await discoverPlugins([first, second], { kinds: KINDS }, context);
 		const build = (name: string) =>
-			buildFacet(plugins.find((each) => each.name === name)!, "worker", { ...NODE, plugins }, context);
+			buildFacet(
+				plugins.find(each => each.name === name)!,
+				"worker",
+				{ ...NODE, plugins },
+				context,
+			);
 		const user = await build("@test/user");
 		if (user.kind === "failed") throw new Error(user.errors.join("\n"));
-		expect(user.copied.map((file) => file.slice(second.length + 1)).sort()).toEqual([
+		expect(user.copied.map(file => file.slice(second.length + 1)).sort()).toEqual([
 			"elsewhere/contract.ts",
 			"elsewhere/other.ts",
 		]);

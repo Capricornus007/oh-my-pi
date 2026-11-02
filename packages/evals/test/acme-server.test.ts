@@ -26,7 +26,7 @@ type Fixture = {
 const fixtures: Fixture[] = [
 	{
 		mode: "openai",
-		url: (server) => `${server.baseUrl()}/chat/completions`,
+		url: server => `${server.baseUrl()}/chat/completions`,
 		headers: { authorization: "Bearer resolved-acme-key" },
 		unauthorizedHeaders: { authorization: "Bearer wrong-key" },
 		model: OPENAI_MODEL_ID,
@@ -38,7 +38,7 @@ const fixtures: Fixture[] = [
 	},
 	{
 		mode: "stream",
-		url: (server) => `${server.origin()}/generate`,
+		url: server => `${server.origin()}/generate`,
 		headers: { "x-acme-key": "resolved-stream-key" },
 		unauthorizedHeaders: { "x-acme-key": "wrong-key" },
 		model: STREAM_MODEL_ID,
@@ -67,20 +67,20 @@ function streamedText(mode: Fixture["mode"], raw: string): string {
 		return raw
 			.split("\n")
 			.filter(Boolean)
-			.map((line) => JSON.parse(line) as { type?: string; text?: string })
-			.filter((event) => event.type === "text_delta")
-			.map((event) => event.text ?? "")
+			.map(line => JSON.parse(line) as { type?: string; text?: string })
+			.filter(event => event.type === "text_delta")
+			.map(event => event.text ?? "")
 			.join("");
 	}
 	return raw
 		.split("\n")
-		.filter((line) => line.startsWith("data: ") && line !== "data: [DONE]")
-		.map((line) => JSON.parse(line.slice("data: ".length)) as { choices?: Array<{ delta?: { content?: string } }> })
-		.map((chunk) => chunk.choices?.[0]?.delta?.content ?? "")
+		.filter(line => line.startsWith("data: ") && line !== "data: [DONE]")
+		.map(line => JSON.parse(line.slice("data: ".length)) as { choices?: Array<{ delta?: { content?: string } }> })
+		.map(chunk => chunk.choices?.[0]?.delta?.content ?? "")
 		.join("");
 }
 
-describe.each(fixtures)("$mode fixture", (fixture) => {
+describe.each(fixtures)("$mode fixture", fixture => {
 	const server = createAcmeServer(fixture.mode);
 
 	beforeAll(() => server.start());

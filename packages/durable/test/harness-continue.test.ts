@@ -77,20 +77,20 @@ const failure = (): AssistantMessage =>
 
 /** A response step that records the roles of the context it was asked with, then answers `text`. */
 function answering(text: string, seen: Message["role"][][]): FauxResponseStep {
-	return (request) => {
-		seen.push(request.messages.map((message) => message.role));
+	return request => {
+		seen.push(request.messages.map(message => message.role));
 		return fauxAssistantMessage([fauxText(text)]);
 	};
 }
 
 async function answerText(root: Conversation, settled: SettledSubmissionRecord): Promise<string | undefined> {
 	if (settled.status !== "done" || settled.type === "write") throw new Error(`Unexpected ${settled.status}`);
-	const answer = await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+	const answer = await root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 	return textOf(answer?.model?.[0]);
 }
 
 async function userEntries(root: Conversation): Promise<number> {
-	return (await allEntries(root)).filter((entry) => UserEntry.is(entry)).length;
+	return (await allEntries(root)).filter(entry => UserEntry.is(entry)).length;
 }
 
 describe("continue", () => {
@@ -161,7 +161,7 @@ describe("continue", () => {
 		await root.configure({ instructions: "Be brief." }, context);
 		const second = await root.submit({ type: "input", content: "two" }, context);
 		expect(await second.wait(context)).toMatchObject({ status: "unanswered", reason: "model_error" });
-		const roles = (await root.context(context)).messages.map((message) => message.role);
+		const roles = (await root.context(context)).messages.map(message => message.role);
 		expect(roles.at(-1)).toBe("system");
 		const settled = await (await root.submit({ type: "continue" }, context)).wait(context);
 		expect(await answerText(root, settled)).toBe("resumed");
@@ -241,7 +241,7 @@ describe("continue", () => {
 			async () =>
 				(await opened.harness.snapshot(LiveDoc, opened.root.id, context))?.generation?.message !== undefined,
 		);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		opened.kill();
 
 		const setup = chatSetup();
@@ -281,7 +281,7 @@ describe("continue", () => {
 		const settled = await (await root.submit({ type: "continue" }, context)).wait(context);
 		expect(settled).toMatchObject({ status: "unanswered", reason: "nothing_to_answer" });
 		expect((await harness.snapshot(InboxDoc, root.id, context))?.items ?? []).toEqual([]);
-		expect((await root.context(context)).messages.filter((message) => message.role !== "system")).toEqual([]);
+		expect((await root.context(context)).messages.filter(message => message.role !== "system")).toEqual([]);
 		expect(setup.faux.state.callCount).toBe(1);
 		await harness.close(context);
 	});
@@ -315,15 +315,15 @@ describe("continue", () => {
 				description: "Delegates",
 				parameters: obj({}),
 				execute: async (_args, api, callContext) => {
-					const child = await api.commit(async (tx) => {
+					const child = await api.commit(async tx => {
 						const created = await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } });
 						await configure(tx, created.id, { model: { provider: "faux", modelId: "faux-1" } });
 						return created.id;
 					}, callContext);
 					const handle = (await api.conversation(child, callContext))!;
-					const first = await (await handle.submit({ type: "input", content: "work" }, callContext)).wait(
-						callContext,
-					);
+					const first = await (
+						await handle.submit({ type: "input", content: "work" }, callContext)
+					).wait(callContext);
 					outcome.first = first.status;
 					const resumed = await handle.submit({ type: "continue" }, callContext);
 					await busy.promise;
@@ -364,25 +364,23 @@ describe("continue", () => {
 		);
 		const root = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const id = await telemetry.startSpan({ name: "caller" }, async (caller) => {
+		const id = await telemetry.startSpan({ name: "caller" }, async caller => {
 			const callContext = withTelemetry(caller, context);
 			const resumed = await root.submit({ type: "continue" }, callContext);
 			await resumed.wait(callContext);
 			return resumed.id;
 		});
 		await harness.waitForIdle(context);
-		await waitFor(() => telemetry.getSpans().every((span) => span.settled));
+		await waitFor(() => telemetry.getSpans().every(span => span.settled));
 		const spans = telemetry.getSpans();
-		const caller = spans.find((span) => span.name === "caller")!;
-		const submit = spans.find(
-			(span) => span.name === "pi.durable.submit" && span.attributes["submission.id"] === id,
-		)!;
+		const caller = spans.find(span => span.name === "caller")!;
+		const submit = spans.find(span => span.name === "pi.durable.submit" && span.attributes["submission.id"] === id)!;
 		expect(submit).toMatchObject({ parentId: null, attributes: { result: "placed" } });
 		expect(submit.links).toEqual([{ context: caller.context, attributes: {} }]);
 		expect((await (await harness.submission(id, context))!.status(context)).trace).toEqual(submit.context);
 		expect(
 			spans.some(
-				(span) =>
+				span =>
 					span.name === "pi.durable.phase" &&
 					span.attributes.phase === "prepare" &&
 					JSON.stringify(span.parentContext) === JSON.stringify(submit.context),

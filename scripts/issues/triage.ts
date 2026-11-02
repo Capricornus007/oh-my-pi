@@ -82,9 +82,9 @@ async function mutate(tx: Tx, number: number, change: (issue: IssueState) => voi
 
 export function loadCategories(dir: string): Category[] {
 	return readdirSync(dir)
-		.filter((file) => file.endsWith(".md"))
+		.filter(file => file.endsWith(".md"))
 		.sort()
-		.map((file) => {
+		.map(file => {
 			const text = readFileSync(join(dir, file), "utf8");
 			const owner = /^owner:[ \t]*(.*)$/m.exec(text)?.[1]?.trim() ?? "";
 			return { name: file.slice(0, -3), owner, text: text.replace(/^---[\s\S]*?---\n/, "").trim() };
@@ -128,11 +128,11 @@ export class Triage {
 				models,
 				registry,
 				settings: { retry: { maxRetries: 3 }, toolExecution: "parallel" },
-				onReport: (error) => console.error("durable:", error),
+				onReport: error => console.error("durable:", error),
 			},
 			context,
 		);
-		await this.harness.commit(async (tx) => {
+		await this.harness.commit(async tx => {
 			const state = await tx.doc(StateDoc);
 			if (!state.inboxSince) {
 				state.inboxSince = new Date(Date.now() - this.options.inboxDays * 86_400_000).toISOString();
@@ -173,7 +173,7 @@ export class Triage {
 	}
 
 	async retriage(number: number): Promise<void> {
-		await this.update(number, (issue) => {
+		await this.update(number, issue => {
 			issue.status = "queued";
 			issue.attempt += 1;
 			issue.conversationId = 0;
@@ -184,7 +184,7 @@ export class Triage {
 
 	/** `undefined` keeps a field, `null` clears it. A category equal to the agent's counts as no override. */
 	async decide(number: number, change: { priority?: Priority | null; category?: string | null }): Promise<void> {
-		await this.update(number, (issue) => {
+		await this.update(number, issue => {
 			const priority = change.priority === undefined ? (issue.decision?.priority ?? null) : change.priority;
 			let category = change.category === undefined ? (issue.decision?.category ?? "") : (change.category ?? "");
 			if (category === issue.result?.category) category = "";
@@ -209,7 +209,7 @@ export class Triage {
 			this.run(number)
 				.catch((error: unknown) => {
 					console.error(`#${number}:`, error);
-					return this.update(number, (issue) => {
+					return this.update(number, issue => {
 						issue.status = "failed";
 						issue.error = error instanceof Error ? error.message : String(error);
 					});
@@ -222,7 +222,7 @@ export class Triage {
 	}
 
 	private async update(number: number, change: (issue: IssueState) => void): Promise<void> {
-		await this.harness.commit((tx) => mutate(tx, number, change), context);
+		await this.harness.commit(tx => mutate(tx, number, change), context);
 	}
 
 	private async run(number: number): Promise<void> {
@@ -241,11 +241,11 @@ export class Triage {
 				context,
 			);
 			this.conversations.set(conversation.id, number);
-			await this.update(number, (state) => {
+			await this.update(number, state => {
 				state.conversationId = conversation!.id;
 			});
 		}
-		await this.update(number, (state) => {
+		await this.update(number, state => {
 			state.status = "running";
 		});
 		const attempt = existing?.attempt ?? 0;
@@ -257,7 +257,7 @@ export class Triage {
 		const after = (await this.state()).issues[number];
 		if (after?.status === "done") return;
 		const detail = settled.status === "unanswered" ? `${settled.reason ?? ""} ${settled.detail ?? ""}` : "";
-		await this.update(number, (state) => {
+		await this.update(number, state => {
 			state.status = "failed";
 			state.error = `no triage submitted ${detail}`.trim();
 		});
@@ -268,7 +268,7 @@ export class Triage {
 		return [
 			`Issue #${issue.number}: ${issue.title}`,
 			`Author: @${issue.author} (${issue.association.toLowerCase()}, ${stats.prior} earlier issues, ${stats.actedOn} of them acted on by maintainers)`,
-			`Template: ${issue.labels.filter((label) => TEMPLATE_LABELS.includes(label)).join(", ") || "none"}. Created ${issue.createdAt}.`,
+			`Template: ${issue.labels.filter(label => TEMPLATE_LABELS.includes(label)).join(", ") || "none"}. Created ${issue.createdAt}.`,
 			"",
 			"<issue_body>",
 			issue.body.trim() || "(empty)",
@@ -278,7 +278,7 @@ export class Triage {
 
 	private extension() {
 		const corpus = this.options.corpus;
-		const names = this.categories.map((category) => category.name);
+		const names = this.categories.map(category => category.name);
 		const issueFor = (conversationId: number) => this.conversations.get(conversationId) ?? -1;
 		const line = (issue: Issue) =>
 			`#${issue.number} [${issueStatus(issue)}] ${issue.title} (${issue.createdAt.slice(0, 10)})\n    ${issue.body.replace(/\s+/g, " ").slice(0, 200)}`;
@@ -300,7 +300,7 @@ export class Triage {
 			description: "Read one issue in full: status, labels, and body.",
 			parameters: Type.Object({ number: Type.Number() }),
 			replay: "safe",
-			execute: async (args) => {
+			execute: async args => {
 				const issue = corpus.get(args.number);
 				if (!issue) return { output: [{ type: "text", text: `#${args.number} is not in the local corpus.` }] };
 				const text = `#${issue.number} [${issueStatus(issue)}] ${issue.title}\nLabels: ${issue.labels.join(", ") || "none"}. Created ${issue.createdAt}.\n\n${issue.body.slice(0, 8000)}`;
@@ -333,11 +333,11 @@ export class Triage {
 				if (number < 0) return { output: [{ type: "text", text: "Unknown conversation." }], isError: true };
 				const result: TriageResult = {
 					...args,
-					duplicates: args.duplicates.filter((dup) => dup.number !== number).slice(0, 5),
+					duplicates: args.duplicates.filter(dup => dup.number !== number).slice(0, 5),
 				};
 				await api.commit(
-					(tx) =>
-						mutate(tx, number, (state) => {
+					tx =>
+						mutate(tx, number, state => {
 							state.result = result;
 							state.status = "done";
 							state.error = "";
@@ -350,7 +350,7 @@ export class Triage {
 		});
 
 		const prompt = readFileSync(join(this.options.scriptDir, "prompt.md"), "utf8");
-		const categories = this.categories.map((category) => category.text).join("\n\n");
+		const categories = this.categories.map(category => category.text).join("\n\n");
 		return defineExtension({
 			name: "triage",
 			sections: [section("preamble", () => prompt, { tag: false }), section("categories", () => categories)],

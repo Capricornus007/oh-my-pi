@@ -132,7 +132,7 @@ export class OwnerTable {
 		const found = this.definition.column(column, "reader");
 		if (found.type !== "json") throw new Error(`${this.definition.name}: column "${column}" is no json(...) column`);
 		// At version 1 a cell is the JSON it was written as: no version to compare, nothing to migrate.
-		if (found.json.version === 1) return (text) => JSON.parse(text) as unknown;
+		if (found.json.version === 1) return text => JSON.parse(text) as unknown;
 		const what = `${this.sql.table}.${column}`;
 		return (text, version, context) => found.json.read(text, version, what, context);
 	}
@@ -147,6 +147,6 @@ export class OwnerTable {
 	): Promise<DecodedRow[]> {
 		const statement = this.sql.select(where, order, undefined, limit);
 		const stored = await executor.all<{ [column: string]: SqliteValue }>(statement.sql, ...statement.params);
-		return stored.map((row) => this.definition.rows.decode(row, context));
+		return stored.map(row => this.definition.rows.decode(row, context));
 	}
 }

@@ -56,7 +56,7 @@ function switchFacets(log: string[]) {
 		});
 	const v1: Facet = {
 		name: "switch",
-		setup: (api) =>
+		setup: api =>
 			api.serve(
 				SwitchV1,
 				(_input, _principal, self) => {
@@ -75,7 +75,7 @@ function switchFacets(log: string[]) {
 	};
 	const v2 = (valid: boolean): Facet => ({
 		name: "switch",
-		setup: (api) =>
+		setup: api =>
 			api.serve(
 				SwitchV2,
 				(_input, _principal, self) => {
@@ -96,7 +96,7 @@ function switchFacets(log: string[]) {
 					return {
 						enabled: enabledState,
 						set: ({ conversation, enabled }, ctx) => {
-							enabledState.change(ctx, (draft) => {
+							enabledState.change(ctx, draft => {
 								draft[conversation] = enabled;
 							});
 						},
@@ -107,7 +107,7 @@ function switchFacets(log: string[]) {
 	});
 	const v3: Facet = {
 		name: "switch",
-		setup: (api) =>
+		setup: api =>
 			api.serve(
 				SwitchV3,
 				(_input, _principal, self) => {
@@ -117,7 +117,7 @@ function switchFacets(log: string[]) {
 					return {
 						enabled: enabledState,
 						update: ({ conversation, enabled }, ctx) => {
-							enabledState.change(ctx, (draft) => {
+							enabledState.change(ctx, draft => {
 								draft[conversation] = enabled;
 							});
 						},
@@ -131,7 +131,7 @@ function switchFacets(log: string[]) {
 
 test("the host's reference to a host object follows contract bumps at commit without reopening its object or resources; failures retain the old reference", async () => {
 	const errors: unknown[] = [];
-	const host = new HostImpl({ self: { kind: "host" }, dev: true, onError: (error) => errors.push(error) });
+	const host = new HostImpl({ self: { kind: "host" }, dev: true, onError: error => errors.push(error) });
 	onTestFinished(() => host.close());
 	const log: string[] = [];
 	const facets = switchFacets(log);
@@ -142,7 +142,7 @@ test("the host's reference to a host object follows contract bumps at commit wit
 	await original.set(true);
 	original.release();
 	const codeVersion = host.codeVersion;
-	await assert.rejects(host.reload([facets.v2(false)]), (error) => isChordError(error, "invalid"));
+	await assert.rejects(host.reload([facets.v2(false)]), error => isChordError(error, "invalid"));
 	assert.equal(host.codeVersion, codeVersion);
 	assert.equal(host.hostObjects.get(SwitchV1.name), initial);
 	assert.equal(initial.status, "live");
@@ -182,11 +182,11 @@ const ReadV2 = local("t.eager-read", {
 });
 const readerV1: Facet = {
 	name: "read",
-	setup: (api) => api.serve(ReadV1, () => ({ read: () => "one" }), { lifetime: "host" }),
+	setup: api => api.serve(ReadV1, () => ({ read: () => "one" }), { lifetime: "host" }),
 };
 const readerV2 = (adapt = false): Facet => ({
 	name: "read",
-	setup: (api) =>
+	setup: api =>
 		api.serve(ReadV2, () => ({ fetch: () => "two" }), {
 			lifetime: "host",
 			...(adapt ? { accepts: { 1: (current: Record<string, unknown>) => ({ read: current.fetch }) } } : {}),
@@ -196,7 +196,7 @@ const readerV2 = (adapt = false): Facet => ({
 test("external old-version consumers still refuse a host object's upgrade without accepts, and keep their adapter when it is provided", async () => {
 	const host = new HostImpl({
 		self: { kind: "host" },
-		onError: (error) => {
+		onError: error => {
 			throw error;
 		},
 	});
@@ -205,7 +205,7 @@ test("external old-version consumers still refuse a host object's upgrade withou
 	const own = host.hostObjects.get(ReadV1.name)!;
 	const consumer = host.hold(ReadV1, {});
 	assert.equal(await consumer.read(), "one");
-	await assert.rejects(host.reload([readerV2()]), (error) => isChordError(error, "contract_mismatch"));
+	await assert.rejects(host.reload([readerV2()]), error => isChordError(error, "contract_mismatch"));
 	assert.equal(host.hostObjects.get(ReadV1.name), own);
 	assert.equal(await consumer.read(), "one");
 	await host.reload([readerV2(true)]);
@@ -225,24 +225,24 @@ test("object-owned old-version references still block a host object's upgrade un
 	});
 	const oldConsumer: Facet = {
 		name: "consumer",
-		setup: (api) =>
+		setup: api =>
 			api.serve(Consumer, (_input, _principal, self) => {
 				const reader = self.get(ReadV1, {});
-				return { read: (ctx) => reader.read(ctx) };
+				return { read: ctx => reader.read(ctx) };
 			}),
 	};
 	const newConsumer: Facet = {
 		name: "consumer",
-		setup: (api) =>
+		setup: api =>
 			api.serve(Consumer, (_input, _principal, self) => {
 				const reader = self.get(ReadV2, {});
-				return { read: (ctx) => reader.fetch(ctx) };
+				return { read: ctx => reader.fetch(ctx) };
 			}),
 	};
 	await host.load([readerV1, oldConsumer]);
 	const consumer = host.hold(Consumer, {});
 	assert.equal(await consumer.read(), "one");
-	await assert.rejects(host.reload([readerV2()]), (error) => isChordError(error, "contract_mismatch"));
+	await assert.rejects(host.reload([readerV2()]), error => isChordError(error, "contract_mismatch"));
 	assert.equal(await consumer.read(), "one");
 	await host.reload([readerV2(), newConsumer]);
 	assert.equal(await consumer.read(), "two");
@@ -262,10 +262,10 @@ test("a forgotten contract bump remains refused even when the only consumer is t
 		host.reload([
 			{
 				name: "read",
-				setup: (api) => api.serve(incompatible, () => ({ fetch: () => "bad" }), { lifetime: "host" }),
+				setup: api => api.serve(incompatible, () => ({ fetch: () => "bad" }), { lifetime: "host" }),
 			},
 		]),
-		(error) => isChordError(error, "contract_mismatch") && /without a version bump/.test(error.message),
+		error => isChordError(error, "contract_mismatch") && /without a version bump/.test(error.message),
 	);
 	assert.equal(host.hostObjects.get(ReadV1.name)?.contract, ReadV1);
 });
@@ -290,17 +290,17 @@ test("a cluster contract upgrade retokens the server's and worker's references t
 	const [down, up] = memoryLinkPair();
 	server.accept(down, { kind: "host", name: "worker", principal: { worker: true } });
 	worker.connect(up, { principal: { kind: "server" } });
-	await new Promise((resolve) => setImmediate(resolve));
+	await new Promise(resolve => setImmediate(resolve));
 	const serverOwn = server.hostObjects.get(SwitchV1.name);
 	const workerOwn = worker.hostObjects.get(SwitchV1.name);
-	await assert.rejects(server.reload([facets.v2(true)], { remote: { worker: ["switch"] } }), (error) =>
+	await assert.rejects(server.reload([facets.v2(true)], { remote: { worker: ["switch"] } }), error =>
 		isChordError(error, "invalid"),
 	);
 	assert.equal(server.hostObjects.get(SwitchV1.name), serverOwn);
 	assert.equal(worker.hostObjects.get(SwitchV1.name), workerOwn);
 	valid = true;
 	await server.reload([facets.v2(true)], { remote: { worker: ["switch"] } });
-	await new Promise((resolve) => setImmediate(resolve));
+	await new Promise(resolve => setImmediate(resolve));
 	assert.equal(server.hostObjects.get(SwitchV2.name)?.contract, SwitchV2);
 	assert.equal(worker.hostObjects.get(SwitchV2.name)?.contract, SwitchV2);
 	assert.deepEqual(server.registry(Read).get("current")!(), { 1: false });
@@ -315,7 +315,7 @@ test("a reload that changes a type's lifetime creates its host object, or lets i
 	const log: string[] = [];
 	const facet = (lifetime: "host" | "referenced"): Facet => ({
 		name: "kept",
-		setup: (api) =>
+		setup: api =>
 			api.serve(
 				Kept,
 				(_input, _principal, self) => {
@@ -338,7 +338,7 @@ test("a reload that changes a type's lifetime creates its host object, or lets i
 		await host.ready();
 		assert.deepEqual(log, ["open host"], "created by the reload that made it a host object");
 		await host.reload([facet("referenced")]);
-		for (let i = 0; i < 50 && log.length < 2; i++) await new Promise((resolve) => setTimeout(resolve, 5));
+		for (let i = 0; i < 50 && log.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 5));
 		assert.deepEqual(log, ["open host", "close"], "nobody else references it: disposed");
 	} finally {
 		await host.close();

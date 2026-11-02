@@ -68,7 +68,7 @@ describe("hostAddress", () => {
 		});
 		expect(onSession.fingerprint).toBe(onServer.fingerprint);
 		expect(contractData(onSession).hostAddress).toBe(hostAddress);
-		const next = evolve(onSession, (v) => v.addState("v", "m", int()));
+		const next = evolve(onSession, v => v.addState("v", "m", int()));
 		expect(contractData(next).hostAddress).toBe(hostAddress);
 	});
 

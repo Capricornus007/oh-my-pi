@@ -79,6 +79,7 @@ export const TAB_GROUPS: Record<SettingTab, readonly string[]> = {
 		"Agent",
 		"Git",
 		"Skills",
+		"Sessions",
 	],
 	context: ["General", "Compaction", "Rules (TTSR)", "Experimental"],
 	memory: ["General", "Auto-Learn", "Mnemopi", "Hindsight", "Sharpshooter"],
@@ -98,7 +99,7 @@ export const TAB_GROUPS: Record<SettingTab, readonly string[]> = {
 		"Developer",
 	],
 	tasks: ["Modes", "Subagents", "Isolation", "Commands & Skills"],
-	providers: ["Services", "Fireworks", "Tiny Model", "Protocol", "Timeouts", "Privacy"],
+	providers: ["Services", "Fireworks", "Tiny Model", "Protocol", "Timeouts", "Privacy", "Identity"],
 };
 
 /** Submenu choice metadata. */

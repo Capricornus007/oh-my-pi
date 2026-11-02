@@ -24,7 +24,7 @@ const echo = defineTool({
 	name: "echo",
 	description: "echo",
 	parameters: obj({ i: num() }),
-	execute: async (args) => ({ output: [{ type: "text", text: String(args.i) }] }),
+	execute: async args => ({ output: [{ type: "text", text: String(args.i) }] }),
 });
 
 const plain = defineTool({

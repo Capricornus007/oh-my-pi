@@ -72,11 +72,11 @@ async function run(
 }
 
 function results(entries: readonly EntryRecord[]): ToolResultMessage[] {
-	return entries.filter((entry) => ToolResultEntry.is(entry)).map((entry) => entry.model![0] as ToolResultMessage);
+	return entries.filter(entry => ToolResultEntry.is(entry)).map(entry => entry.model![0] as ToolResultMessage);
 }
 
 function resultText(message: ToolResultMessage): string {
-	return message.content.map((item) => (item.type === "text" ? item.text : `[${item.type}]`)).join("|");
+	return message.content.map(item => (item.type === "text" ? item.text : `[${item.type}]`)).join("|");
 }
 
 describe("tool round", () => {
@@ -84,13 +84,13 @@ describe("tool round", () => {
 		const setup = chatSetup();
 		addTool(
 			setup.registry,
-			tool("echo", async (args) => ({
+			tool("echo", async args => ({
 				output: [{ type: "text", text: `echo ${args.text}` }],
 			})),
 		);
 		const { harness, root, entries, status } = await run(setup, [calls(["echo", { text: "hi" }, "c1"]), DONE]);
 		expect(status).toBe("done");
-		expect(entries.map((entry) => entry.kind)).toEqual([
+		expect(entries.map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.system",
 			"pi.assistant",
@@ -153,13 +153,13 @@ describe("tool round", () => {
 		expect(ghost).toMatchObject({ toolCallId: "c1", isError: true });
 		expect(resultText(ghost!)).toBe("<harness>\n[error] Tool ghost is not available\n</harness>");
 		expect(echo).toMatchObject({ toolCallId: "c2", isError: false });
-		const ghostEntry = entries.find((entry) => ToolResultEntry.is(entry) && entry.model![0]!.role === "toolResult");
+		const ghostEntry = entries.find(entry => ToolResultEntry.is(entry) && entry.model![0]!.role === "toolResult");
 		expect(ghostEntry?.data).toEqual({
 			diagnostics: [{ severity: "error", code: "tool_unavailable", message: "Tool ghost is not available" }],
 		});
 		// #11043: the unoffered call has its own task, so `afterTool` and `control` apply to it as to any call.
-		const tasks = await harness.commit((tx) => tx.scanTasks({ conversationId: root.id }, 20), context);
-		const inputs = tasks.items.filter((task) => task.kind === "pi.tool").map((task) => task.input);
+		const tasks = await harness.commit(tx => tx.scanTasks({ conversationId: root.id }, 20), context);
+		const inputs = tasks.items.filter(task => task.kind === "pi.tool").map(task => task.input);
 		expect(inputs).toHaveLength(2);
 		expect(inputs).toContainEqual(expect.objectContaining({ callId: "c1", unoffered: true }));
 		expect(inputs).toContainEqual(expect.not.objectContaining({ unoffered: true }));
@@ -209,7 +209,7 @@ describe("tool round", () => {
 		expect(seen).toEqual([]);
 		expect(resultText(results(result.entries)[0]!)).toBe("<harness>\n[error] Tool echo is not available\n</harness>");
 		// The next preparation removes it.
-		const systems = result.entries.filter((entry) => entry.kind === "pi.system");
+		const systems = result.entries.filter(entry => entry.kind === "pi.system");
 		expect((systems.at(-1)!.model![0] as SystemMessage).toolsRemoved).toEqual([{ name: "echo" }]);
 		await result.harness.close(context);
 	});
@@ -224,7 +224,7 @@ describe("tool round", () => {
 		const second = await (await first.root.submit({ type: "input", content: "again" }, context)).wait(context);
 		expect(second.status).toBe("done");
 		let entries = await allEntries(first.root);
-		const removal = entries.filter((entry) => entry.kind === "pi.system").at(-1)!.model![0] as SystemMessage;
+		const removal = entries.filter(entry => entry.kind === "pi.system").at(-1)!.model![0] as SystemMessage;
 		expect(removal.toolsRemoved).toEqual([{ name: "echo" }]);
 		expect(results(entries)[0]).toMatchObject({ isError: true });
 		// The stored agent is not rewritten; the tool is only not resolved.
@@ -234,8 +234,8 @@ describe("tool round", () => {
 		setup.faux.setResponses([DONE]);
 		await (await first.root.submit({ type: "input", content: "back" }, context)).wait(context);
 		entries = await allEntries(first.root);
-		const addition = entries.filter((entry) => entry.kind === "pi.system").at(-1)!.model![0] as SystemMessage;
-		expect(addition.toolsAdded?.map((declared) => declared.name)).toEqual(["echo"]);
+		const addition = entries.filter(entry => entry.kind === "pi.system").at(-1)!.model![0] as SystemMessage;
+		expect(addition.toolsAdded?.map(declared => declared.name)).toEqual(["echo"]);
 		await first.harness.close(context);
 	});
 
@@ -272,7 +272,7 @@ describe("tool round", () => {
 				events.push(`start ${name}`);
 				// Changed after the round started: not seen by this round.
 				setup.settings.toolExecution = "parallel";
-				await new Promise((resolve) => setTimeout(resolve, 20));
+				await new Promise(resolve => setTimeout(resolve, 20));
 				events.push(`end ${name}`);
 				return { output: [] };
 			};
@@ -295,7 +295,7 @@ describe("tool round", () => {
 				(name: string): Execute =>
 				async () => {
 					events.push(`start ${name}`);
-					await new Promise((resolve) => setTimeout(resolve, 20));
+					await new Promise(resolve => setTimeout(resolve, 20));
 					events.push(`end ${name}`);
 					return { output: [] };
 				};
@@ -319,7 +319,7 @@ describe("tool round", () => {
 			tool(
 				"a",
 				async () => {
-					await new Promise((resolve) => setTimeout(resolve, 20));
+					await new Promise(resolve => setTimeout(resolve, 20));
 					events.push("a");
 					return { output: [] };
 				},
@@ -334,11 +334,11 @@ describe("tool round", () => {
 			}),
 		);
 		const result = await run(perTool, [calls(["a", {}, "c1"], ["b", {}, "c2"]), DONE]);
-		const tasks = await result.harness.commit((tx) => tx.scanTasks({ conversationId: result.root.id }, 20), context);
-		const tools = tasks.items.filter((task) => task.kind === "pi.tool").sort((a, b) => a.id - b.id);
+		const tasks = await result.harness.commit(tx => tx.scanTasks({ conversationId: result.root.id }, 20), context);
+		const tools = tasks.items.filter(task => task.kind === "pi.tool").sort((a, b) => a.id - b.id);
 		// The generation owns both tools and creates the second only after the first ended.
-		const [generation] = tasks.items.filter((task) => task.kind === "pi.generation");
-		expect(tools.map((task) => task.owner)).toEqual([generation!.id, generation!.id]);
+		const [generation] = tasks.items.filter(task => task.kind === "pi.generation");
+		expect(tools.map(task => task.owner)).toEqual([generation!.id, generation!.id]);
 		expect(events).toEqual(["a", "b"]);
 		await result.harness.close(context);
 	});
@@ -368,8 +368,8 @@ describe("tool results", () => {
 		expect(resultText(result!)).toBe(
 			"line 1\nline 2\n|<harness>\n[info] from api\n[warn] from result\n[warn] Output truncated to its beginning: 1 lines, 7 bytes dropped\n</harness>",
 		);
-		const entry = entries.find((candidate) => ToolResultEntry.is(candidate));
-		expect(ToolResultEntry.is(entry) && entry.data.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		const entry = entries.find(candidate => ToolResultEntry.is(candidate));
+		expect(ToolResultEntry.is(entry) && entry.data.diagnostics.map(diagnostic => diagnostic.code)).toEqual([
 			undefined,
 			undefined,
 			"truncated",
@@ -413,7 +413,7 @@ describe("tool results", () => {
 		});
 		expect(windows).toContainEqual(undefined);
 		// 8 bytes written, 8 skipped, then "x\n" dropped by the window: 3 lines, 18 bytes in all.
-		expect(resultText(results(entries).find((result) => result.toolCallId === "c1")!)).toBe(
+		expect(resultText(results(entries).find(result => result.toolCallId === "c1")!)).toBe(
 			"y\n|<harness>\n[warn] Output truncated to its end: 3 lines, 18 bytes dropped\n</harness>",
 		);
 		await harness.close(context);
@@ -459,7 +459,7 @@ describe("tool results", () => {
 	// #10549
 	it("records how long execute() took, excluding hooks, and nothing for calls that did not run", async () => {
 		const setup = chatSetup();
-		const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+		const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 		addTool(
 			setup.registry,
 			tool("slow", async () => {
@@ -475,7 +475,7 @@ describe("tool results", () => {
 			}),
 		);
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: async (call) => {
+			beforeTool: async call => {
 				await sleep(100);
 				return call.id === "blocked" ? { block: "no" } : undefined;
 			},
@@ -484,7 +484,7 @@ describe("tool results", () => {
 			calls(["slow", {}, "slow"], ["thrower", {}, "thrower"], ["slow", {}, "blocked"]),
 			DONE,
 		]);
-		const byId = new Map(results(entries).map((result) => [result.toolCallId, result]));
+		const byId = new Map(results(entries).map(result => [result.toolCallId, result]));
 		for (const id of ["slow", "thrower"]) {
 			expect(byId.get(id)?.durationMs).toBeGreaterThanOrEqual(25);
 			expect(byId.get(id)?.durationMs).toBeLessThan(100);
@@ -499,13 +499,13 @@ describe("tool results", () => {
 		const seen: { text?: string }[] = [];
 		addTool(
 			setup.registry,
-			tool("echo", async (args) => {
+			tool("echo", async args => {
 				seen.push(args);
 				return { output: [] };
 			}),
 		);
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: (call) => {
+			beforeTool: call => {
 				if (call.id === "block") return { block: "not today" };
 				if (call.id === "throw") throw new Error("hook failed");
 				if (call.id === "bad") return { arguments: { text: { not: "a string" } } };
@@ -524,7 +524,7 @@ describe("tool results", () => {
 			DONE,
 		]);
 		// Parallel tools append their results in completion order.
-		const byId = new Map(results(entries).map((result) => [result.toolCallId, [result.isError, resultText(result)]]));
+		const byId = new Map(results(entries).map(result => [result.toolCallId, [result.isError, resultText(result)]]));
 		expect(byId.get("block")).toEqual([true, "<harness>\n[error] Tool call blocked: not today\n</harness>"]);
 		expect(byId.get("throw")).toEqual([true, "<harness>\n[error] Tool call blocked: hook failed\n</harness>"]);
 		expect(byId.get("bad")![0]).toBe(true);
@@ -546,12 +546,12 @@ describe("tool results", () => {
 			setup.registry,
 			tool(
 				"echo",
-				async (args) => {
+				async args => {
 					seen.push(args);
 					return { output: [] };
 				},
 				{
-					prepareArguments: (args) => {
+					prepareArguments: args => {
 						const text = (args as { text?: unknown }).text;
 						if (text === "throw") throw new Error("cannot repair");
 						return typeof text === "number" ? { text: `#${text}` } : (args as { text?: string });
@@ -563,12 +563,12 @@ describe("tool results", () => {
 			calls(["echo", { text: 7 as unknown as string }, "fixed"], ["echo", { text: "throw" }, "broken"]),
 			DONE,
 		]);
-		const byId = new Map(results(entries).map((result) => [result.toolCallId, resultText(result)]));
+		const byId = new Map(results(entries).map(result => [result.toolCallId, resultText(result)]));
 		expect(byId.get("fixed")).toBe("");
 		expect(byId.get("broken")).toBe("<harness>\n[error] cannot repair\n</harness>");
 		expect(seen).toEqual([{ text: "#7" }]);
 		// The stored call keeps what the model sent.
-		const call = (entries[2]!.model![0] as AssistantMessage).content.find((item) => item.type === "toolCall");
+		const call = (entries[2]!.model![0] as AssistantMessage).content.find(item => item.type === "toolCall");
 		expect(call?.type === "toolCall" && call.arguments).toEqual({ text: 7 });
 		await harness.close(context);
 	});
@@ -611,7 +611,7 @@ describe("tool results", () => {
 			afterTool: (_call, result) => ({
 				...result,
 				details: {
-					replaced: (result.output ?? []).map((item) => (item.type === "text" ? item.text : "")).join("|"),
+					replaced: (result.output ?? []).map(item => (item.type === "text" ? item.text : "")).join("|"),
 				},
 			}),
 		});
@@ -623,7 +623,7 @@ describe("tool results", () => {
 		const [result] = results(entries);
 		expect(resultText(result!)).toBe("first");
 		expect(result!.details).toEqual({ replaced: "first" });
-		const resultEntry = entries.find((entry) => ToolResultEntry.is(entry))!;
+		const resultEntry = entries.find(entry => ToolResultEntry.is(entry))!;
 		expect(observed).toEqual([entries[2]!.id, [resultEntry.id]]);
 		await harness.close(context);
 	});
@@ -650,7 +650,7 @@ describe("tool results", () => {
 			phases: { never: async () => {} },
 			abort: async () => {},
 		});
-		const childId = await first.harness.commit(async (tx) => {
+		const childId = await first.harness.commit(async tx => {
 			const taskId = await tx.createTask(
 				owner,
 				{},
@@ -686,8 +686,8 @@ describe("tool results", () => {
 		});
 		expect(first.status).toBe("done");
 		expect(first.entries.at(-1)!.kind).toBe("pi.tool-result");
-		const settled = await first.harness.commit((tx) => tx.scanTasks({ conversationId: first.root.id }, 20), context);
-		expect(settled.items.every((task) => task.state.status === "terminal")).toBe(true);
+		const settled = await first.harness.commit(tx => tx.scanTasks({ conversationId: first.root.id }, 20), context);
+		expect(settled.items.every(task => task.state.status === "terminal")).toBe(true);
 
 		setup.faux.setResponses([calls(["stop", {}, "c1"], ["grow", {}, "c2"]), DONE]);
 		const second = await (await first.root.submit({ type: "input", content: "again" }, context)).wait(context);
@@ -724,8 +724,8 @@ describe("generation hooks", () => {
 	it("replaces request messages, observes responses, and continues on yield", async () => {
 		const setup = chatSetup();
 		const requests: string[][] = [];
-		const record: FauxResponseStep = (request) => {
-			requests.push(request.messages.map((message) => `${message.role}:${textOf(message as never) ?? ""}`));
+		const record: FauxResponseStep = request => {
+			requests.push(request.messages.map(message => `${message.role}:${textOf(message as never) ?? ""}`));
 			return fauxAssistantMessage([fauxText(`answer ${requests.length}`)]);
 		};
 		addHooks(setup.registry, GenerationTask, {
@@ -735,7 +735,7 @@ describe("generation hooks", () => {
 		});
 		const responses: string[] = [];
 		addHooks(setup.registry, GenerationTask, {
-			afterResponse: (message) => void responses.push(textOf(message) ?? ""),
+			afterResponse: message => void responses.push(textOf(message) ?? ""),
 		});
 		let yields = 0;
 		addHooks(setup.registry, GenerationTask, {
@@ -745,9 +745,9 @@ describe("generation hooks", () => {
 		expect(status).toBe("done");
 		expect(requests[0]!.slice(-2)).toEqual(["user:go", "user:injected"]);
 		expect(responses).toEqual(["answer 1", "answer 2"]);
-		expect(entries.map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.user", "pi.assistant"]);
+		expect(entries.map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.user", "pi.assistant"]);
 		// The injected message was used for the request only.
-		expect(entries.some((entry) => textOf(entry.model?.[0]) === "injected")).toBe(false);
+		expect(entries.some(entry => textOf(entry.model?.[0]) === "injected")).toBe(false);
 		await harness.close(context);
 	});
 
@@ -814,7 +814,7 @@ describe("generation hooks", () => {
 		const { harness, status } = await run(setup, [respond]);
 		expect(status).toBe("done");
 		expect(sent).toEqual({ body: 1, after: true });
-		expect(setup.infos.filter((info) => info.kind === "extension_error")).toEqual([
+		expect(setup.infos.filter(info => info.kind === "extension_error")).toEqual([
 			expect.objectContaining({ extension: "broken" }),
 		]);
 		await harness.close(context);
@@ -834,11 +834,11 @@ describe("generation hooks", () => {
 			statusAtSecondRequest = (await (await harness.submission(input!, context))!.status(context)).status;
 			return fauxAssistantMessage([fauxText("second")]);
 		};
-		const result = await run(setup, [fauxAssistantMessage([fauxText("first")]), second], async (opened) => {
+		const result = await run(setup, [fauxAssistantMessage([fauxText("first")]), second], async opened => {
 			harness = opened;
 		});
 		expect(statusAtSecondRequest).toBe("placed");
-		const answers = result.entries.filter((entry) => entry.kind === "pi.assistant");
+		const answers = result.entries.filter(entry => entry.kind === "pi.assistant");
 		expect(await (await harness.submission(input!, context))!.status(context)).toMatchObject({
 			status: "done",
 			answer: answers[1]!.id,
@@ -850,7 +850,7 @@ describe("generation hooks", () => {
 		const setup = chatSetup({ deferred: { pendingFetches: 1, pollAfterMs: 1 } });
 		const observed: string[] = [];
 		addHooks(setup.registry, GenerationTask, {
-			afterResponse: (message) => void observed.push(`${message.stopReason}:${textOf(message) ?? ""}`),
+			afterResponse: message => void observed.push(`${message.stopReason}:${textOf(message) ?? ""}`),
 		});
 		setup.settings.stream = { deferred: true };
 		const result = await run(setup, [fauxAssistantMessage([fauxText("late")])]);
@@ -877,7 +877,7 @@ describe("generation hooks", () => {
 		addHooks(setup.registry, GenerationTask, {
 			onYield: () => {
 				called.push("second onYield");
-				return called.filter((name) => name === "second onYield").length === 1 ? { continue: "second" } : undefined;
+				return called.filter(name => name === "second onYield").length === 1 ? { continue: "second" } : undefined;
 			},
 		});
 		const { harness, entries } = await run(setup, [
@@ -886,11 +886,11 @@ describe("generation hooks", () => {
 			fauxAssistantMessage([fauxText("c")]),
 		]);
 		// The first continuation skips the second handler; on the next answer the second handler's continuation wins.
-		const users = entries.filter((entry) => entry.kind === "pi.user").map((entry) => textOf(entry.model![0]));
+		const users = entries.filter(entry => entry.kind === "pi.user").map(entry => textOf(entry.model![0]));
 		expect(users).toEqual(["go", "first", "second"]);
-		expect(called.filter((name) => name === "second onYield")).toHaveLength(2);
-		expect(called.filter((name) => name === "next observer")).toHaveLength(3);
-		expect(setup.reports.map((error) => (error as Error).message)).toContain("observer failed");
+		expect(called.filter(name => name === "second onYield")).toHaveLength(2);
+		expect(called.filter(name => name === "next observer")).toHaveLength(3);
+		expect(setup.reports.map(error => (error as Error).message)).toContain("observer failed");
 		await harness.close(context);
 	});
 
@@ -936,9 +936,9 @@ describe("tool execution api", () => {
 		const seen: unknown[] = [];
 		const probe = tool("probe", async (_args, api) => {
 			seen.push(api.env?.cwd);
-			seen.push((await api.agent(context)).tools.map((each) => each.name));
+			seen.push((await api.agent(context)).tools.map(each => each.name));
 			seen.push(api.registry.extension("tool:probe") !== undefined);
-			const entry = await api.commit(async (tx) => {
+			const entry = await api.commit(async tx => {
 				// The next call runs in the new directory: its environment is built when it executes.
 				await configure(tx, api.conversationId, { cwd: "/" });
 				return tx.appendEntry(api.conversationId, { kind: "test.note", data: api.callId });
@@ -985,7 +985,7 @@ describe("tool execution api", () => {
 		expect(result).toMatchObject({ isError: true });
 		expect(resultText(result!)).toBe("<harness>\n[error] no sandbox\n</harness>");
 		// Each preparation reports the failure and renders without an environment.
-		expect(setup.reports.filter((error) => (error as Error).message === "no sandbox").length).toBe(2);
+		expect(setup.reports.filter(error => (error as Error).message === "no sandbox").length).toBe(2);
 		await harness.close(context);
 	});
 });
@@ -1001,12 +1001,12 @@ describe("coding tools", () => {
 			const env = new NodeExecutionEnv({ cwd: directory });
 			const { harness, root } = await openChat(new MemoryStorage(), setup, { env });
 			await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-			const entry = (await allEntries(root)).find((candidate) => ToolResultEntry.is(candidate))!;
+			const entry = (await allEntries(root)).find(candidate => ToolResultEntry.is(candidate))!;
 			const [result] = results([entry]);
 			expect(result!.isError).toBe(true);
 			const text = resultText(result!);
 			expect(text.startsWith("line-1001\n")).toBe(true);
-			expect(ToolResultEntry.is(entry) && entry.data.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			expect(ToolResultEntry.is(entry) && entry.data.diagnostics.map(diagnostic => diagnostic.code)).toEqual([
 				"full_output",
 				"exit_code",
 				"truncated",
@@ -1040,7 +1040,7 @@ describe("coding tools", () => {
 			const settled = await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 			expect(settled.status).toBe("done");
 			const entries = await allEntries(root);
-			expect(results(entries).map((result) => [result.toolName, result.isError, resultText(result)])).toEqual([
+			expect(results(entries).map(result => [result.toolName, result.isError, resultText(result)])).toEqual([
 				["read", false, "hello world\n"],
 				["edit", false, "Successfully replaced 1 block(s) in notes.txt."],
 				["bash", false, "hello durable\n"],
@@ -1093,7 +1093,7 @@ describe("tool progress and lifetime", () => {
 		);
 		const { harness, entries } = await run(setup, [calls(["noisy", {}, "c1"], ["explicit", {}, "c2"]), DONE]);
 		expect(slotOutput).toBe("ab\n");
-		const byId = new Map(results(entries).map((result) => [result.toolCallId, resultText(result)]));
+		const byId = new Map(results(entries).map(result => [result.toolCallId, resultText(result)]));
 		expect(byId.get("c1")).toBe("ab\n");
 		expect(byId.get("c2")).toBe("c\u001bd");
 		await harness.close(context);
@@ -1154,11 +1154,11 @@ describe("tool progress and lifetime", () => {
 	it("finishes a call under the implementation it resolved when the tool is replaced mid-call", async () => {
 		const setup = chatSetup();
 		let release!: () => void;
-		const started = new Promise<void>((resolve) => {
+		const started = new Promise<void>(resolve => {
 			release = resolve;
 		});
 		let finish!: () => void;
-		const finished = new Promise<void>((resolve) => {
+		const finished = new Promise<void>(resolve => {
 			finish = resolve;
 		});
 		const v1 = tool("work", async () => {
@@ -1209,7 +1209,7 @@ describe("tool progress and lifetime", () => {
 		setup.registry.install(prompt("v2"));
 		reloaded.resolve();
 		await submission.wait(context);
-		const sections = (await allEntries(root)).flatMap((entry) => {
+		const sections = (await allEntries(root)).flatMap(entry => {
 			const message = entry.model?.[0];
 			return message?.role === "system" && message.sections !== undefined ? [message.sections] : [];
 		});
@@ -1264,7 +1264,7 @@ describe("tool progress and lifetime", () => {
 		addHooks(setup.registry, ToolTask, {
 			afterTool: async (_call, result, _api, callContext) => {
 				// The abort handler's result runs the hooks too (#11043); only the executed call's waits.
-				if (result.diagnostics?.some((diagnostic) => diagnostic.code === "aborted")) return undefined;
+				if (result.diagnostics?.some(diagnostic => diagnostic.code === "aborted")) return undefined;
 				inAfterTool.resolve();
 				await aborted(callContext.abortSignal!);
 				return undefined;
@@ -1284,7 +1284,7 @@ describe("tool progress and lifetime", () => {
 	it("answers an aborted tool with only its durable output, discarding buffered output", async () => {
 		const setup = chatSetup();
 		let reached!: () => void;
-		const buffered = new Promise<void>((resolve) => {
+		const buffered = new Promise<void>(resolve => {
 			reached = resolve;
 		});
 		addTool(
@@ -1292,7 +1292,7 @@ describe("tool progress and lifetime", () => {
 			tool("slow", async (_args, api, callContext) => {
 				api.output("durable\n");
 				// The first output commits at once; this one waits for the next throttle window.
-				await new Promise((resolve) => setTimeout(resolve, 20));
+				await new Promise(resolve => setTimeout(resolve, 20));
 				api.output("buffered\n");
 				reached();
 				await new Promise((_, reject) =>

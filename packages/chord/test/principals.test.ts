@@ -33,29 +33,29 @@ const Who = local("t.who", {
 describe("principals", () => {
 	it("factories, methods and contexts see the app's principal type", async () => {
 		const host = createHost<Principal>({ self: { kind: "host" }, principalKey });
-		const facet = defineFacet<Principal>((api) => {
+		const facet = defineFacet<Principal>(api => {
 			const plain: FacetApi = api;
 			void plain;
 			api.serve(Who, (_input, principal, self) => {
 				// Narrowing on `kind` needs no cast.
 				const created = principal.kind === "guest" ? `guest ${principal.id}` : principal.kind;
-				self.task(async (ctx) => {
+				self.task(async ctx => {
 					const kind: Principal["kind"] = ctx.principal.kind;
 					void kind;
 				});
-				return { who: (ctx) => `${created}, called by ${ctx.principal.kind}` };
+				return { who: ctx => `${created}, called by ${ctx.principal.kind}` };
 			});
 		});
 		await host.install({ name: "who", ...facet });
 		const guest = host.hold(Who, {}, { principal: { kind: "guest", id: "g1" } });
 		assert.equal(
-			await host.root((ctx) => guest.who(ctx), { principal: { kind: "guest", id: "g1" } }),
+			await host.root(ctx => guest.who(ctx), { principal: { kind: "guest", id: "g1" } }),
 			"guest g1, called by host",
 		);
 		// A typed host, facet API and context are usable where Chord's untyped ones are expected.
 		const untyped: Host = host;
 		void untyped;
-		await host.root(async (ctx) => {
+		await host.root(async ctx => {
 			const plain: Ctx = ctx;
 			void plain;
 		});

@@ -12,6 +12,6 @@ const Notes = remote("test.notes", {
 	variants: { main: { state: { label: str() } } },
 });
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Notes, ({ id }) => ({ variant: "main", members: { label: constant(`${id} ${label}`) } })),
 );

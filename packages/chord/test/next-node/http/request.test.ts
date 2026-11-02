@@ -12,7 +12,7 @@ describe("the request a route gets", () => {
 		const server = await served({
 			"@app/a": contributing({
 				routes: {
-					"GET /notes/:id": async (request) => {
+					"GET /notes/:id": async request => {
 						seen = request;
 						return { kind: "json", value: null };
 					},
@@ -39,8 +39,8 @@ describe("bodies", () => {
 		served({
 			"@app/a": contributing({
 				routes: {
-					"POST /json": async (request) => ({ kind: "json", value: await request.json(16) }),
-					"POST /body": async (request) => {
+					"POST /json": async request => ({ kind: "json", value: await request.json(16) }),
+					"POST /body": async request => {
 						let bytes = 0;
 						for await (const chunk of request.body(16)) bytes += chunk.byteLength;
 						return { kind: "json", value: bytes };
@@ -77,8 +77,8 @@ describe("bodies", () => {
 			agent: false,
 		});
 		request.on("error", () => {});
-		const status = new Promise<number>((resolve) => {
-			request.on("response", (response) => {
+		const status = new Promise<number>(resolve => {
+			request.on("response", response => {
 				response.resume();
 				resolve(response.statusCode ?? 0);
 			});
@@ -98,7 +98,7 @@ describe("bodies", () => {
 			new Promise<{ connection: string | undefined; socket: unknown }>((resolve, reject) => {
 				const request = httpRequest(
 					{ host: "127.0.0.1", port: server.port, method: "POST", path: "/ignore", agent },
-					(response) => {
+					response => {
 						response.resume();
 						response.on("end", () =>
 							resolve({ connection: response.headers.connection, socket: request.socket }),

@@ -52,7 +52,7 @@ describe("metrics", () => {
 		metrics.counter("network.bytes").add(128, { direction: "out" });
 		metrics.upDownCounter("network.active").add(1);
 		metrics.upDownCounter("network.active").add(-1);
-		await adapter.startSpan({ name: "request" }, (span) => {
+		await adapter.startSpan({ name: "request" }, span => {
 			metrics.histogram("call.duration").record(12, { method: "read" }, span);
 			metrics.histogram("call.duration").record(13);
 			metrics.histogram("call.duration").record(14, undefined, span);
@@ -135,7 +135,7 @@ describe("metrics", () => {
 	it("returns detached measurement snapshots including exemplars and boundaries", async () => {
 		const telemetry = new InMemoryTelemetryContext();
 		const histogram = telemetry.histogram("duration", { boundaries: [1, 2] });
-		await telemetry.startSpan({ name: "request" }, (span) => histogram.record(1, { tags: ["original"] }, span));
+		await telemetry.startSpan({ name: "request" }, span => histogram.record(1, { tags: ["original"] }, span));
 		const measurement = telemetry.getMetrics()[0];
 		if (!measurement?.context) throw new Error("Expected measurement context");
 		(measurement.boundaries as number[]).push(3);

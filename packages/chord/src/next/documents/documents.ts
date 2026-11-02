@@ -45,7 +45,7 @@ export class Documents {
 	 * The idle persisted keyed documents and their eviction. A sweep's only rejection is `onLine`'s `released` once
 	 * the object ended (a sweep itself drops trackers in memory and does not throw): nothing to report.
 	 */
-	readonly residency = new Residency((sweep) => void this.onLine(async () => sweep()).catch(() => {}));
+	readonly residency = new Residency(sweep => void this.onLine(async () => sweep()).catch(() => {}));
 	readonly #owner: DocumentsOwner;
 	/** The token of the object's own transactions: sealed with the object (`seal`). */
 	readonly own = new SealToken();
@@ -119,7 +119,7 @@ export class Documents {
 	 * fails the activation.
 	 */
 	load(context: Context): Promise<void> | undefined {
-		const persisted = [...this.#slots.values()].filter((slot) => slot.persisted !== undefined);
+		const persisted = [...this.#slots.values()].filter(slot => slot.persisted !== undefined);
 		// In memory only: nothing to wait for (an activation without persisted documents takes no extra turn).
 		if (persisted.length === 0) return undefined;
 		return this.onLine(async () => {

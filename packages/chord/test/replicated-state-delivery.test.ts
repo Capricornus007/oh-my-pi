@@ -34,7 +34,7 @@ function fixture(kind: Kind, onError: (error: Error) => void = () => {}) {
 			{
 				attach: () => ({
 					snapshot: { value: { value: 0 }, cursor: 0 },
-					activate: (listener) => {
+					activate: listener => {
 						receive = listener;
 					},
 					dispose() {},
@@ -48,20 +48,20 @@ function fixture(kind: Kind, onError: (error: Error) => void = () => {}) {
 	return { state, publish };
 }
 
-describe.each<Kind>(["mutable", "attached"])("%s public delivery", (kind) => {
+describe.each<Kind>(["mutable", "attached"])("%s public delivery", kind => {
 	test("awaits hydration and each update independently of other subscribers", async () => {
 		const { state, publish } = fixture(kind);
 		const hydration = deferred();
 		const update = deferred();
 		const events: string[] = [];
 		const fast: number[] = [];
-		state.subscribe(async (value) => {
+		state.subscribe(async value => {
 			events.push(`start:${value.value}`);
 			if (value.value === 0) await hydration.promise;
 			if (value.value === 1) await update.promise;
 			events.push(`end:${value.value}`);
 		});
-		state.subscribe((value) => fast.push(value.value));
+		state.subscribe(value => fast.push(value.value));
 		publish({ value: 1 }, BACKGROUND_CONTEXT);
 		publish({ value: 2 }, BACKGROUND_CONTEXT);
 		expect(events).toEqual(["start:0"]);
@@ -73,11 +73,11 @@ describe.each<Kind>(["mutable", "attached"])("%s public delivery", (kind) => {
 		await vi.waitFor(() => expect(events).toEqual(["start:0", "end:0", "start:1", "end:1", "start:2", "end:2"]));
 	});
 
-	test.each([100, 101, 102, 201, 202])("bounds %i pending deliveries", async (count) => {
+	test.each([100, 101, 102, 201, 202])("bounds %i pending deliveries", async count => {
 		const { state, publish } = fixture(kind);
 		const hydration = deferred();
 		const received: number[] = [];
-		state.subscribe((value) => {
+		state.subscribe(value => {
 			received.push(value.value);
 			if (value.value === 0) return hydration.promise;
 		});
@@ -115,7 +115,7 @@ describe.each<Kind>(["mutable", "attached"])("%s public delivery", (kind) => {
 	test("serializes reentrant hydration and update callbacks", () => {
 		const { state, publish } = fixture(kind);
 		const events: string[] = [];
-		state.subscribe((value) => {
+		state.subscribe(value => {
 			events.push(`start:${value.value}`);
 			if (value.value < 2) publish({ value: value.value + 1 }, BACKGROUND_CONTEXT);
 			events.push(`end:${value.value}`);
@@ -148,7 +148,7 @@ describe.each<Kind>(["mutable", "attached"])("%s public delivery", (kind) => {
 		const { context } = withCancel(BACKGROUND_CONTEXT);
 		const received: number[] = [];
 		let completed = false;
-		const stop = state.subscribe(async (value) => {
+		const stop = state.subscribe(async value => {
 			received.push(value.value);
 			if (value.value === 1) {
 				await gate.promise;
@@ -172,11 +172,11 @@ describe("attached listener errors", () => {
 	const kind: Kind = "attached";
 	test("isolates a synchronous hydration failure without removing the subscription", () => {
 		const errors: Error[] = [];
-		const { state, publish } = fixture(kind, (error) => errors.push(error));
+		const { state, publish } = fixture(kind, error => errors.push(error));
 		const received: number[] = [];
 		const failure = new Error("sync hydration");
 		expect(() =>
-			state.subscribe((value) => {
+			state.subscribe(value => {
 				received.push(value.value);
 				if (value.value === 0) throw failure;
 			}),
@@ -188,30 +188,30 @@ describe("attached listener errors", () => {
 
 	test("observes hydration rejection, synchronous throw, and update rejection while continuing delivery", async () => {
 		const errors: Error[] = [];
-		const { state, publish } = fixture(kind, (error) => errors.push(error));
+		const { state, publish } = fixture(kind, error => errors.push(error));
 		const gate = deferred();
 		const received: number[] = [];
 		const fast: number[] = [];
-		state.subscribe((value) => {
+		state.subscribe(value => {
 			received.push(value.value);
 			if (value.value === 0) return gate.promise;
 			if (value.value === 1) throw new Error("sync update");
 			if (value.value === 2) return Promise.reject(new Error("async update"));
 		});
-		state.subscribe((value) => fast.push(value.value));
+		state.subscribe(value => fast.push(value.value));
 		for (let value = 1; value <= 3; value += 1) publish({ value }, BACKGROUND_CONTEXT);
 		gate.reject(new Error("async hydration"));
 		await vi.waitFor(() => expect(received).toEqual([0, 1, 2, 3]));
-		expect(errors.map((error) => error.message)).toEqual(["async hydration", "sync update", "async update"]);
+		expect(errors.map(error => error.message)).toEqual(["async hydration", "sync update", "async update"]);
 		expect(fast).toEqual([0, 1, 2, 3]);
 	});
 
 	test("still observes a callback rejection after unsubscribe", async () => {
 		const errors: Error[] = [];
-		const { state, publish } = fixture(kind, (error) => errors.push(error));
+		const { state, publish } = fixture(kind, error => errors.push(error));
 		const gate = deferred();
 		const received: number[] = [];
-		const stop = state.subscribe((value) => {
+		const stop = state.subscribe(value => {
 			received.push(value.value);
 			return gate.promise;
 		});
@@ -226,14 +226,14 @@ describe("attached listener errors", () => {
 
 test("mutable state reports rejected callbacks through its default error reporter", async () => {
 	const reports: (() => void)[] = [];
-	const spy = vi.spyOn(globalThis, "queueMicrotask").mockImplementation((report) => {
+	const spy = vi.spyOn(globalThis, "queueMicrotask").mockImplementation(report => {
 		reports.push(report);
 	});
 	try {
 		const state = replicatedState({ value: 0 });
 		const failure = new Error("async mutable hydration");
 		const received: number[] = [];
-		state.subscribe((value) => {
+		state.subscribe(value => {
 			received.push(value.value);
 			if (value.value === 0) return Promise.reject(failure);
 		});

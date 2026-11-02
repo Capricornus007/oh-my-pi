@@ -27,7 +27,7 @@ const server = createAcmeServer("openai");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
-	await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+	await Promise.all(temporaryDirectories.splice(0).map(path => rm(path, { recursive: true, force: true })));
 });
 beforeAll(() => server.start());
 beforeEach(() => server.reset());

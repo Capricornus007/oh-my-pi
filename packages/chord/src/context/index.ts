@@ -101,7 +101,7 @@ export function traceIn<T>(
 	fn: (context: Context) => T | Promise<T>,
 	context: Context,
 ): Promise<T> {
-	return context.telemetry.startSpan(options, (span) => fn(withTelemetry(span, context)));
+	return context.telemetry.startSpan(options, span => fn(withTelemetry(span, context)));
 }
 
 /**
@@ -143,7 +143,7 @@ export function awaitWithContext<T>(promise: Promise<T>, context: Context): Prom
 		const onAbort = (): void => reject(abortError(signal));
 		signal.addEventListener("abort", onAbort, { once: true });
 		void promise.then(
-			(value) => {
+			value => {
 				signal.removeEventListener("abort", onAbort);
 				resolve(value);
 			},

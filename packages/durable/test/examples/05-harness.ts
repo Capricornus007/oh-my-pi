@@ -25,7 +25,7 @@ const read = defineTool({
 	name: "read",
 	description: "Read a file",
 	parameters: obj({ path: str() }),
-	execute: async (args) => ({ output: [{ type: "text", text: `contents of ${args.path}` }] }),
+	execute: async args => ({ output: [{ type: "text", text: `contents of ${args.path}` }] }),
 });
 const Files = defineExtension({ name: "files", tools: [read] });
 const registry = createRegistry();
@@ -61,8 +61,8 @@ const agent = await root.agent(context);
 console.log(
 	"resolved:",
 	agent.thinkingLevel,
-	agent.extensions.map((extension) => extension.name),
-	agent.tools.map((tool) => tool.name),
+	agent.extensions.map(extension => extension.name),
+	agent.tools.map(tool => tool.name),
 );
 
 await harness.close(context);

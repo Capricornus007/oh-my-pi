@@ -54,7 +54,7 @@ function echoTool(extra: Partial<Tool> = {}) {
 	const state = { runs: 0 };
 	const registration = tool(
 		"echo",
-		async (args) => {
+		async args => {
 			state.runs++;
 			return { output: [{ type: "text", text: `echo ${args.text ?? ""}` }] };
 		},
@@ -70,18 +70,18 @@ function call(name: string, args: Record<string, string> = {}, id = "c1"): Assis
 const DONE = fauxAssistantMessage([fauxText("done")]);
 
 function results(entries: readonly EntryRecord[]): ToolResultMessage[] {
-	return entries.filter((entry) => ToolResultEntry.is(entry)).map((entry) => entry.model![0] as ToolResultMessage);
+	return entries.filter(entry => ToolResultEntry.is(entry)).map(entry => entry.model![0] as ToolResultMessage);
 }
 
 /** The text of a result message, or the value a schema-less nested call gives programs. */
 function text(result: NestedToolExecutionResult | ToolResultMessage | undefined): string {
 	if (result === undefined) return "";
 	if (!("role" in result)) return typeof result.structuredOutput === "string" ? result.structuredOutput : "";
-	return result.content.map((item) => (item.type === "text" ? item.text : "")).join("|");
+	return result.content.map(item => (item.type === "text" ? item.text : "")).join("|");
 }
 
 async function toolTasks(harness: Harness) {
-	return (await harness.commit((tx) => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
+	return (await harness.commit(tx => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
 }
 
 async function runOnce(setup: ChatSetup, responses: AssistantMessage[]) {
@@ -126,7 +126,7 @@ describe("nested tool calls", () => {
 		};
 		const { harness, root } = await openChat(storage, setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const nested = written.filter((write) => write.kind.startsWith("pi.tool."));
+		const nested = written.filter(write => write.kind.startsWith("pi.tool."));
 		expect(nested).toEqual([
 			{ kind: NestedCallDoc.definition.kind, key: "1" },
 			{ kind: NestedCallDoc.definition.kind, key: "named" },
@@ -161,7 +161,7 @@ describe("nested tool calls", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const submission = await root.submit({ type: "input", content: "go" }, context);
 		await started.promise;
-		await harness.commit(async (tx) => {
+		await harness.commit(async tx => {
 			const record = (await tx.task(caller!))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({ ...record, abortRequested: true });
 		}, context);
@@ -195,7 +195,7 @@ describe("nested tool calls", () => {
 			durationMs: expect.any(Number),
 		});
 		// One result entry: the model-issued call's, which records nothing of its nested calls.
-		expect(results(entries).map((result) => [result.toolCallId, text(result)])).toEqual([["c1", "got echo a"]]);
+		expect(results(entries).map(result => [result.toolCallId, text(result)])).toEqual([["c1", "got echo a"]]);
 		expect(results(entries)[0]).not.toHaveProperty("nestedCalls");
 		expect(parent!.input).toMatchObject({ kind: "model", callId: "c1" });
 		expect(child!.owner).toBe(parent!.id);
@@ -237,8 +237,8 @@ describe("nested tool calls", () => {
 			}),
 		);
 		const { harness } = await runOnce(setup, [call("batch"), DONE]);
-		expect(seen.map((each) => each.callId).sort()).toEqual(["c1/a", "c1/b"]);
-		expect(new Set(seen.map((each) => each.taskId)).size).toBe(2);
+		expect(seen.map(each => each.callId).sort()).toEqual(["c1/a", "c1/b"]);
+		expect(new Set(seen.map(each => each.taskId)).size).toBe(2);
 		await harness.close(context);
 	});
 
@@ -248,7 +248,7 @@ describe("nested tool calls", () => {
 		addTool(setup.registry, echo.registration);
 		const parents: ToolHookCall["parent"][] = [];
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: (hookCall) => {
+			beforeTool: hookCall => {
 				parents.push(hookCall.parent);
 				return hookCall.parent !== undefined && hookCall.arguments.text === "secret"
 					? { block: "no secrets" }
@@ -291,7 +291,7 @@ describe("nested tool calls", () => {
 			}),
 		);
 		const { harness } = await runOnce(setup, [call("batch"), DONE]);
-		expect(nested.map((result) => [result.isError, result.diagnostics[0]?.code])).toEqual([
+		expect(nested.map(result => [result.isError, result.diagnostics[0]?.code])).toEqual([
 			[true, "tool_unavailable"],
 			[true, "invalid_arguments"],
 		]);
@@ -330,7 +330,7 @@ describe("nested tool calls", () => {
 				name: "pair",
 				description: "pair",
 				parameters: obj({ a: str(), b: str() }),
-				execute: async (args) => {
+				execute: async args => {
 					runs++;
 					return { output: [{ type: "text", text: `${args.a}${args.b}` }] };
 				},
@@ -347,7 +347,7 @@ describe("nested tool calls", () => {
 		);
 		const { harness } = await runOnce(setup, [call("batch"), DONE]);
 		expect(runs).toBe(1);
-		expect(nested.map((result) => text(result))).toEqual(["xy", "xy"]);
+		expect(nested.map(result => text(result))).toEqual(["xy", "xy"]);
 		await harness.close(context);
 	});
 
@@ -478,12 +478,12 @@ describe("nested tool calls", () => {
 		expect(nestedResultOf(states, nested, "c1/1")).toMatchObject({ structuredOutput: "slow done", isError: false });
 		// Slots name the call's task and, for a nested call, the calling one.
 		const [parent, child] = await toolTasks(harness);
-		expect(slotsOf(states, "c1/1").find((slot) => slot !== undefined)).toMatchObject({
+		expect(slotsOf(states, "c1/1").find(slot => slot !== undefined)).toMatchObject({
 			taskId: child!.id,
 			parentCallId: "c1",
 			parentTaskId: parent!.id,
 		});
-		expect(slotsOf(states, "c1").find((slot) => slot?.taskId !== undefined)).toMatchObject({ taskId: parent!.id });
+		expect(slotsOf(states, "c1").find(slot => slot?.taskId !== undefined)).toMatchObject({ taskId: parent!.id });
 		expect(await harness.snapshot(LiveDoc, root.id, context)).toEqual({});
 		await harness.close(context);
 	});
@@ -588,7 +588,7 @@ describe("nested tool calls", () => {
 		expect(echo.state.runs).toBe(2);
 		expect(text(results(await allEntries(opened.root))[0])).toBe("run 2: echo a, echo b");
 		const tasks = await toolTasks(opened.harness);
-		expect(tasks.filter((task) => (task.input as ToolTaskInput).kind === "nested")).toHaveLength(2);
+		expect(tasks.filter(task => (task.input as ToolTaskInput).kind === "nested")).toHaveLength(2);
 		const outcome = tasks[1]!.state.status === "terminal" ? tasks[1]!.state.outcome : undefined;
 		expect((outcome?.result as ToolTaskResult | undefined)?.kind).toBe("nested");
 		await opened.harness.close(context);
@@ -645,7 +645,7 @@ describe("nested tool calls", () => {
 		);
 		const { harness } = await runOnce(setup, [call("batch"), DONE]);
 		expect(echo.state.runs).toBe(1);
-		expect(both.map((result) => text(result))).toEqual(["echo a", "echo a"]);
+		expect(both.map(result => text(result))).toEqual(["echo a", "echo a"]);
 		expect(await toolTasks(harness)).toHaveLength(2);
 		await harness.close(context);
 	});
@@ -721,7 +721,7 @@ describe("nested tool calls", () => {
 		);
 		const { harness, root, status } = await runOnce(setup, [call("batch"), DONE]);
 		expect(status).toBe("done");
-		const late = (await toolTasks(harness)).find((task) => {
+		const late = (await toolTasks(harness)).find(task => {
 			const input = task.input as ToolTaskInput;
 			return input.kind === "nested" && input.call.name === "hang";
 		});
@@ -763,8 +763,8 @@ describe("nested tool calls", () => {
 		);
 		const { harness, status } = await runOnce(setup, [call("batch"), DONE]);
 		expect(status).toBe("done");
-		const nested = (await toolTasks(harness)).filter((task) => (task.input as ToolTaskInput).kind === "nested");
-		expect(nested.map((task) => task.state.status)).toEqual(["terminal", "terminal"]);
+		const nested = (await toolTasks(harness)).filter(task => (task.input as ToolTaskInput).kind === "nested");
+		expect(nested.map(task => task.state.status)).toEqual(["terminal", "terminal"]);
 		await harness.close(context);
 	});
 
@@ -823,7 +823,7 @@ describe("nested tool calls", () => {
 		expect([inner!.owner, deep!.owner]).toEqual([outer!.id, inner!.id]);
 		const states = history.live();
 		expect(startOrder(states)).toEqual(["c1", "c1/1", "c1/1/x"]);
-		expect(slotsOf(states, "c1/1/x").find((slot) => slot !== undefined)).toMatchObject({ parentCallId: "c1/1" });
+		expect(slotsOf(states, "c1/1/x").find(slot => slot !== undefined)).toMatchObject({ parentCallId: "c1/1" });
 		// Children end first.
 		expect(endedAt(states, "c1/1/x")).toBeLessThan(endedAt(states, "c1/1"));
 		expect(endedAt(states, "c1/1")).toBeLessThan(endedAt(states, "c1"));
@@ -864,7 +864,7 @@ describe("nested tool calls", () => {
 		await Promise.all([running.one.promise, running.two.promise]);
 		const watch = await root.watch(context);
 		const nestedOf = (view: ConversationView) => (view.docs["pi.live"] as LiveState).nestedTools ?? [];
-		expect(nestedOf(watch.value).map((slot) => [slot.callId, slot.status])).toEqual([
+		expect(nestedOf(watch.value).map(slot => [slot.callId, slot.status])).toEqual([
 			["c1/1", "running"],
 			["c1/2", "running"],
 		]);
@@ -973,7 +973,7 @@ describe("nested tool calls", () => {
 		expect(result).toMatchObject({ isError: true });
 		expect(result).not.toHaveProperty("structuredOutput");
 		expect(result).not.toHaveProperty("details");
-		expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(["aborted"]);
+		expect(result.diagnostics.map(diagnostic => diagnostic.code)).toEqual(["aborted"]);
 		await harness.close(context);
 	});
 
@@ -993,7 +993,7 @@ describe("nested tool calls", () => {
 			}),
 		);
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: async (hookCall) => {
+			beforeTool: async hookCall => {
 				if (hookCall.parent === undefined) return undefined;
 				hookEntered.resolve();
 				await hookRelease.promise;
@@ -1020,7 +1020,7 @@ describe("nested tool calls", () => {
 		await submission.wait(context);
 		await harness.waitForIdle(context);
 		// The slot showed the arguments the call runs with; the task input keeps the ones it was made with.
-		const nested = (await toolTasks(harness)).find((task) => (task.input as ToolTaskInput).kind === "nested");
+		const nested = (await toolTasks(harness)).find(task => (task.input as ToolTaskInput).kind === "nested");
 		expect(nested!.input as ToolTaskInput).toMatchObject({ call: { arguments: { text: "asked" } } });
 		await harness.close(context);
 	});
@@ -1032,7 +1032,7 @@ describe("nested tool calls", () => {
 			setup.registry,
 			tool(
 				"repaired",
-				async (args) => {
+				async args => {
 					seen.push(args);
 					return {};
 				},
@@ -1087,7 +1087,7 @@ describe("nested tool calls", () => {
 		const submission = await root.submit({ type: "input", content: "go" }, context);
 		await before.promise;
 		const done = { status: "done", summary: { isError: false, durationMs: expect.any(Number) } };
-		expect(slots).toEqual(["c1/1", "c1/2", "c1/3", "c1/4"].map((callId) => ({ callId, ...done })));
+		expect(slots).toEqual(["c1/1", "c1/2", "c1/3", "c1/4"].map(callId => ({ callId, ...done })));
 		checked.resolve();
 		await submission.wait(context);
 		await harness.close(context);
@@ -1267,7 +1267,7 @@ describe("tool task version 1 and 2 records", () => {
 		const path = join(directory, "session.sqlite");
 		// No submission, so the Harness never starts scheduling and the task stays pending.
 		const { harness, root } = await openChat(await openNodeSqliteStorage(path), setup);
-		const id = await root.commit(async (tx) => {
+		const id = await root.commit(async tx => {
 			const entry = await tx.appendEntry(AssistantEntry, root.id, { model: [call("echo", { text: "old" })] });
 			return tx.createTask(
 				ToolTask,

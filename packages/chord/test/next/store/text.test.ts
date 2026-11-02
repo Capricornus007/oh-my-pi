@@ -55,8 +55,8 @@ describe("prefixUpperBound", () => {
 		const texts = ["a", "a/", "a/x", "a/\u{1F600}", "a/\uFFFF", "a0", "a.", "b"];
 		for (const prefix of ["a/", "a", "a/\uFFFF"]) {
 			const upper = prefixUpperBound(prefix)!;
-			const inRange = texts.filter((t) => compareText(t, prefix) >= 0 && compareText(t, upper) < 0);
-			expect(inRange).toEqual(texts.filter((t) => t.startsWith(prefix)));
+			const inRange = texts.filter(t => compareText(t, prefix) >= 0 && compareText(t, upper) < 0);
+			expect(inRange).toEqual(texts.filter(t => t.startsWith(prefix)));
 		}
 	});
 });

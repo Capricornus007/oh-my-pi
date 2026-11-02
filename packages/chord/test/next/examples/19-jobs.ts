@@ -85,7 +85,7 @@ async function runProcess(lines: number, ctx: Context, onLine: (line: string) =>
 	return 0;
 }
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(ChatStore, (_, self) => {
 		const entries = self.state(Entries);
 		const notify = self.job(NotifyJob, {
@@ -101,14 +101,14 @@ const facet = defineFacet<P>((host) => {
 				// Every state change is a commit and, while watched, a message: the author throttles them (50 ms here).
 				const write = async () => {
 					const text = out.snapshot().text;
-					await ctx.state.change((draft) => {
+					await ctx.state.change(draft => {
 						draft.output = text;
 					}, ctx);
 					return text.length;
 				};
-				const progress = new Progress(write, (error) => console.error("progress failed:", error), 50);
+				const progress = new Progress(write, error => console.error("progress failed:", error), 50);
 				try {
-					const exit = await runProcess(lines, ctx, (line) => {
+					const exit = await runProcess(lines, ctx, line => {
 						out.push(line);
 						progress.mark();
 					});
@@ -132,11 +132,10 @@ const facet = defineFacet<P>((host) => {
 			},
 		});
 		// What the views read: one object per run, kept while the run's entry is the same object (`mapShared`).
-		const toShell = mapShared(
-			(entry: (typeof shell.running.value)[number]): Static<typeof Shell> =>
-				entry.phase === "blocked"
-					? { id: entry.id, phase: entry.phase, command: "?", output: "" }
-					: { id: entry.id, phase: entry.phase, command: entry.args.command, output: entry.state.output },
+		const toShell = mapShared((entry: (typeof shell.running.value)[number]): Static<typeof Shell> =>
+			entry.phase === "blocked"
+				? { id: entry.id, phase: entry.phase, command: "?", output: "" }
+				: { id: entry.id, phase: entry.phase, command: entry.args.command, output: entry.state.output },
 		);
 		return {
 			entries: self.derive([entries], ([d]) => d.list),
@@ -153,9 +152,11 @@ const facet = defineFacet<P>((host) => {
 		const store = self.get(ChatStore, {});
 		if (principal.kind !== "owner") {
 			// A guest sees no output: the view drops it (computed once per variant in a real store, §12).
-			const strip = mapShared(
-				(s: Static<typeof Shell>): Static<typeof GuestShell> => ({ id: s.id, phase: s.phase, command: s.command }),
-			);
+			const strip = mapShared((s: Static<typeof Shell>): Static<typeof GuestShell> => ({
+				id: s.id,
+				phase: s.phase,
+				command: s.command,
+			}));
 			return {
 				variant: "guest",
 				members: { entries: store.entries, shells: self.derive([store.shells], ([list]) => strip(list)) },
@@ -177,11 +178,11 @@ const facet = defineFacet<P>((host) => {
 const server = createHost<P>({
 	address: Server(),
 	principal: { kind: "server" },
-	onError: (error) => console.error(error),
+	onError: error => console.error(error),
 });
 await server.load([{ name: "@example/chat", facet }], context);
 async function tab(principal: P) {
-	const host = createHost<P>({ onError: (error) => console.error(error) });
+	const host = createHost<P>({ onError: error => console.error(error) });
 	await host.load([], context);
 	const [a, b] = memoryLinkPair();
 	server.accept(a, { principal }, context);

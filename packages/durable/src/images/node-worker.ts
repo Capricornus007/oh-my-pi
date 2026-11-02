@@ -25,7 +25,7 @@ const images = createPhotonImages(
 );
 port.on("message", (request: PrepareRequest) => {
 	void images.prepare(request.bytes, request.mimeType, request.limits).then(
-		(result) => port.postMessage({ id: request.id, result } satisfies PrepareReply),
+		result => port.postMessage({ id: request.id, result } satisfies PrepareReply),
 		(error: unknown) =>
 			port.postMessage({
 				id: request.id,

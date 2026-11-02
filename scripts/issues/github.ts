@@ -89,15 +89,15 @@ export class Corpus {
 	search(query: string, exclude: number, limit = 10): Issue[] {
 		const terms = tokenize(query);
 		if (terms.length === 0) return [];
-		const issues = this.all().filter((issue) => issue.number !== exclude);
-		const docs = issues.map((issue) => ({ issue, title: issue.title.toLowerCase(), body: issue.body.toLowerCase() }));
+		const issues = this.all().filter(issue => issue.number !== exclude);
+		const docs = issues.map(issue => ({ issue, title: issue.title.toLowerCase(), body: issue.body.toLowerCase() }));
 		const phrase = query.toLowerCase().trim();
-		const weights = terms.map((term) => {
-			const df = docs.filter((doc) => doc.title.includes(term) || doc.body.includes(term)).length;
+		const weights = terms.map(term => {
+			const df = docs.filter(doc => doc.title.includes(term) || doc.body.includes(term)).length;
 			return Math.log((docs.length + 1) / (df + 1));
 		});
 		return docs
-			.map((doc) => {
+			.map(doc => {
 				let score = 0;
 				terms.forEach((term, i) => {
 					if (doc.title.includes(term)) score += 3 * weights[i]!;
@@ -106,15 +106,15 @@ export class Corpus {
 				if (phrase.length > 8 && (doc.title.includes(phrase) || doc.body.includes(phrase))) score *= 2;
 				return { issue: doc.issue, score };
 			})
-			.filter((hit) => hit.score > 0)
+			.filter(hit => hit.score > 0)
 			.sort((a, b) => b.score - a.score)
 			.slice(0, limit)
-			.map((hit) => hit.issue);
+			.map(hit => hit.issue);
 	}
 
 	/** How many issues the author filed before, and how many of those maintainers acted on. */
 	authorStats(issue: Issue): { prior: number; actedOn: number } {
-		const prior = this.all().filter((other) => other.author === issue.author && other.number < issue.number);
+		const prior = this.all().filter(other => other.author === issue.author && other.number < issue.number);
 		return { prior: prior.length, actedOn: prior.filter(isActedOn).length };
 	}
 }
@@ -130,7 +130,7 @@ export function isActedOn(issue: Issue): boolean {
 }
 
 export function issueStatus(issue: Issue): string {
-	const labels = issue.labels.filter((label) => ["p0", "p1", "no-action", "untriaged"].includes(label));
+	const labels = issue.labels.filter(label => ["p0", "p1", "no-action", "untriaged"].includes(label));
 	const state = issue.state === "open" ? "open" : `closed${issue.stateReason ? `:${issue.stateReason}` : ""}`;
 	return labels.length ? `${state} ${labels.join(",")}` : state;
 }
@@ -145,8 +145,8 @@ function tokenize(text: string): string[] {
 	const terms = text
 		.toLowerCase()
 		.split(/[^a-z0-9_./:-]+/)
-		.map((term) => term.replace(/^[./:-]+|[./:-]+$/g, ""))
-		.filter((term) => term.length >= 3 && !STOPWORDS.has(term));
+		.map(term => term.replace(/^[./:-]+|[./:-]+$/g, ""))
+		.filter(term => term.length >= 3 && !STOPWORDS.has(term));
 	return [...new Set(terms)];
 }
 
@@ -158,7 +158,7 @@ export function gh(args: string[]): Promise<string> {
 		child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
 		child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
 		child.on("error", reject);
-		child.on("close", (code) => {
+		child.on("close", code => {
 			if (code === 0) resolve(Buffer.concat(out).toString("utf8"));
 			else
 				reject(new Error(`gh ${args.slice(0, 3).join(" ")} failed: ${Buffer.concat(err).toString("utf8").trim()}`));

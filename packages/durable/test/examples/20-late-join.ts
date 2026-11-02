@@ -17,7 +17,7 @@ import {
 } from "../../src/index.ts";
 
 const context = BACKGROUND_CONTEXT;
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // A tool that prints a line every 100 ms, then a slowly streamed answer.
 const registry = createRegistry();
@@ -60,23 +60,23 @@ const view = await root.watch(context);
 const live = view.value.docs["pi.live"] as LiveState;
 console.log(
 	"view entries:",
-	view.value.entries.map((entry) => entry.kind),
+	view.value.entries.map(entry => entry.kind),
 );
 console.log("view tool slot:", live.tools?.[0]?.status, JSON.stringify(live.tools?.[0]?.output));
 let shown = "";
-view.start(async (call) => {
+view.start(async call => {
 	if (call.kind !== "value") return;
 	const { value } = call;
 	const state = value.docs["pi.live"] as LiveState;
 	const slot = state.tools?.[0];
 	if (slot?.status === "running") console.log("view output now:", JSON.stringify(slot.output));
-	const partial = state.generation?.message?.content.find((block) => block.type === "text")?.text ?? "";
+	const partial = state.generation?.message?.content.find(block => block.type === "text")?.text ?? "";
 	if (partial !== shown && partial !== "") console.log("view answer now:", JSON.stringify(partial));
 	shown = partial;
 	if (state.run === undefined)
 		console.log(
 			"view entries:",
-			value.entries.map((entry) => entry.kind),
+			value.entries.map(entry => entry.kind),
 		);
 });
 

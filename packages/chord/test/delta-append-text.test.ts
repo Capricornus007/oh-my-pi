@@ -28,15 +28,13 @@ describe("appendText", () => {
 	it("records an append op and the appended value", () => {
 		const tracker = track(doc());
 		const before = tracker.value;
-		expect(commit(tracker, (draft) => appendText(draft.content[0]!, "text", " world"))).toEqual([
+		expect(commit(tracker, draft => appendText(draft.content[0]!, "text", " world"))).toEqual([
 			["a", ["content", 0, "text"], " world"],
 		]);
 		expect(tracker.value.content[0]!.text).toBe("hello world");
 		expect(before.content[0]!.text).toBe("hello");
-		expect(commit(tracker, (draft) => appendText(draft, "title", "!"))).toEqual([["a", ["title"], "!"]]);
-		expect(commit(tracker, (draft) => appendText(draft.meta, "note", "ote"))).toEqual([
-			["a", ["meta", "note"], "ote"],
-		]);
+		expect(commit(tracker, draft => appendText(draft, "title", "!"))).toEqual([["a", ["title"], "!"]]);
+		expect(commit(tracker, draft => appendText(draft.meta, "note", "ote"))).toEqual([["a", ["meta", "note"], "ote"]]);
 		expect(tracker.value).toEqual({
 			title: "t!",
 			content: [{ type: "text", text: "hello world", tags: ["a"] }],
@@ -46,7 +44,7 @@ describe("appendText", () => {
 
 	it("joins several appends to one key in one change into one op, next to other changes", () => {
 		const tracker = track(doc());
-		const ops = commit(tracker, (draft) => {
+		const ops = commit(tracker, draft => {
 			appendText(draft.content[0]!, "text", " a");
 			draft.title = "new";
 			appendText(draft.content[0]!, "text", " b");
@@ -62,25 +60,25 @@ describe("appendText", () => {
 	it("falls back to the string comparison when the same key is also assigned or deleted", () => {
 		const tracker = track(doc());
 		expect(
-			commit(tracker, (draft) => {
+			commit(tracker, draft => {
 				appendText(draft.content[0]!, "text", " x");
 				draft.content[0]!.text += " y";
 			}),
 		).toEqual([["a", ["content", 0, "text"], " x y"]]);
 		expect(
-			commit(tracker, (draft) => {
+			commit(tracker, draft => {
 				appendText(draft.content[0]!, "text", " z");
 				draft.content[0]!.text = "replaced";
 			}),
 		).toEqual([["s", ["content", 0, "text"], "replaced"]]);
 		expect(
-			commit(tracker, (draft) => {
+			commit(tracker, draft => {
 				draft.title = "assigned";
 				appendText(draft, "title", " then appended");
 			}),
 		).toEqual([["s", ["title"], "assigned then appended"]]);
 		expect(
-			commit(tracker, (draft) => {
+			commit(tracker, draft => {
 				appendText(draft.meta, "note", "x");
 				delete (draft.meta as { note?: string }).note;
 			}),
@@ -89,13 +87,13 @@ describe("appendText", () => {
 
 	it("appends inside a block the same change inserted or replaced", () => {
 		const tracker = track(doc());
-		commit(tracker, (draft) => {
+		commit(tracker, draft => {
 			draft.content.push({ type: "text", text: "new", tags: [] });
 			appendText(draft.content[1]!, "text", " block");
 			draft.content[0] = { type: "text", text: "other", tags: [] };
 			appendText(draft.content[0]!, "text", " one");
 		});
-		expect(tracker.value.content.map((block) => block.text)).toEqual(["other one", "new block"]);
+		expect(tracker.value.content.map(block => block.text)).toEqual(["other one", "new block"]);
 	});
 
 	it("rejects what a JavaScript caller can get wrong", () => {
@@ -142,7 +140,7 @@ describe("appendText", () => {
 		const ops: Op[] = [];
 		for (let index = 0; index < 50; index++) {
 			const source = `${index}`.repeat(100_000);
-			ops.push(...commit(tracker, (draft) => appendText(draft.content[0]!, "text", source.slice(0, 40))));
+			ops.push(...commit(tracker, draft => appendText(draft.content[0]!, "text", source.slice(0, 40))));
 		}
 		gc();
 		expect(getHeapStatistics().used_heap_size - before).toBeLessThan(1_000_000);

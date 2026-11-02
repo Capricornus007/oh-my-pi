@@ -45,7 +45,7 @@ export async function runClusterReload(
 	// version afterwards; a child whose hello arrives while the reload runs is synced or reconciled once it ends
 	// (`HostImpl.peerHello`).
 	const synced = [...host.connections].filter(
-		(connection) =>
+		connection =>
 			connection.role === "downstream" && connection.peer.kind === "host" && connection.open && connection.synced,
 	);
 	const codeVersion = host.peekNextCodeVersion();
@@ -54,10 +54,10 @@ export async function runClusterReload(
 		// Retire first: its `retire` frames reach every child before `prepare` (FIFO), so a child never retires a code
 		// version this host still runs roots of.
 		await reload.waitForRetirement();
-		const participants = synced.filter((connection) => connection.open);
+		const participants = synced.filter(connection => connection.open);
 		const id = ++reloadSeq;
 		const deadline = options.voteDeadline ?? (options.gateDeadline ?? 5000) + (options.retireDeadline ?? 5000) + 5000;
-		const votes = participants.map((connection) => {
+		const votes = participants.map(connection => {
 			const name = connection.name ?? "child";
 			const vote = awaitVote(connection, id, deadline);
 			connection.send({
@@ -72,7 +72,7 @@ export async function runClusterReload(
 				},
 			});
 			return vote.then(
-				(report) => [name, report as ReloadReport | undefined] as const,
+				report => [name, report as ReloadReport | undefined] as const,
 				(error: unknown) => {
 					const cause = reloadError(error);
 					throw new ChordError(cause.code, `${name}: ${cause.message}`, { cause, reason: cause.reason });
@@ -86,7 +86,7 @@ export async function runClusterReload(
 			}),
 			...votes,
 		]);
-		const failed = results.find((result) => result.status === "rejected");
+		const failed = results.find(result => result.status === "rejected");
 		if (failed !== undefined) {
 			for (const connection of participants) {
 				connection.votes.delete(id);

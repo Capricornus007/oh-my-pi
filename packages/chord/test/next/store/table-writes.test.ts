@@ -65,7 +65,7 @@ describe("schema writes", () => {
 		]);
 		expect(store.table(TABLE)).toMatchObject({ version: 2, state: "ready", indexes: { by_path: ["path"] } });
 		const indexes = await store.read(
-			(executor) => executor.all(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?`, TABLE),
+			executor => executor.all(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?`, TABLE),
 			context,
 		);
 		expect(indexes).toContainEqual({ name: `${TABLE}:by_path` });
@@ -82,7 +82,7 @@ describe("schema writes", () => {
 describe("row writes in the outbox", () => {
 	it("carry what a replica needs: put with v and json versions, update and delete with counts, the canonical set", async () => {
 		await opened();
-		await commitWith((changes) => {
+		await commitWith(changes => {
 			changes.put({ id: "a", path: "x/1", meta: {} });
 			changes.put({ id: "b", path: "x/2" });
 			changes.update({ id: "a" }, (e: { hits: never }) => ({ hits: add(e.hits, 1), note: undefined, meta: {} }));
@@ -116,14 +116,14 @@ describe("row writes in the outbox", () => {
 
 	it("a put is an upsert: the whole row replaced", async () => {
 		await opened();
-		await commitWith((changes) => changes.put({ id: "a", path: "x", hits: 5, note: "n" }));
-		await commitWith((changes) => changes.put({ id: "a", path: "y" }));
+		await commitWith(changes => changes.put({ id: "a", path: "x", hits: 5, note: "n" }));
+		await commitWith(changes => changes.put({ id: "a", path: "y" }));
 		expect(await handle.get({ id: "a" }, context)).toEqual({ id: "a", path: "y", hits: 0 });
 	});
 
 	it("updateWhere and deleteWhere are one statement each, recorded with where, set and count", async () => {
 		await opened();
-		await commitWith((changes) => {
+		await commitWith(changes => {
 			for (let i = 0; i < 5; i++) changes.put({ id: `e${i}`, path: i < 3 ? `a/${i}` : `b/${i}` });
 		});
 		const { counts, context: counting } = await metered();
@@ -149,7 +149,7 @@ describe("row writes in the outbox", () => {
 			},
 			{ kind: "deleteWhere", table: TABLE, where: { eq: ["path", "b/4"] }, count: 1 },
 		]);
-		expect((await handle.page(query(Edits), 10, context)).items.map((r) => r.path)).toEqual([
+		expect((await handle.page(query(Edits), 10, context)).items.map(r => r.path)).toEqual([
 			"c/0",
 			"c/1",
 			"c/2",
@@ -162,7 +162,7 @@ describe("alter writes", () => {
 	/** Applies `edits` to the edits table as the migration to version 3 does, one commit. */
 	async function altered(...edits: TableEdit[]): Promise<void> {
 		await store.commit(
-			edits.map((edit) => stageEdit(TABLE, 3, edit)),
+			edits.map(edit => stageEdit(TABLE, 3, edit)),
 			FENCE,
 			context,
 		);
@@ -171,7 +171,7 @@ describe("alter writes", () => {
 	/** The physical columns of the edits table. */
 	async function physical(): Promise<string[]> {
 		const rows = await store.read(
-			(executor) => executor.all<{ readonly name: string }>(`SELECT name FROM pragma_table_info('${TABLE}')`),
+			executor => executor.all<{ readonly name: string }>(`SELECT name FROM pragma_table_info('${TABLE}')`),
 			context,
 		);
 		return rows.map(({ name }) => name);
@@ -179,7 +179,7 @@ describe("alter writes", () => {
 
 	it("rename a column: a json(...) one's version column, the key and the indexes follow", async () => {
 		await opened();
-		await commitWith((changes) => changes.put({ id: "a", path: "p" }));
+		await commitWith(changes => changes.put({ id: "a", path: "p" }));
 		await altered({ kind: "rename", from: "meta", to: "info" }, { kind: "rename", from: "path", to: "file" });
 		expect(await physical()).toEqual(["id", "file", "hits", "note", "info", "info$v", "$v"]);
 		expect(store.table(TABLE)).toMatchObject({ indexes: { by_path: ["file"] } });
@@ -188,7 +188,7 @@ describe("alter writes", () => {
 
 	it("add a column: existing rows get its default; an opt(...) json(...) one adds its version column", async () => {
 		await opened();
-		await commitWith((changes) => changes.put({ id: "a", path: "p" }));
+		await commitWith(changes => changes.put({ id: "a", path: "p" }));
 		await altered(
 			{ kind: "add", name: "level", column: { type: "int", default: 3 } },
 			{ kind: "add", name: "extra", column: { type: "json", optional: true, version: 1, fingerprint: "f" } },
@@ -205,14 +205,14 @@ describe("alter writes", () => {
 			"extra",
 			"extra$v",
 		]);
-		const rows = await store.read((executor) => executor.all(`SELECT level FROM "${TABLE}"`), context);
+		const rows = await store.read(executor => executor.all(`SELECT level FROM "${TABLE}"`), context);
 		expect(rows).toEqual([{ level: 3 }]);
 		expect(store.table(TABLE)!.columns.level).toEqual({ type: "int", default: 3 });
 	});
 
 	it("drop a column (with its version column); a json edit changes the record only", async () => {
 		await opened();
-		await commitWith((changes) => changes.put({ id: "a", path: "p" }));
+		await commitWith(changes => changes.put({ id: "a", path: "p" }));
 		const column = { type: "json", optional: true, version: 4, fingerprint: "g" } as const;
 		await altered({ kind: "drop", name: "note" }, { kind: "json", name: "meta", column });
 		expect(await physical()).toEqual(["id", "path", "hits", "meta", "meta$v", "$v"]);

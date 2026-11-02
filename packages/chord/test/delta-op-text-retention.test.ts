@@ -37,7 +37,7 @@ describe("append op text", () => {
 				ops.push(...prepared.ops);
 				tracker.adopt(prepared);
 			}
-			expect(ops.every((op) => op[0] === "a")).toBe(true);
+			expect(ops.every(op => op[0] === "a")).toBe(true);
 			return { ops, value: tracker.value };
 		});
 		// One copy of the text plus the op texts: well under a megabyte. Sliced op texts held one copy per op (30 MB).
@@ -53,7 +53,7 @@ describe("append op text", () => {
 				ops.push(...diffRevisions({ text }, { text: next }));
 				text = next;
 			}
-			expect(ops.every((op) => op[0] === "a")).toBe(true);
+			expect(ops.every(op => op[0] === "a")).toBe(true);
 			return { ops, text };
 		});
 		expect(bytes).toBeLessThan(2_000_000);

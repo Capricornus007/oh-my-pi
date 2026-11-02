@@ -34,7 +34,7 @@ async function shipped(root: string): Promise<PluginScript[]> {
 	const { plugins } = await discoverPlugins([root], { kinds: ["worker"] }, context);
 	const options = { hostPackages: Object.keys(HOST_PACKAGES), platform: "node", plugins } as const;
 	return Promise.all(
-		plugins.map(async (each) => ({ plugin: each, built: await buildFacet(each, "worker", options, context) })),
+		plugins.map(async each => ({ plugin: each, built: await buildFacet(each, "worker", options, context) })),
 	);
 }
 

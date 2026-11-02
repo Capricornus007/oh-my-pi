@@ -69,7 +69,7 @@ abstract class BaseLink implements Link {
 		const next = (this.#decoding ?? Promise.resolve())
 			.then(() => frame)
 			.then(
-				(decoded) => this.#deliverNow(decoded),
+				decoded => this.#deliverNow(decoded),
 				() => this.close("protocol error"),
 			)
 			.finally(() => {
@@ -373,7 +373,7 @@ export class WebSocketLink extends BaseLink {
 		socket.addEventListener("open", () => {
 			for (const data of this.#outbox.splice(0)) socket.send(data);
 		});
-		socket.addEventListener("message", (event) => {
+		socket.addEventListener("message", event => {
 			try {
 				const data = event.data;
 				if (typeof data === "string") {
@@ -390,7 +390,7 @@ export class WebSocketLink extends BaseLink {
 				if (bytes === undefined) throw new TypeError("unknown message type");
 				const { envelope, field, bytes: payload } = splitMessage(bytes);
 				if (zlib !== undefined) this.deliver({ ...envelope, [field]: new Packed(payload) } as Frame);
-				else this.deliverLater(inflate(payload).then((value) => ({ ...envelope, [field]: value }) as Frame));
+				else this.deliverLater(inflate(payload).then(value => ({ ...envelope, [field]: value }) as Frame));
 			} catch {
 				this.close("protocol error");
 			}

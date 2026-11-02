@@ -47,10 +47,10 @@ function startWorker(id: string) {
 	const worker = createHost<Principal>({
 		address: Session({ id }),
 		principal: { kind: "worker", session: id },
-		onError: (error) => console.log(`${at()}: worker reported ${error.kind}`),
+		onError: error => console.log(`${at()}: worker reported ${error.kind}`),
 	});
 	worker.connect(down, { principal: { kind: "server" }, trusted: true }, context);
-	const agents = defineFacet<Principal>((host) =>
+	const agents = defineFacet<Principal>(host =>
 		host.serve(Agent, (_params, _principal, self) => {
 			console.log(`${at()}: worker: Agent declares the server's Catalog`);
 			return { variant: "v", members: { models: self.get(Catalog, {}).models } };
@@ -68,13 +68,13 @@ const server = createHost<Principal>({
 	principal: { kind: "server" },
 	// No readyTimeout is needed to break anything: a long one shows nothing waits for it.
 	readyTimeout: 600_000,
-	onError: (error) => console.log(`${at()}: server reported ${error.kind}`),
+	onError: error => console.log(`${at()}: server reported ${error.kind}`),
 });
 server.route(
 	Session,
 	{
 		authorize: () => true,
-		resolve: async (address) => {
+		resolve: async address => {
 			const started = startWorker(address.params.id);
 			workers.push(started);
 			return { link: started.link, principal: { kind: "worker", session: address.params.id }, trusted: true };
@@ -82,7 +82,7 @@ server.route(
 	},
 	context,
 );
-const core = defineFacet<Principal>((host) => {
+const core = defineFacet<Principal>(host => {
 	host.serve(Catalog, () => ({ variant: "v", members: { models: constant(3) } }));
 	host.serve(Bootstrap, (_, self) => {
 		console.log(`${at()}: server: Bootstrap declares the worker's Agent`);

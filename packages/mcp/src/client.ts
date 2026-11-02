@@ -206,9 +206,9 @@ export class McpClient {
 		this.state = "connecting";
 		this.transport = transport;
 		this.disposers = [
-			transport.onMessage((message) => this.handleMessage(message)),
+			transport.onMessage(message => this.handleMessage(message)),
 			// Transport errors are reported only. Pending requests fail when the transport closes.
-			transport.onError((error) => this.emitError(error)),
+			transport.onError(error => this.emitError(error)),
 			transport.onClose(() => this.handleTransportClose()),
 		];
 
@@ -439,7 +439,7 @@ export class McpClient {
 			this.armTimeout(id, entry);
 			transport
 				.send(message, { signal: entry.sendController.signal })
-				.catch((error) => this.cancelPending(id, error, false));
+				.catch(error => this.cancelPending(id, error, false));
 		});
 	}
 
@@ -500,7 +500,7 @@ export class McpClient {
 					id: message.id,
 					error: { code: JSON_RPC_ERROR_CODES.methodNotFound, message: `Method not found: ${message.method}` },
 				})
-				.catch((error) => this.emitError(error));
+				.catch(error => this.emitError(error));
 			return;
 		}
 		const controller = new AbortController();
@@ -515,7 +515,7 @@ export class McpClient {
 					: { code: JSON_RPC_ERROR_CODES.internalError, message: toError(error).message };
 			await transport
 				.send({ jsonrpc: "2.0", id: message.id, error: responseError })
-				.catch((sendError) => this.emitError(sendError));
+				.catch(sendError => this.emitError(sendError));
 		} finally {
 			this.incoming.delete(message.id);
 		}
@@ -570,7 +570,7 @@ export class McpClient {
 					method: "notifications/cancelled",
 					params: { requestId: id, ...(reason ? { reason } : {}) },
 				})
-				.catch((sendError) => this.emitError(sendError));
+				.catch(sendError => this.emitError(sendError));
 		}
 	}
 

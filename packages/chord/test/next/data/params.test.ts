@@ -79,24 +79,24 @@ describe("checkParams", () => {
 			{ a: "x", b: "y|z" },
 			{ a: "x\\", b: "|z" },
 			{ a: "x\\|", b: "z" },
-		].map((raw) => checkParams(Pair, raw, BACKGROUND_CONTEXT).key);
+		].map(raw => checkParams(Pair, raw, BACKGROUND_CONTEXT).key);
 		expect(new Set(keys).size).toBe(keys.length);
 		expect(keys[0]).toBe("x\\|y|z");
 	});
 
 	it("counts one compilation per contract, then one validation per get; a failure adds one walk", async () => {
 		const Fresh = local("fresh", { version: 1, params: { id: str() }, members: {} });
-		expect(await counted((context) => checkParams(Fresh, { id: "a" }, context))).toEqual({
+		expect(await counted(context => checkParams(Fresh, { id: "a" }, context))).toEqual({
 			walks: 0,
 			validations: 1,
 			compilations: 1,
 		});
-		expect(await counted((context) => checkParams(Fresh, { id: "b" }, context))).toEqual({
+		expect(await counted(context => checkParams(Fresh, { id: "b" }, context))).toEqual({
 			walks: 0,
 			validations: 1,
 			compilations: 0,
 		});
-		const failed = await counted((context) => {
+		const failed = await counted(context => {
 			expect(() => checkParams(Fresh, { id: 1 }, context)).toThrow();
 		});
 		expect(failed).toEqual({ walks: 1, validations: 1, compilations: 0 });

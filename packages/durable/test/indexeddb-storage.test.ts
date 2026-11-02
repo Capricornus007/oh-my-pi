@@ -111,7 +111,7 @@ async function withStorage(use: (storage: Storage) => Promise<void>): Promise<vo
 
 registerStorageConformance({ describe, expect, it }, "IndexedDbStorage", withStorage);
 
-registerStorageConformance({ describe, expect, it }, "IndexedDbStorage across reopen", async (use) => {
+registerStorageConformance({ describe, expect, it }, "IndexedDbStorage across reopen", async use => {
 	const indexedDB = new IDBFactory();
 	const name = "reopening-conformance";
 	const created = await IndexedDbStorage.open(name, { indexedDB });
@@ -318,7 +318,7 @@ describe("commit", () => {
 	}
 
 	it("stores the batches before a refused one, and the storage goes on", () =>
-		withStorage("batch-prefix", async (storage) => {
+		withStorage("batch-prefix", async storage => {
 			const first = await storage.mintId<EntryId>();
 			const after = await storage.mintId<EntryId>();
 			const receipts: [number, Seq][] = [];
@@ -338,7 +338,7 @@ describe("commit", () => {
 		}));
 
 	it("resolves a copy against the state an earlier batch of the call left", () =>
-		withStorage("batch-copy", async (storage) => {
+		withStorage("batch-copy", async storage => {
 			const sourceId = await storage.mintId<DocumentId>();
 			const childId = await storage.mintId<ConversationId>();
 			const copyId = await storage.mintId<DocumentId>();
@@ -375,7 +375,7 @@ describe("commit", () => {
 		}));
 
 	it("refuses a batch whose copy fails before it writes anything, keeping the batches before it", () =>
-		withStorage("batch-copy-refused", async (storage) => {
+		withStorage("batch-copy-refused", async storage => {
 			const sourceId = await storage.mintId<DocumentId>();
 			await commitWrites(
 				storage,
@@ -415,7 +415,7 @@ describe("commit", () => {
 		}));
 
 	it("rejects with nothing stored when IndexedDB fails during a batch's checks", () =>
-		withStorage("batch-check-failure", async (storage) => {
+		withStorage("batch-check-failure", async storage => {
 			const first = await storage.mintId<EntryId>();
 			const second = await storage.mintId<EntryId>();
 			const get = FakeIDBObjectStore.prototype.get;
@@ -430,7 +430,7 @@ describe("commit", () => {
 			const receipts: number[] = [];
 			try {
 				await expect(
-					storage.commit([[entryWrite(first)], [entryWrite(second)]], (index) => receipts.push(index), context),
+					storage.commit([[entryWrite(first)], [entryWrite(second)]], index => receipts.push(index), context),
 				).rejects.toBe(failure);
 			} finally {
 				spy.mockRestore();
@@ -442,7 +442,7 @@ describe("commit", () => {
 		}));
 
 	it("rejects with nothing stored when IndexedDB fails during a batch's writes", () =>
-		withStorage("batch-write-failure", async (storage) => {
+		withStorage("batch-write-failure", async storage => {
 			const first = await storage.mintId<EntryId>();
 			const second = await storage.mintId<EntryId>();
 			// A function cannot be stored: the put throws IndexedDB's `DataCloneError`.
@@ -452,7 +452,7 @@ describe("commit", () => {
 			} as unknown as StorageWrite;
 			const receipts: number[] = [];
 			await expect(
-				storage.commit([[entryWrite(first)], [unstorable]], (index) => receipts.push(index), context),
+				storage.commit([[entryWrite(first)], [unstorable]], index => receipts.push(index), context),
 			).rejects.toMatchObject({ name: "DataCloneError" });
 			expect(receipts).toEqual([]);
 			expect(await storage.entry(first, context)).toBeUndefined();

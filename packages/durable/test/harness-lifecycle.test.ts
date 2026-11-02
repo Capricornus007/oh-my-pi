@@ -47,7 +47,7 @@ function oneStep(name: string, run: () => Promise<void> = async () => {}) {
 
 function start(conversation: Conversation, task: ReturnType<typeof oneStep>, background = false): Promise<TaskId> {
 	return conversation.commit(
-		(tx) => tx.createTask(task, null, { ownership: { kind: "conversation" }, background }),
+		tx => tx.createTask(task, null, { ownership: { kind: "conversation" }, background }),
 		context,
 	);
 }
@@ -265,7 +265,7 @@ describe("Harness close", () => {
 		const held = storage.holdCommits();
 		const controller = new AbortController();
 		const committing = root.commit(
-			(tx) => tx.appendEntry(root.id, { kind: "note" }).then((entry) => entry.id),
+			tx => tx.appendEntry(root.id, { kind: "note" }).then(entry => entry.id),
 			withSignal(controller.signal),
 		);
 		await held.entered;
@@ -273,7 +273,7 @@ describe("Harness close", () => {
 		held.release();
 		const id = await committing;
 		const page = await root.entries({}, 10, undefined, context);
-		expect(page.items.map((entry) => entry.id)).toEqual([id]);
+		expect(page.items.map(entry => entry.id)).toEqual([id]);
 		await harness.close(context);
 	});
 
@@ -288,7 +288,7 @@ describe("Harness close", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, []);
 		const root = await harness.root(context);
-		await harness.commit(async (tx) => {
+		await harness.commit(async tx => {
 			(await tx.doc(Notes)).text = "before";
 		}, context);
 		const docWatch = (await harness.watchDoc(Notes, context))!;
@@ -302,7 +302,7 @@ describe("Harness close", () => {
 		const viewValue = viewWatch.value;
 
 		const held = storage.holdCommits();
-		const committing = harness.commit(async (tx) => {
+		const committing = harness.commit(async tx => {
 			(await tx.doc(Notes)).text = "during close";
 			await tx.appendEntry(root.id, { kind: "note" });
 			await tx.createTask(oneStep("test.close-graph"), null, {
@@ -338,14 +338,14 @@ describe("Harness close", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, []);
 		const root = await harness.root(context);
-		await harness.commit(async (tx) => {
+		await harness.commit(async tx => {
 			(await tx.doc(Notes)).text = "x";
 		}, context);
 		// Count commit subscriptions of document observers.
 		let subscriptions = 0;
 		const session = harness as unknown as SessionImpl;
 		const subscribe = session.followCommits.bind(session);
-		session.followCommits = (listener) => {
+		session.followCommits = listener => {
 			subscriptions++;
 			const unsubscribe = subscribe(listener);
 			let active = true;
@@ -390,11 +390,11 @@ describe("Harness close", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, []);
 		const root = await harness.root(context);
-		const entry = await root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		const entry = await root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		const submission = await root.submit({ type: "write", entry: { kind: "note" } }, context);
 
 		const held = storage.holdCommits();
-		const blocking = harness.commit((tx) => tx.appendEntry(root.id, { kind: "blocker" }).then(() => {}), context);
+		const blocking = harness.commit(tx => tx.appendEntry(root.id, { kind: "blocker" }).then(() => {}), context);
 		await held.entered;
 		const queuedInspect = harness.inspect(context);
 		const closing = harness.close(context);
@@ -433,7 +433,7 @@ describe("Harness close", () => {
 				(error: unknown) => (/closed/.test(String(error)) ? "closed" : String(error)),
 			);
 		}
-		expect(outcomes).toEqual(Object.fromEntries(Object.keys(operations).map((name) => [name, "closed"])));
+		expect(outcomes).toEqual(Object.fromEntries(Object.keys(operations).map(name => [name, "closed"])));
 		expect(() => harness.resume()).toThrow("closed");
 		held.release();
 		await blocking;
@@ -460,17 +460,17 @@ describe("Harness close", () => {
 		const storage = new ControlledStorage();
 		const { harness } = await openTasks(storage, []);
 		const root = await harness.root(context);
-		await harness.commit((tx) => tx.doc(Notes).then(() => {}), context);
+		await harness.commit(tx => tx.doc(Notes).then(() => {}), context);
 		const taskId = await start(root, Pending);
 		const write = await root.submit({ type: "write", entry: { kind: "note" } }, context);
 		await write.wait(context);
 
 		const held = storage.holdCommits();
-		const blocking = harness.commit((tx) => tx.appendEntry(root.id, { kind: "blocker" }).then(() => {}), context);
+		const blocking = harness.commit(tx => tx.appendEntry(root.id, { kind: "blocker" }).then(() => {}), context);
 		await held.entered;
 		const settle = (promise: Promise<unknown>): Promise<string> =>
 			promise.then(
-				(value) => (value === undefined ? "undefined" : "resolved"),
+				value => (value === undefined ? "undefined" : "resolved"),
 				(error: unknown) => (/closed/.test(String(error)) ? "closed" : String(error)),
 			);
 		const queued = {
@@ -514,7 +514,7 @@ describe("scheduling on a paused Harness", () => {
 		// Background, so idle waits and conversation abort leave it alone.
 		const id = await start(root, Marker, true);
 		const submissionId = await harness.commit(
-			async (tx) => (await tx.createSubmission({ conversationId: root.id, type: "write", status: "queued" })).id,
+			async tx => (await tx.createSubmission({ conversationId: root.id, type: "write", status: "queued" })).id,
 			context,
 		);
 		return { harness, root, id, submissionId, ran: () => ran };
@@ -529,7 +529,7 @@ describe("scheduling on a paused Harness", () => {
 			scope: "session",
 			initial: () => ({ text: "" }),
 		});
-		await harness.commit((tx) => tx.doc(Notes).then(() => {}), context);
+		await harness.commit(tx => tx.doc(Notes).then(() => {}), context);
 		await harness.inspect(context);
 		await harness.getTask(id, context);
 		await harness.usage(context);

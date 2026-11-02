@@ -799,7 +799,7 @@ export class Transaction implements Tx {
 	 * only when every write changes an existing `latest`, `initial`-fork conversation document at its stored version.
 	 */
 	holdable(): { readonly loaded: LoadedDocument; readonly ops: readonly Op[]; readonly base: boolean }[] | undefined {
-		if (this.#writes.some((write) => write.type !== "document.change")) return undefined;
+		if (this.#writes.some(write => write.type !== "document.change")) return undefined;
 		const held = [];
 		for (const plan of this.#plans) {
 			const { content, change } = plan;
@@ -894,9 +894,7 @@ export class Transaction implements Tx {
 
 	/** Stage a content write for an incarnation, before its retirement when it retires. */
 	#insertBeforeRetirement(write: Extract<StorageWrite, { readonly type: "document.change" }>): void {
-		const at = this.#writes.findIndex(
-			(candidate) => candidate.type === "document.retire" && candidate.id === write.id,
-		);
+		const at = this.#writes.findIndex(candidate => candidate.type === "document.retire" && candidate.id === write.id);
 		if (at < 0) this.#writes.push(write);
 		else this.#writes.splice(at, 0, write);
 	}

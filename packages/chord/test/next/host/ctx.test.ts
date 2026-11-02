@@ -28,26 +28,26 @@ async function desk() {
 	const seen: { ctx?: Ctx; item?: Reference<typeof Item>; late?: Promise<unknown>; factories: number } = {
 		factories: 0,
 	};
-	const { host } = await loaded((h) => {
+	const { host } = await loaded(h => {
 		h.serve(Item, ({ id }) => {
 			seen.factories++;
 			return { id: constant(id) };
 		});
 		h.serve(Desk, () => ({
-			use: async (ctx) => {
+			use: async ctx => {
 				const item = await ctx.get(Item, { id: 1 });
 				return item.id.value;
 			},
-			leak: async (ctx) => {
+			leak: async ctx => {
 				seen.ctx = ctx;
 				seen.item = await ctx.get(Item, { id: 2 });
 				return null;
 			},
-			late: async (ctx) => {
+			late: async ctx => {
 				seen.late = ctx.get(Item, { id: 3 }).catch((error: unknown) => error);
 				return null;
 			},
-			who: async (ctx) => `${ctx.principal?.kind ?? "none"} ${ctx.incarnation}`,
+			who: async ctx => `${ctx.principal?.kind ?? "none"} ${ctx.incarnation}`,
 		}));
 	});
 	return { host, seen, desk: await host.get(Desk, {}, context) };
@@ -78,13 +78,13 @@ describe("ctx", () => {
 		let factories = 0;
 		let got: Promise<unknown> | undefined;
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Item, ({ id }) => {
 				factories++;
 				return { id: constant(id) };
 			});
 			h.serve(Desk, () => ({
-				use: async (ctx) => {
+				use: async ctx => {
 					await gate.promise;
 					got = ctx.get(Item, { id: 1 }).catch((error: unknown) => error);
 					return 0;
@@ -128,9 +128,9 @@ describe("ctx", () => {
 		});
 		const Starter = local("app.starter", { version: 1, params: {}, members: { start: method() } });
 		let pending: Promise<unknown> | undefined;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Starter, () => ({
-				start: async (ctx) => {
+				start: async ctx => {
 					pending = ctx.get(Far, {}).catch((error: unknown) => error);
 					return null;
 				},
@@ -164,13 +164,13 @@ describe("local handlers act as the host (§4, audit)", () => {
 			variants: { v: { methods: { who: method(undefined, str()), through: method(undefined, str()) } } },
 		});
 		const who = (ctx: Ctx<TestPrincipal>) => `${ctx.principal?.kind ?? "none"} ${ctx.incarnation}`;
-		const { server, client } = await linked((h) => {
-			h.serve(Store, () => ({ who: async (ctx) => who(ctx) }));
+		const { server, client } = await linked(h => {
+			h.serve(Store, () => ({ who: async ctx => who(ctx) }));
 			h.serve(Gate, () => ({
 				variant: "v",
 				members: {
-					who: async (ctx) => who(ctx),
-					through: async (ctx) => (await ctx.get(Store, {})).who(ctx),
+					who: async ctx => who(ctx),
+					through: async ctx => (await ctx.get(Store, {})).who(ctx),
 				},
 			}));
 		});

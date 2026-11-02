@@ -21,7 +21,7 @@ async function watched() {
 	await writePlugin(root, "b", "@test/b", { "server.ts": "" });
 	const failures: unknown[] = [];
 	const watcher = new PluginWatcher(
-		{ roots: [root], base: [base], kinds: KINDS, failed: (error) => failures.push(error) },
+		{ roots: [root], base: [base], kinds: KINDS, failed: error => failures.push(error) },
 		new Batch(() => {}, undefined),
 	);
 	const discovery = await discoverPlugins([root], { kinds: KINDS }, context);
@@ -33,7 +33,7 @@ async function watched() {
 		facet,
 		source: "",
 		digest: "",
-		inputs: files.map((file) => ({ file, hash: "" })),
+		inputs: files.map(file => ({ file, hash: "" })),
 		copied: [contract],
 		assets: [],
 	});
@@ -193,7 +193,7 @@ function inotifyWatches(): number {
 		try {
 			count += readFileSync(`/proc/self/fdinfo/${fd}`, "utf8")
 				.split("\n")
-				.filter((line) => line.startsWith("inotify wd:")).length;
+				.filter(line => line.startsWith("inotify wd:")).length;
 		} catch {
 			// Closed meanwhile.
 		}

@@ -51,7 +51,7 @@ function setter<C>(R: Registry<C, unknown>, initial: C, of: (n: number) => C) {
 }
 
 function kinds(errors: readonly HostError[]): string[] {
-	return errors.map((error) => error.kind);
+	return errors.map(error => error.kind);
 }
 
 describe("the table", () => {
@@ -62,7 +62,7 @@ describe("the table", () => {
 				self.contribute(Names, "a");
 				setter(Names, "store", String)(host);
 			},
-			"@m/provider": (host) => host.serve(Names, { compose: listed }),
+			"@m/provider": host => host.serve(Names, { compose: listed }),
 		});
 		const value = await host.registry(Names, context);
 		expect(value.value).toEqual(["@a/early:=a", "@a/early:app.setter=store", "@z/late:=z"]);
@@ -76,7 +76,7 @@ describe("the table", () => {
 		const V4 = defineRegistry<string, unknown>("app.versions", { version: 4 });
 		const adapted: string[] = [];
 		const { host, errors } = await loadedPlugins({
-			"@app/provider": (host) =>
+			"@app/provider": host =>
 				host.serve(V3, {
 					compose: listed,
 					accepts: {
@@ -89,7 +89,7 @@ describe("the table", () => {
 					},
 				}),
 			"@app/one": (_, self) => self.contribute(V1, "one"),
-			"@app/two": setter(V2, { old: "first" }, (n) => ({ old: `${n}` })),
+			"@app/two": setter(V2, { old: "first" }, n => ({ old: `${n}` })),
 			"@app/three": (_, self) => self.contribute(V3, "three"),
 			"@app/four": (_, self) => self.contribute(V4, "four"),
 		});
@@ -112,9 +112,9 @@ describe("the table", () => {
 		let composed: readonly string[] | undefined;
 		const { host } = await loadedPlugins({
 			"@app/a": (_, self) => self.contribute(Names, "first"),
-			"@app/provider": (host) =>
+			"@app/provider": host =>
 				host.serve(Names, {
-					compose: (table) => {
+					compose: table => {
 						composed = listed(table);
 						return composed;
 					},
@@ -135,7 +135,7 @@ describe("compose", () => {
 			{
 				"@app/provider": (host, self) => {
 					host.serve(Names, { compose: listed });
-					host.serve(Other, { compose: (table) => table.length });
+					host.serve(Other, { compose: table => table.length });
 					self.contribute(Names, "a");
 					host.serve(Reader, (_, self) => {
 						const names = self.registry(Names);
@@ -164,8 +164,8 @@ describe("compose", () => {
 		const Flagger = local("app.flagger", { version: 1, params: {}, members: { set: method(int()) } });
 		const { host } = await loadedPlugins(
 			{
-				"@app/flags": (host) => {
-					host.serve(Flags, { compose: (table) => table.filter(({ value }) => value).length });
+				"@app/flags": host => {
+					host.serve(Flags, { compose: table => table.filter(({ value }) => value).length });
 					host.serve(Flagger, (_, self) => {
 						const doc = self.state(Doc);
 						self.contribute(
@@ -174,7 +174,7 @@ describe("compose", () => {
 						);
 						return {
 							set: async (n: number, ctx) => {
-								await doc.change((d) => {
+								await doc.change(d => {
 									d.n = n;
 								}, ctx);
 								return null;
@@ -216,15 +216,15 @@ describe("compose", () => {
 		const Sum = defineRegistry<{ readonly a: number; readonly b: number }, number>("app.sum", { version: 1 });
 		const { host } = await loadedPlugins(
 			{
-				"@app/sum": (host) => {
-					host.serve(Sum, { compose: (table) => table.reduce((n, { value }) => n + value.a + value.b, 0) });
+				"@app/sum": host => {
+					host.serve(Sum, { compose: table => table.reduce((n, { value }) => n + value.a + value.b, 0) });
 					host.serve(Two, (_, self) => {
 						const doc = self.state(Doc);
 						self.contribute(Sum, doc);
 						return {
 							sum: self.derive([self.registry(Sum)], ([n]) => n),
 							both: async (n: number, ctx) => {
-								await self.tx(async (tx) => {
+								await self.tx(async tx => {
 									const d = await tx.draft(doc);
 									d.a = n;
 									d.b = n;
@@ -240,7 +240,7 @@ describe("compose", () => {
 		const two = await host.get(Two, {}, context);
 		const sums: number[] = [];
 		const watch = await two.sum.watch(context);
-		watch.start(async (call) => {
+		watch.start(async call => {
 			if (call.kind === "value") sums.push(call.value);
 		});
 		const base = counts()["chord.registry.composes"]!;
@@ -259,12 +259,12 @@ describe("compose", () => {
 		);
 		const { host, errors } = await loadedPlugins({
 			"@app/a": (_, self) => self.contribute(Routes, { "/x": "a" }),
-			"@app/b": setter(Routes, { "/x": "b" } as Readonly<Record<string, string>>, (n) => ({
+			"@app/b": setter(Routes, { "/x": "b" } as Readonly<Record<string, string>>, n => ({
 				"/x": "b",
 				[`/${n}`]: "b",
 			})),
-			"@app/http": (host) =>
-				host.serve(Routes, { compose: (table, { report }) => keyedEntries(table, (c) => c, report) }),
+			"@app/http": host =>
+				host.serve(Routes, { compose: (table, { report }) => keyedEntries(table, c => c, report) }),
 		});
 		const routes = await host.registry(Routes, context);
 		expect(routes.value.get("/x")).toEqual({ value: "a", plugin: "@app/a" });
@@ -287,21 +287,21 @@ describe("compose", () => {
 	it("a throwing compose: reported once, a failed call, `.value` keeps the last good composition; the next good one heals", async () => {
 		const Count = defineRegistry<number, number>("app.count", { version: 1 });
 		const { host, errors } = await loadedPlugins({
-			"@app/count": (host) => {
+			"@app/count": host => {
 				host.serve(Count, {
-					compose: (table) => {
+					compose: table => {
 						const sum = table.reduce((n, { value }) => n + value, 0);
 						if (sum < 0) throw new Error(`negative: ${sum}`);
 						return sum;
 					},
 				});
-				setter(Count, 1, (n) => n)(host);
+				setter(Count, 1, n => n)(host);
 			},
 		});
 		const count = await host.registry(Count, context);
 		const calls: NativeWatchCall<number>[] = [];
 		const watch = await count.watch(context);
-		watch.start(async (call) => void calls.push(call));
+		watch.start(async call => void calls.push(call));
 		const setters = await host.get(Setter, {}, context);
 		await setters.set(-1, context);
 		await setters.set(-2, context);
@@ -324,7 +324,7 @@ describe("compose", () => {
 	it("before any good composition, `.value` throws the error and `host.registry` rejects with it at its readyTimeout", async () => {
 		const Broken = defineRegistry<number, number>("app.broken", { version: 1 });
 		const { host, errors } = await loadedPlugins({
-			"@app/broken": (host) =>
+			"@app/broken": host =>
 				host.serve(Broken, {
 					compose: () => {
 						throw new Error("bug");
@@ -356,7 +356,7 @@ describe("contributions", () => {
 					);
 					return {
 						set: async (n: number, ctx) => {
-							await doc.change((d) => {
+							await doc.change(d => {
 								d.n = n;
 							}, ctx);
 							return null;
@@ -419,8 +419,8 @@ describe("contributions", () => {
 		const ToB = local("app.to-b", { version: 1, params: {}, members: {} });
 		const { host, errors } = await loadedPlugins({
 			"@app/ring": (h, self) => {
-				h.serve(A, { compose: (table) => table.length });
-				h.serve(B, { compose: (table) => table.length });
+				h.serve(A, { compose: table => table.length });
+				h.serve(B, { compose: table => table.length });
 				h.serve(ToA, (_, self) => {
 					self.contribute(A, self.registry(B));
 					return {};
@@ -434,7 +434,7 @@ describe("contributions", () => {
 			},
 		});
 		const live = [await host.get(ToA, {}, context), await host.get(ToB, {}, context)];
-		expect(live.map((reference) => reference.state.value)).toEqual([{ kind: "live" }, { kind: "live" }]);
+		expect(live.map(reference => reference.state.value)).toEqual([{ kind: "live" }, { kind: "live" }]);
 		// A composes first: B composes for it and its contribution of A, read while A composes, is left out. A has its
 		// plain entry and B's value, B its plain entry.
 		expect([(await host.registry(A, context)).value, (await host.registry(B, context)).value]).toEqual([2, 1]);
@@ -463,7 +463,7 @@ describe("contributions", () => {
 			return table.reduce((total, { value }) => total + (typeof value === "number" ? value : 0), 0);
 		};
 		const { host, errors } = await loadedPlugins({
-			"@app/later": (h) => {
+			"@app/later": h => {
 				h.serve(A, { compose: sum });
 				h.serve(B, { compose: sum });
 				h.serve(Ring, (_, self) => {
@@ -494,7 +494,7 @@ describe("contributions", () => {
 		// B changed and composes first now: it reads A, whose contribution of B, read while B composes, is cut instead.
 		expect(composes - before).toBe(2);
 		expect([a.value, b.value]).toEqual([0, 5]);
-		expect(errors.map((error) => (error.kind === "contribution_failed" ? error.registry : error.kind))).toEqual([
+		expect(errors.map(error => (error.kind === "contribution_failed" ? error.registry : error.kind))).toEqual([
 			"app.later-b",
 			"app.later-a",
 		]);
@@ -510,9 +510,9 @@ describe("contributions", () => {
 		const B = defineRegistry<unknown, number>("app.both-b", { version: 1 });
 		const Both = local("app.both", { version: 1, params: {}, members: {} });
 		const { host, errors } = await loadedPlugins({
-			"@app/both": (h) => {
-				h.serve(A, { compose: (table) => table.length });
-				h.serve(B, { compose: (table) => table.length });
+			"@app/both": h => {
+				h.serve(A, { compose: table => table.length });
+				h.serve(B, { compose: table => table.length });
 				h.serve(Both, (_, self) => {
 					self.contribute(A, self.registry(B));
 					self.contribute(
@@ -526,7 +526,7 @@ describe("contributions", () => {
 		expect((await host.get(Both, {}, context)).state.value).toEqual({ kind: "live" });
 		await host.registry(A, context);
 		await host.registry(B, context);
-		const cut = errors.filter((error) => error.kind === "contribution_failed");
+		const cut = errors.filter(error => error.kind === "contribution_failed");
 		expect(cut.length).toBeGreaterThan(0);
 		for (const error of cut) expect(error).toMatchObject({ error: { code: "invalid", reason: "cycle" } });
 		expect(failures(errors)).toEqual([]);
@@ -540,7 +540,7 @@ describe("contributions", () => {
 		const native = { value: "a handle", watch: () => "a native operation" };
 		const { host } = await loadedPlugins({
 			"@app/x": (h, self) => {
-				h.serve(Natives, { compose: (table) => table.map(({ value }) => value.watch()) });
+				h.serve(Natives, { compose: table => table.map(({ value }) => value.watch()) });
 				self.contribute(Natives, native);
 			},
 		});
@@ -552,7 +552,7 @@ describe("contributions", () => {
 		const Nothing = defineRegistry<undefined, number>("app.undefined", { version: 1 });
 		const { host } = await loadedPlugins({
 			"@app/a": (h, self) => {
-				h.serve(Nothing, { compose: (table) => table.length });
+				h.serve(Nothing, { compose: table => table.length });
 				self.contribute(Nothing, undefined);
 			},
 		});
@@ -565,16 +565,16 @@ describe("contributions", () => {
 		const Target = defineRegistry<number, readonly number[]>("app.target", { version: 1 });
 		const Bridge = local("app.bridge", { version: 1, params: {}, members: {} });
 		const { host, errors } = await loadedPlugins({
-			"@app/a": (h) => {
+			"@app/a": h => {
 				h.serve(Source, {
-					compose: (table) => {
+					compose: table => {
 						const n = table.reduce((sum, { value }) => sum + value, 0);
 						if (n < 0) throw new Error("negative");
 						return n;
 					},
 				});
-				h.serve(Target, { compose: (table) => table.map(({ value }) => value) });
-				setter(Source, 1, (n) => n)(h);
+				h.serve(Target, { compose: table => table.map(({ value }) => value) });
+				setter(Source, 1, n => n)(h);
 				h.serve(Bridge, (_, self) => {
 					self.contribute(Target, self.registry(Source));
 					return {};
@@ -588,7 +588,7 @@ describe("contributions", () => {
 		// The source's readers keep its last good value; as a contribution it is failed: left out, reported.
 		expect((await host.registry(Source, context)).value).toBe(1);
 		expect(target.value).toEqual([]);
-		expect(errors.find((error) => error.kind === "contribution_failed")).toMatchObject({
+		expect(errors.find(error => error.kind === "contribution_failed")).toMatchObject({
 			registry: "app.target",
 			plugin: "@app/a",
 			type: "app.bridge",
@@ -603,12 +603,12 @@ describe("contributions", () => {
 		let end: (() => void) | undefined;
 		const Follower = local("app.follower", { version: 1, params: {}, members: {} });
 		const { host, errors } = await loadedPlugins({
-			"@app/a": (h) => {
+			"@app/a": h => {
 				h.serve(Names, { compose: listed });
 				h.serve(Follower, (_, self) => {
 					self.contribute(
 						Names,
-						self.follow(async (observer) => {
+						self.follow(async observer => {
 							end = () => observer.end({ kind: "ended" });
 							return { value: "followed", detach: () => {} };
 						}),
@@ -630,7 +630,7 @@ describe("contributions", () => {
 		const { host, fail, retry } = await storeRestartable(
 			objects,
 			(attempt, self) => self.contribute(Names, `attempt ${attempt}`),
-			{ serve: (host) => host.serve(Names, { compose: listed }) },
+			{ serve: host => host.serve(Names, { compose: listed }) },
 		);
 		const names = await host.registry(Names, context);
 		expect(names.value).toEqual(["@test/app:app.store=attempt 1"]);
@@ -655,7 +655,7 @@ describe("the last good composition (decision 5)", () => {
 			objects,
 			(attempt, self) => self.contribute(Count, attempt),
 			{
-				serve: (host) => host.serve(Count, { compose }),
+				serve: host => host.serve(Count, { compose }),
 			},
 		);
 		const count = await host.registry(Count, context);
@@ -675,7 +675,7 @@ describe("the table's memory", () => {
 		const Kept = local("app.kept", { version: 1, params: {}, members: {} });
 		const refs = await (async () => {
 			const { host } = await loadedPlugins({
-				"@app/kept": (host) => {
+				"@app/kept": host => {
 					host.serve(Names, { compose: listed });
 					host.serve(Kept, (_, self) => {
 						self.contribute(
@@ -700,10 +700,10 @@ describe("a reload's new contribution adapter (fix round 1)", () => {
 		const Old = defineRegistry<number, number>("astra.contrib", { version: 1 });
 		const contribution = defineFacet((_, self) => self.contribute(Old, 7));
 		const provider = (factor: number) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(R, {
-					compose: (entries) => entries.reduce((n, e) => n + e.value, 0),
-					accepts: { 1: { contribution: (n) => n * factor, value: (n) => n } },
+					compose: entries => entries.reduce((n, e) => n + e.value, 0),
+					accepts: { 1: { contribution: n => n * factor, value: n => n } },
 				}),
 			);
 		const host = createHost({ onError: () => {} });

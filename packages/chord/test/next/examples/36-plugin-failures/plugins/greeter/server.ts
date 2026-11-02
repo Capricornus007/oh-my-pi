@@ -5,4 +5,4 @@ import { greeting } from "./label.ts";
 
 const Greeting = local("example.greeting", { version: 1, params: {}, members: { text: str() } });
 
-export default defineFacet((host) => host.serve(Greeting, () => ({ text: constant(greeting) })));
+export default defineFacet(host => host.serve(Greeting, () => ({ text: constant(greeting) })));

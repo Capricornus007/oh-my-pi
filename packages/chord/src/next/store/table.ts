@@ -97,7 +97,7 @@ export class TableDefinition<
 		this.version = version;
 		this.schemas = columns;
 		this.columns = describeColumns(columns, name);
-		this.byName = new Map(this.columns.map((column) => [column.name, column]));
+		this.byName = new Map(this.columns.map(column => [column.name, column]));
 		this.key = orderColumns(this.byName, key, `${name}: the key`);
 		if (this.key.length === 0) throw new Error(`${name}: the key has no column`);
 		this.indexes = new Map(
@@ -106,7 +106,7 @@ export class TableDefinition<
 				return [index, orderColumns(this.byName, columns, `${name}: index "${index}"`)] as const;
 			}),
 		);
-		this.record = Object.fromEntries(this.columns.map((column) => [column.name, columnRecord(column)]));
+		this.record = Object.fromEntries(this.columns.map(column => [column.name, columnRecord(column)]));
 		this.fingerprint = tableFingerprint(this.record, this.key, this.indexes);
 		this.rows = new RowCodec(this.columns, this.key, name);
 		this.refs = columnRefs(this.columns);

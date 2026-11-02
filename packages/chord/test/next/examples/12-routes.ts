@@ -54,13 +54,13 @@ const NoteStore = local("example.note-store", {
 const NotesDoc = defineState("notes", { schema: obj({ list: arr(str()) }), version: 1, initial: () => ({ list: [] }) });
 
 /** The worker's facet: an owner edits, anyone else reads; `whoami` shows whom a call acts for. */
-const workerFacet = defineFacet<P>((host) => {
+const workerFacet = defineFacet<P>(host => {
 	host.serve(NoteStore, (_, self) => {
 		const doc = self.state(NotesDoc);
 		return {
 			list: self.derive([doc], ([d]) => d.list),
 			add: async ({ text }, ctx) => {
-				await doc.change((draft) => void draft.list.push(text), ctx);
+				await doc.change(draft => void draft.list.push(text), ctx);
 				return doc.value.list.length;
 			},
 		};
@@ -73,7 +73,7 @@ const workerFacet = defineFacet<P>((host) => {
 	});
 });
 
-const serverFacet = defineFacet<P>((host) => {
+const serverFacet = defineFacet<P>(host => {
 	host.serve(Lobby, () => ({
 		variant: "visitor",
 		members: {
@@ -97,7 +97,7 @@ server.route(
 	{
 		authorize: (principal, address) =>
 			principal.kind === "owner" || (principal.kind === "guest" && principal.session === address.params.id),
-		resolve: async (address) => {
+		resolve: async address => {
 			console.log(`server: resolving ${address.key} (resolve #${++resolves})`);
 			const [up, down] = memoryLinkPair();
 			const worker = createHost<P>({
@@ -136,7 +136,7 @@ console.log("owner:", notes.variant, again.notes.value, "resolves so far:", reso
 const guest = await tabAs({ kind: "guest", session: "S1" });
 const read = await guest.get(Notes, { session: "S1" }, context);
 console.log("guest:", read.variant, read.notes.value, "acts as", await read.whoami(context));
-await guest.get(Notes, { session: "S2" }, context).catch((error) => {
+await guest.get(Notes, { session: "S2" }, context).catch(error => {
 	console.log("guest, S2:", isChordError(error) ? error.code : error, "resolves so far:", resolves);
 });
 
@@ -148,12 +148,12 @@ console.log("guest via the lobby:", await lobby.peek({ session: "S1" }, context)
 // its handshake), and the new worker (a fresh run, empty notes here) binds them again.
 const states: string[] = [];
 const watch = await notes.state.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") states.push(call.value.kind);
 });
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 workerLink!.close();
-while (states.length < 2 || states.at(-1) !== "live") await new Promise((resolve) => setTimeout(resolve, 50));
+while (states.length < 2 || states.at(-1) !== "live") await new Promise(resolve => setTimeout(resolve, 50));
 console.log("after the drop:", states.join(" → "), "notes:", notes.notes.value, "resolves:", resolves);
 
 await owner.close(context);

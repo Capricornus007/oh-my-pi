@@ -463,7 +463,6 @@ describe("ModelRegistry runtime discovery", () => {
 				{
 					id: "late-runtime-model",
 					name: "Late runtime model",
-					provider: "runtime-gateway",
 					api: "openai-completions",
 					baseUrl: "http://127.0.0.1:9992/v1",
 					reasoning: false,

@@ -259,7 +259,7 @@ describe("D11: members across variants", () => {
 });
 
 describe("reserved member names", () => {
-	it.each(["then", "release", "variant", "state", "retry"])("refuses %s in remote, local and evolve", (name) => {
+	it.each(["then", "release", "variant", "state", "retry"])("refuses %s in remote, local and evolve", name => {
 		expect(() =>
 			remote("n", { version: 1, params: {}, hostAddress, variants: { v: { state: { [name]: str() } } } }),
 		).toThrow(`n.v.state.${name}: "${name}" is reserved: a reference has it`);
@@ -267,7 +267,7 @@ describe("reserved member names", () => {
 			`n.members.${name}: "${name}" is reserved: a reference has it`,
 		);
 		const base = local("n", { version: 1, params: {}, members: {} });
-		expect(() => evolve(base, (e) => e.addState(name, str()))).toThrow(
+		expect(() => evolve(base, e => e.addState(name, str()))).toThrow(
 			`n v2.members.${name}: "${name}" is reserved: a reference has it`,
 		);
 	});
@@ -281,7 +281,7 @@ describe("keyed members (slice 6a §12)", () => {
 		expect([[...variant.keyed.keys()], [...variant.state.keys()]]).toEqual([["notes"], []]);
 		expect(Keyed.fingerprint).not.toBe(State.fingerprint);
 		// Evolving the contract carries its keyed members over unchanged (their versions are slice 7's).
-		const next = evolve(Keyed, (e) => e.addMethod("clear", str(), str()));
+		const next = evolve(Keyed, e => e.addMethod("clear", str(), str()));
 		expect(currentVariants(next).get(LOCAL)!.keyed.has("notes")).toBe(true);
 	});
 

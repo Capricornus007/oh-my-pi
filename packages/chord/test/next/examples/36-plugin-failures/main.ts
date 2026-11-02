@@ -27,7 +27,7 @@ await cp(fileURLToPath(new URL("./plugins/", import.meta.url)), root, { recursiv
 
 /** Waits until `ready()` holds (the watcher's events arrive on their own time). */
 async function until(ready: () => boolean): Promise<void> {
-	while (!ready()) await new Promise((resolve) => setTimeout(resolve, 10));
+	while (!ready()) await new Promise(resolve => setTimeout(resolve, 10));
 }
 
 /** Replaces `from` with `to` in the plugin file `file` (the copy). */
@@ -38,14 +38,14 @@ async function edit(file: string, from: string, to: string): Promise<void> {
 
 /** Waits until the watcher marks every plugin in `names` dirty, then builds the dirty plugins. */
 async function buildDirty(names: readonly string[]) {
-	await until(() => names.every((name) => plugins.state.value.dirty.includes(name)));
+	await until(() => names.every(name => plugins.state.value.dirty.includes(name)));
 	return plugins.build(plugins.state.value.dirty, context);
 }
 
 /** A reload's report: what changed, its objects' fates, and each failed plugin with its error's mapped stack. */
 function print(report: ReloadReport): void {
 	console.log("   plugins:", JSON.stringify(report.plugins));
-	const objects = report.objects.map((each) => `${each.object} ${each.kind}`);
+	const objects = report.objects.map(each => `${each.object} ${each.kind}`);
 	if (objects.length > 0) console.log("   objects:", objects.join(", "));
 	for (const { plugin, error } of report.failed) {
 		// The first line, and the second where it names the plugin's code: a build error, or a mapped stack frame.
@@ -69,7 +69,7 @@ const plugins = createPlugins(
 	{
 		roots: [root],
 		kinds: { server: { platform: "node", hostPackages: Object.keys(modules) } },
-		onError: (error) => console.log("plugins:", error.kind),
+		onError: error => console.log("plugins:", error.kind),
 	},
 	context,
 );
@@ -91,7 +91,7 @@ const summary = await host.get(Summary, {}, context);
 const status = await host.get(Status, {}, context);
 const values = () =>
 	[greeting.text.value, boot.mode.value, counter.start.value, summary.text.value]
-		.map((v) => JSON.stringify(v))
+		.map(v => JSON.stringify(v))
 		.join(" ");
 console.log("   running:", values());
 
@@ -134,7 +134,7 @@ await edit("cache/server.ts", 'const generation = "v1"', 'const generation = "v2
 const cache = await buildDirty(["@example/cache"]);
 const abort = new AbortController();
 const watchStatus = await status.state.watch(context);
-watchStatus.start(async (call) => {
+watchStatus.start(async call => {
 	if (call.kind !== "value") return;
 	console.log("   the status reference:", call.value.kind);
 	if (call.value.kind !== "live") abort.abort(new Error("the app shuts down"));

@@ -54,7 +54,7 @@ function napTask(delay: number, runs: { after: number } = { after: 0 }) {
 
 async function startNap(harness: Awaited<ReturnType<typeof openTasks>>["harness"], task: ReturnType<typeof napTask>) {
 	const root = await harness.root(context);
-	return root.commit((tx) => tx.createTask(task, null, { ownership: { kind: "conversation" } }), context);
+	return root.commit(tx => tx.createTask(task, null, { ownership: { kind: "conversation" } }), context);
 }
 
 async function stateOf(harness: Awaited<ReturnType<typeof openTasks>>["harness"], id: TaskId) {
@@ -74,13 +74,13 @@ function fakeTimers() {
 			timer.disarmed = true;
 		};
 	};
-	return { armed, setTimer, live: () => armed.filter((timer) => !timer.disarmed) };
+	return { armed, setTimer, live: () => armed.filter(timer => !timer.disarmed) };
 }
 
 /** Let microtasks and a few timer turns run. */
 async function settle(): Promise<void> {
 	await flush();
-	await new Promise((resolve) => setTimeout(resolve, 20));
+	await new Promise(resolve => setTimeout(resolve, 20));
 	await flush();
 }
 
@@ -92,7 +92,7 @@ describe("sleeping tasks", () => {
 		const Nap = napTask(1_000, runs);
 		const { harness } = await openTasks(new MemoryStorage(), [Nap], {
 			now: () => clock,
-			onWake: (wake) => wakes.push(wake),
+			onWake: wake => wakes.push(wake),
 		});
 		const graph = await harness.watchTaskGraph(context);
 		// A started watch keeps its value current.
@@ -106,7 +106,7 @@ describe("sleeping tasks", () => {
 			until: 2_000,
 		});
 		const inspection = await harness.inspect(context);
-		expect(inspection.tasks.find((task) => task.record.id === id)?.state).toEqual({ kind: "sleeping", until: 2_000 });
+		expect(inspection.tasks.find(task => task.record.id === id)?.state).toEqual({ kind: "sleeping", until: 2_000 });
 		expect(graph.value.tasks[String(id)]?.state).toEqual({ status: "sleeping", phase: "after", until: 2_000 });
 		await eventually(() => !harness.wake().active);
 		expect(harness.wake()).toEqual({ active: false, at: 2_000 });
@@ -174,12 +174,12 @@ describe("sleeping tasks", () => {
 		const { harness } = await openTasks(new MemoryStorage(), [Nap], { now: () => clock, setTimer: timers.setTimer });
 		const id = await startNap(harness, Nap);
 		harness.resume();
-		await eventually(() => timers.live().some((timer) => timer.delayMs === 500));
+		await eventually(() => timers.live().some(timer => timer.delayMs === 500));
 		expect((await stateOf(harness, id))?.status).toBe("sleeping");
 		clock = 1_500;
 		timers
 			.live()
-			.find((timer) => timer.delayMs === 500)!
+			.find(timer => timer.delayMs === 500)!
 			.callback();
 		// Polled: `waitForTask()` would call `resume()`, which wakes due sleeps itself.
 		await eventually(async () => (await stateOf(harness, id))?.status === "terminal");
@@ -217,13 +217,13 @@ describe("sleeping tasks", () => {
 		});
 		const aborted = await startNap(harness, Short);
 		harness.resume();
-		await eventually(() => timers.live().some((timer) => timer.delayMs === 500));
+		await eventually(() => timers.live().some(timer => timer.delayMs === 500));
 		await harness.abortTask(aborted, context);
 		await harness.waitForTask(aborted, context);
 		await eventually(() => timers.live().length === 0);
 		const kept = await startNap(harness, Short);
 		await eventually(async () => (await stateOf(harness, kept))?.status === "sleeping");
-		expect(timers.live().map((timer) => timer.delayMs)).toEqual([500]);
+		expect(timers.live().map(timer => timer.delayMs)).toEqual([500]);
 		await harness.close(context);
 		expect(timers.live()).toEqual([]);
 	});
@@ -245,13 +245,10 @@ describe("sleeping tasks", () => {
 		const timers = fakeTimers();
 		const { harness } = await openTasks(new MemoryStorage(), [Timed], { setTimer: timers.setTimer });
 		const root = await harness.root(context);
-		const id = await root.commit(
-			(tx) => tx.createTask(Timed, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await root.commit(tx => tx.createTask(Timed, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();
 		await harness.waitForTask(id, context);
-		const timer = timers.armed.find((armed) => armed.delayMs === 60_000)!;
+		const timer = timers.armed.find(armed => armed.delayMs === 60_000)!;
 		await eventually(() => timer.disarmed);
 		// A host timer that fires anyway: the ended invocation's callback does not run.
 		timer.callback();
@@ -288,7 +285,7 @@ describe("sleeping tasks", () => {
 		harness.resume();
 		expect((await harness.waitForTask(first, context)).state.outcome.status).toBe("completed");
 		expect((await harness.waitForTask(second, context)).state.outcome.status).toBe("completed");
-		expect(reports.map((error) => (error as Error).message)).toEqual([
+		expect(reports.map(error => (error as Error).message)).toEqual([
 			"HarnessOptions.setTimer declined a timer that paces work; using setTimeout",
 		]);
 		await harness.close(context);
@@ -304,7 +301,7 @@ describe("sleeping tasks", () => {
 			initial: () => ({ phase: "start" }),
 			phases: {
 				start: async (task, runtime, ctx) => {
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						const child = await tx.createTask(Child, null, { ownership: { kind: "task", taskId: task.id } });
 						// Held: completes next, holding its outcome over the sleeping child. Otherwise waits for it.
 						return task.input.hold
@@ -325,7 +322,7 @@ describe("sleeping tasks", () => {
 			});
 			const root = await harness.root(context);
 			const id = await root.commit(
-				(tx) => tx.createTask(Parent, { hold }, { ownership: { kind: "conversation" } }),
+				tx => tx.createTask(Parent, { hold }, { ownership: { kind: "conversation" } }),
 				context,
 			);
 			harness.resume();
@@ -384,11 +381,11 @@ describe("sleeping tasks", () => {
 		const { harness } = await openTasks(new MemoryStorage(), [Invalid, Aborting]);
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Invalid, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Invalid, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const aborting = await root.commit(
-			(tx) => tx.createTask(Aborting, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Aborting, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		harness.resume();
@@ -409,7 +406,7 @@ describe("sleeping tasks", () => {
 		const { harness } = await openTasks(new MemoryStorage(), []);
 		const root = await harness.root(context);
 		// Created through a token the registry does not hold: nothing can run it.
-		await root.commit((tx) => tx.createTask(Missing, null, { ownership: { kind: "conversation" } }), context);
+		await root.commit(tx => tx.createTask(Missing, null, { ownership: { kind: "conversation" } }), context);
 		await eventually(() => !harness.wake().active);
 		expect(harness.wake()).toEqual({ active: false });
 		harness.resume();
@@ -427,14 +424,14 @@ describe("sleeping tasks", () => {
 		const Nap = napTask(1_000);
 		const { harness, registry, reports } = await openTasks(new MemoryStorage(), [Nap], {
 			now: () => clock,
-			onWake: (wake) => {
+			onWake: wake => {
 				wakes.push(wake);
 				if (failing && wake.at !== undefined) throw failure;
 			},
 		});
 		const id = await startNap(harness, Nap);
 		harness.resume();
-		await eventually(() => wakes.some((wake) => wake.at === 2_000 && !wake.active));
+		await eventually(() => wakes.some(wake => wake.at === 2_000 && !wake.active));
 		expect(reports).toContain(failure);
 		// The host recovers; an unrelated change offers the same, undelivered wake again.
 		failing = false;

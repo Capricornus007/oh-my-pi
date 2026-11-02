@@ -38,13 +38,13 @@ export async function openHarness(
 ): Promise<{ readonly harness: Harness; readonly registry: Registry }> {
 	const registry = options.registry ?? createRegistry();
 	if (toolNames.length > 0)
-		registry.install(defineExtension({ name: "tools", tools: toolNames.map((name) => tool(name)) }));
+		registry.install(defineExtension({ name: "tools", tools: toolNames.map(name => tool(name)) }));
 	const harness = await Harness.open(
 		storage,
 		{
 			models: createModels(),
 			registry,
-			...(options.onReport === undefined ? {} : { onReport: (report) => options.onReport?.(report.error) }),
+			...(options.onReport === undefined ? {} : { onReport: report => options.onReport?.(report.error) }),
 		},
 		context,
 	);
@@ -59,7 +59,7 @@ export function assistant(
 	text: string,
 	options: { readonly calls?: readonly string[]; readonly stopReason?: StopReason } = {},
 ): AssistantMessage {
-	const calls: ToolCall[] = (options.calls ?? []).map((id) => ({
+	const calls: ToolCall[] = (options.calls ?? []).map(id => ({
 		type: "toolCall",
 		id,
 		name: `tool-${id}`,
@@ -105,11 +105,11 @@ export function describeMessage(message: Message): string {
 		case "user":
 			return `user:${message.content as string}`;
 		case "assistant": {
-			const text = message.content.find((content) => content.type === "text");
+			const text = message.content.find(content => content.type === "text");
 			return `assistant:${text?.type === "text" ? text.text : ""}`;
 		}
 		case "toolResult": {
-			const text = message.content.find((content) => content.type === "text");
+			const text = message.content.find(content => content.type === "text");
 			return `result:${message.toolCallId}:${message.isError ? "error" : text?.type === "text" ? text.text : ""}`;
 		}
 		case "system":

@@ -47,8 +47,8 @@ function errored(variant: EvalObservation["variant"], runNumber: number, totalTo
 }
 
 function expectedFor(runNumbers: readonly number[]): ExpectedEvalRun[] {
-	return runNumbers.flatMap((runNumber) =>
-		(["without_docs", "with_docs"] as const).map((variant) => ({
+	return runNumbers.flatMap(runNumber =>
+		(["without_docs", "with_docs"] as const).map(variant => ({
 			evalSet: "tool access",
 			caseId: "create",
 			variant,

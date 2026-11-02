@@ -18,7 +18,7 @@ const Runtime = local("app.runtime", { version: 1, params: {}, members: { set: m
 /** Serves `Models` (throwing for a negative sum) and `Runtime`, contributing a writable count of models. */
 function serveModels(h: FacetHost): void {
 	h.serve(Models, {
-		compose: (table) => {
+		compose: table => {
 			const sum = table.reduce((n, { value }) => n + value, 0);
 			if (sum < 0) throw new Error("negative");
 			return sum;
@@ -62,7 +62,7 @@ function serveUser(h: FacetHost, opens: { n: number }, wait?: () => Promise<void
 describe("retryOn", () => {
 	it("retries a failed object (a broken open) when a source gets a new value: the watches were installed before the open", async () => {
 		const opens = { n: 0 };
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			serveUser(h, opens);
 		});
@@ -79,7 +79,7 @@ describe("retryOn", () => {
 	it("does nothing while the object is parked failed { waiting }: its dependencies decide (dependency model §3.8)", async () => {
 		const Missing = local("app.missing", { version: 1, params: {}, members: {} });
 		let factories = 0;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			h.serve(User, (_, self) => {
 				factories++;
@@ -99,7 +99,7 @@ describe("retryOn", () => {
 
 	it("wakes on value calls only: a throwing compose wakes nothing, its next good composition does", async () => {
 		const opens = { n: 0 };
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			serveUser(h, opens);
 		});
@@ -119,7 +119,7 @@ describe("retryOn", () => {
 	it("remembers a wake while it activates: that attempt failing is retried at once", async () => {
 		const opens = { n: 0 };
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			serveUser(h, opens, async () => {
 				if (opens.n === 1) await gate.promise;
@@ -140,7 +140,7 @@ describe("retryOn", () => {
 
 	it("ignores wakes while live", async () => {
 		const opens = { n: 0 };
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			h.serve(User, (_, self) => {
 				self.retryOn(self.registry(Models));
@@ -163,7 +163,7 @@ describe("retryOn", () => {
 	it("refuses sources that end with an attempt: a reference's member, its own writable, `ref.state`", async () => {
 		const Other = local("app.other", { version: 1, params: {}, members: { n: int() } });
 		const Picky = local("app.picky", { version: 1, params: { which: int() }, members: {} });
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Other, () => ({ n: constant(1) }));
 			h.serve(Picky, ({ which }, self) => {
 				const other = self.get(Other, {});
@@ -183,7 +183,7 @@ describe("retryOn", () => {
 
 	it("are the object's: a failed object that ends releases them, and is collected while the registry lives", async () => {
 		const opens = { n: 0 };
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			serveUser(h, opens);
 		});
@@ -192,7 +192,7 @@ describe("retryOn", () => {
 			await flushed();
 			user.release();
 			await flushed();
-			return objects.filter((ref) => ref.deref()?.label === "app.user(1)");
+			return objects.filter(ref => ref.deref()?.label === "app.user(1)");
 		})();
 		expect(refs.length).toBeGreaterThan(0);
 		await expectCollected(...refs);
@@ -202,7 +202,7 @@ describe("retryOn", () => {
 	it("does not wake an object by its own contributions leaving (it failed live: no retry without backoff)", async () => {
 		const Contributor = local("app.contributor", { version: 1, params: {}, members: {} });
 		let contributor: StoreSelf | undefined;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			serveModels(h);
 			h.serve(Contributor, (_, self) => {
 				contributor = self;
@@ -213,7 +213,7 @@ describe("retryOn", () => {
 		});
 		const models = await host.registry(Models, context);
 		const watched: number[] = [];
-		(await models.watch(context)).start(async (call) => void (call.kind === "value" && watched.push(call.value)));
+		(await models.watch(context)).start(async call => void (call.kind === "value" && watched.push(call.value)));
 		failLive(objects, contributor as Self, new ChordError({ code: "unavailable", message: "boom" }));
 		await flushed();
 		const reference = host.hold(Contributor, {}, context);

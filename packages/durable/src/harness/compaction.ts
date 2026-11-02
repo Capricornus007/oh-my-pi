@@ -138,7 +138,7 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint, 
 				...(instructions === undefined ? {} : { instructions }),
 			};
 			let decision: { readonly decline: true } | { readonly summary: string } | undefined;
-			await runtime.hooks.each("beforeCompact", async (hook) => {
+			await runtime.hooks.each("beforeCompact", async hook => {
 				if (decision === undefined) decision = await hook(compaction, runtime, context);
 			});
 			if (decision !== undefined && "decline" in decision) return complete(runtime, context);
@@ -165,7 +165,7 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint, 
 			if (model === undefined) return failNoModel(runtime, ref, context);
 			// The context at `tail` is immutable, so this is the range `select` chose.
 			const view = await runtime.context(runtime.conversationId, context, { at: tail });
-			const cut = view.entries.findIndex((entry) => entry.id === firstKept);
+			const cut = view.entries.findIndex(entry => entry.id === firstKept);
 			const now = runtime.now();
 			const messages: Message[] = [
 				{ role: "system", content: SUMMARIZATION_SYSTEM_PROMPT, timestamp: now },
@@ -226,7 +226,7 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint, 
 			if (cutOffTooOften(task, runtime)) return failCutOff(runtime, task, context);
 			if (until > runtime.now()) return runtime.sleepUntil(until, task.state.checkpoint, context);
 			const attempt = request.attempt + 1;
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				const status = compactionStatus(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId);
 				if (status !== undefined) {
 					status.attempt = attempt;
@@ -237,7 +237,7 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint, 
 		},
 	},
 	abort: async (_task, runtime, context) => {
-		await runtime.commit(async (tx) => {
+		await runtime.commit(async tx => {
 			removeCompactionStatus(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId);
 			return { status: "terminal", outcome: { status: "aborted" } };
 		}, context);
@@ -293,7 +293,7 @@ export function selectCut(view: ContextView, keepRecentTokens: number): number |
 	for (let index = contributions.length - 1; index >= start; index--) {
 		for (const message of contributions[index]!) kept += estimateMessageTokens(message);
 		if (kept < keepRecentTokens) continue;
-		cut = candidates.find((candidate) => candidate >= index) ?? candidates.at(-1);
+		cut = candidates.find(candidate => candidate >= index) ?? candidates.at(-1);
 		break;
 	}
 	if (cut === undefined) return undefined;
@@ -308,9 +308,9 @@ function isCandidate(contributions: ContextView["contributions"], index: number)
 	// A result of the preceding assistant's calls that follows this entry, before the next assistant, belongs before it.
 	let calls: ReadonlySet<string> = new Set();
 	for (let before = index - 1; before >= 0; before--) {
-		const assistant = contributions[before]!.findLast((message) => message.role === "assistant");
+		const assistant = contributions[before]!.findLast(message => message.role === "assistant");
 		if (assistant === undefined) continue;
-		calls = new Set(assistant.content.flatMap((content) => (content.type === "toolCall" ? [content.id] : [])));
+		calls = new Set(assistant.content.flatMap(content => (content.type === "toolCall" ? [content.id] : [])));
 		break;
 	}
 	if (calls.size === 0) return true;
@@ -352,10 +352,9 @@ export function estimateContext(view: ContextView, extra: readonly Message[]): n
 
 /** The summary of a clean `stop` with text and no tool call; anything else is not a summary. */
 function summaryText(message: AssistantMessage): string | undefined {
-	if (message.stopReason !== "stop" || message.content.some((content) => content.type === "toolCall"))
-		return undefined;
+	if (message.stopReason !== "stop" || message.content.some(content => content.type === "toolCall")) return undefined;
 	const text = message.content
-		.flatMap((content) => (content.type === "text" ? [content.text] : []))
+		.flatMap(content => (content.type === "text" ? [content.text] : []))
 		.join("\n")
 		.trim();
 	return text.length === 0 ? undefined : text;
@@ -366,7 +365,7 @@ function summaryFailure(message: AssistantMessage): string {
 		return `Summarization failed: ${message.errorMessage ?? message.stopReason}`;
 	}
 	if (message.stopReason === "length") return "Summarization hit the token limit; the summary is incomplete";
-	if (message.content.some((content) => content.type === "toolCall")) return "Summarization attempted to call a tool";
+	if (message.content.some(content => content.type === "toolCall")) return "Summarization attempted to call a tool";
 	return "Summarization produced no text";
 }
 
@@ -389,8 +388,8 @@ export function serializeConversation(messages: readonly Message[]): string {
 			const text = contentText(message.content);
 			if (text.length > 0) parts.push(`[User]: ${text}`);
 		} else if (message.role === "assistant") {
-			const text = message.content.flatMap((content) => (content.type === "text" ? [content.text] : []));
-			const calls = message.content.flatMap((content) =>
+			const text = message.content.flatMap(content => (content.type === "text" ? [content.text] : []));
+			const calls = message.content.flatMap(content =>
 				content.type === "toolCall"
 					? [
 							`${content.name}(${Object.entries(content.arguments)
@@ -411,9 +410,7 @@ export function serializeConversation(messages: readonly Message[]): string {
 
 function contentText(content: string | readonly { readonly type: string; readonly text?: string }[]): string {
 	if (typeof content === "string") return content;
-	return content
-		.flatMap((block) => (block.type === "text" && block.text !== undefined ? [block.text] : []))
-		.join("\n");
+	return content.flatMap(block => (block.type === "text" && block.text !== undefined ? [block.text] : [])).join("\n");
 }
 
 function truncate(text: string, maxChars: number): string {
@@ -472,7 +469,7 @@ async function placeSummary(
 
 /** Remove the status and complete without a summary. */
 async function complete(runtime: Runtime, context: Context): Promise<void> {
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		removeCompactionStatus(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId);
 		return { status: "terminal", outcome: { status: "completed", result: {} } };
 	}, context);
@@ -481,7 +478,7 @@ async function complete(runtime: Runtime, context: Context): Promise<void> {
 /** Fail a compaction cut off `settings.restartLimit` times in a row (spec §5.4) instead of running it again. */
 async function failCutOff(runtime: Runtime, task: { readonly restarts?: number }, context: Context): Promise<void> {
 	const message = `Compaction was interrupted ${cutOffCount(task)}`;
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		failCompactionStatus(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId, message);
 		return {
 			status: "terminal",
@@ -493,7 +490,7 @@ async function failCutOff(runtime: Runtime, task: { readonly restarts?: number }
 async function failNoModel(runtime: Runtime, ref: ModelRef | undefined, context: Context): Promise<void> {
 	const message =
 		ref === undefined ? "No model is configured" : `Model ${ref.provider}/${ref.modelId} is not available`;
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		failCompactionStatus(await tx.doc(LiveDoc, runtime.conversationId), runtime.taskId, message);
 		return { status: "terminal", outcome: { status: "failed", error: { message, detail: { reason: "no_model" } } } };
 	}, context);

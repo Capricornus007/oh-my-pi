@@ -72,7 +72,7 @@ describe("a path", () => {
 	it("says what changed: a holder attached without a link, a drop, the last release; fails its holders waiting", () => {
 		const events: string[] = [];
 		const failed: string[] = [];
-		const path = new Path((event) => events.push(event.kind));
+		const path = new Path(event => events.push(event.kind));
 		const a = {
 			attach: () => {},
 			dropped: () => {},

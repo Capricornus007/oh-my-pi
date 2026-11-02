@@ -75,10 +75,10 @@ describe("fingerprints", () => {
 		const declare = () =>
 			remote("n", { version: 1, params: {}, hostAddress: () => Server(), variants: { a: { state: { s: str() } } } });
 		const v1 = declare();
-		const v2 = evolve(v1, (e) => e.state("a", "s", int()));
+		const v2 = evolve(v1, e => e.state("a", "s", int()));
 		expect(declare().fingerprint).toBe(v1.fingerprint);
 		expect(v2.fingerprint).not.toBe(v1.fingerprint);
-		expect(evolve(declare(), (e) => e.state("a", "s", int())).fingerprint).toBe(v2.fingerprint);
+		expect(evolve(declare(), e => e.state("a", "s", int())).fingerprint).toBe(v2.fingerprint);
 	});
 
 	it("differ between local and remote", () => {

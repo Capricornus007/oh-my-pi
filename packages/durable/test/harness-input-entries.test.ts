@@ -69,7 +69,7 @@ const HOLD = fauxAssistantMessage([fauxToolCall("hold", {}, { id: "c1" })], { st
 /** Role and text of each request message, as the provider receives them. */
 function requestLog(requests: string[][], reply: AssistantMessage): FauxResponseStep {
 	return (request: ModelContext) => {
-		requests.push(request.messages.map((message) => `${message.role}:${textOf(message) ?? ""}`));
+		requests.push(request.messages.map(message => `${message.role}:${textOf(message) ?? ""}`));
 		return reply;
 	};
 }
@@ -77,8 +77,8 @@ function requestLog(requests: string[][], reply: AssistantMessage): FauxResponse
 /** Kind, application data, and model text of each entry, skipping system entries. */
 function transcript(entries: readonly EntryRecord[]): unknown[][] {
 	return entries
-		.filter((entry) => entry.kind !== "pi.system")
-		.map((entry) => {
+		.filter(entry => entry.kind !== "pi.system")
+		.map(entry => {
 			const message = entry.model?.[0];
 			const text = message === undefined || message.role === "toolResult" ? undefined : textOf(message);
 			const data = entry.data === undefined || entry.kind.startsWith("pi.") ? [] : [entry.data];
@@ -110,13 +110,13 @@ describe("input entries", () => {
 			["chat.mention", { author: "ann", text: "hi" }, "ann: hi"],
 			["pi.assistant", "hi ann"],
 		]);
-		const placed = entries.find((entry) => entry.kind === "chat.mention")!;
+		const placed = entries.find(entry => entry.kind === "chat.mention")!;
 		expect(placed.model).toEqual([{ role: "user", content: "ann: hi", timestamp: 42 }]);
 		expect(settled).toMatchObject({ status: "done", entry: placed.id, answer: entries.at(-1)!.id });
 		expect(requests).toEqual([["user:ann: hi"]]);
 		// The context of a fork at the input is the same as for a pi.user entry.
 		const view = await root.context(context, { at: placed.id });
-		expect(view.messages.filter((message) => message.role !== "system")).toEqual(placed.model);
+		expect(view.messages.filter(message => message.role !== "system")).toEqual(placed.model);
 		await harness.close(context);
 	});
 
@@ -160,13 +160,11 @@ describe("input entries", () => {
 		});
 		first.release();
 		await queued.wait(context);
-		const mentions = (await allEntries(root)).filter((entry) => entry.kind === "chat.mention");
-		expect(mentions.map((entry) => [entry.head, entry.edits, textOf(entry.model?.[0]), entry.model?.length])).toEqual(
-			[
-				[undefined, undefined, "idle", 1],
-				[undefined, undefined, "later", 1],
-			],
-		);
+		const mentions = (await allEntries(root)).filter(entry => entry.kind === "chat.mention");
+		expect(mentions.map(entry => [entry.head, entry.edits, textOf(entry.model?.[0]), entry.model?.length])).toEqual([
+			[undefined, undefined, "idle", 1],
+			[undefined, undefined, "later", 1],
+		]);
 		await harness.close(context);
 	});
 
@@ -218,8 +216,8 @@ describe("input entries", () => {
 			["p2.input", "f"],
 			["pi.assistant", "follow-up"],
 		]);
-		const answers = entries.filter((entry) => entry.kind === "pi.assistant");
-		const placed = (kind: string) => entries.find((entry) => entry.kind === kind)!.id;
+		const answers = entries.filter(entry => entry.kind === "pi.assistant");
+		const placed = (kind: string) => entries.find(entry => entry.kind === kind)!.id;
 		expect(await input.status(context)).toMatchObject({ status: "done", answer: answers[1]!.id });
 		expect(await steer.status(context)).toMatchObject({
 			status: "done",
@@ -244,14 +242,14 @@ describe("input entries", () => {
 		const withdrawn = await root.submit({ type: "input", content: "w", entry: mention("w") }, context);
 		const aborted = await root.submit({ type: "input", content: "x", entry: mention("x") }, context);
 		expect(await withdrawn.abort(context)).toBe("aborted");
-		expect((await inboxItems(harness, root)).map((item) => item.id)).toEqual([aborted.id]);
+		expect((await inboxItems(harness, root)).map(item => item.id)).toEqual([aborted.id]);
 		await root.abort(context);
 		for (const submission of [withdrawn, aborted]) {
 			expect(await submission.wait(context)).toMatchObject({ status: "unanswered", reason: "aborted" });
 		}
 		expect(await input.wait(context)).toMatchObject({ status: "unanswered", reason: "aborted" });
 		expect(await inboxItems(harness, root)).toEqual([]);
-		expect((await allEntries(root)).some((entry) => entry.kind === "chat.mention")).toBe(false);
+		expect((await allEntries(root)).some(entry => entry.kind === "chat.mention")).toBe(false);
 		await harness.close(context);
 	});
 });
@@ -279,7 +277,7 @@ describe("data-only writes", () => {
 			["chat.message", { author: "bob", text: "lunch?" }],
 		]);
 		// The view shows it while the run goes on.
-		const shown = history.views.find((view) => view.entries.some((entry) => entry.kind === "chat.message"));
+		const shown = history.views.find(view => view.entries.some(entry => entry.kind === "chat.message"));
 		expect(shown?.entries.at(-1)).toMatchObject({
 			kind: "chat.message",
 			id: settled.status === "done" && settled.entry,
@@ -319,9 +317,9 @@ describe("data-only writes", () => {
 		await input.wait(context);
 		const settled = await chat.wait(context);
 		const entries = await allEntries(root);
-		const reset = entries.find((entry) => entry.kind === "pi.reset")!;
+		const reset = entries.find(entry => entry.kind === "pi.reset")!;
 		expect(settled.status === "done" && settled.entry).toBeGreaterThan(reset.id);
-		expect((await root.context(context)).entries.map((entry) => entry.kind)).toEqual(["pi.reset", "chat.message"]);
+		expect((await root.context(context)).entries.map(entry => entry.kind)).toEqual(["pi.reset", "chat.message"]);
 		// Once the reset is placed, display-only writes go in at once again.
 		const later = await root.submit({ type: "write", entry: { kind: "chat.message", data: "again" } }, context);
 		expect((await later.status(context)).status).toBe("done");
@@ -350,7 +348,7 @@ describe("data-only writes", () => {
 		render.resolve();
 		await second.wait(context);
 		expect(requests[1]).toEqual(["system:", "user:a", "assistant:one", "user:b"]);
-		const kinds = (await allEntries(root)).map((entry) => entry.kind);
+		const kinds = (await allEntries(root)).map(entry => entry.kind);
 		// The unchanged prompt adds no second pi.system entry.
 		expect(kinds).toEqual(["pi.user", "pi.system", "pi.assistant", "pi.user", "chat.message", "pi.assistant"]);
 		await harness.close(context);
@@ -371,7 +369,7 @@ describe("data-only writes", () => {
 		expect((await note.status(context)).status).toBe("done");
 		await harness.waitForIdle(context);
 		expect((await f.status(context)).status).toBe("queued");
-		expect((await inboxItems(harness, root)).map((item) => item.id)).toEqual([f.id]);
+		expect((await inboxItems(harness, root)).map(item => item.id)).toEqual([f.id]);
 		expect(await harness.snapshot(LiveDoc, root.id, context)).toEqual({
 			runFailure: {
 				taskId: expect.any(Number),
@@ -408,11 +406,11 @@ describe("data-only writes", () => {
 			await opened.harness.close(context);
 
 			opened = await openChat(await openNodeSqliteStorage(path), setup);
-			expect((await inboxItems(opened.harness, opened.root)).find((item) => item.id === f)).toMatchObject({
+			expect((await inboxItems(opened.harness, opened.root)).find(item => item.id === f)).toMatchObject({
 				entry: mention("f"),
 			});
 			const settled = await (await opened.harness.submission(f, context))!.wait(context);
-			const placed = (await allEntries(opened.root)).find((entry) => entry.kind === "chat.mention")!;
+			const placed = (await allEntries(opened.root)).find(entry => entry.kind === "chat.mention")!;
 			expect(settled).toMatchObject({ status: "done", entry: placed.id });
 			expect(placed).toMatchObject({ data: mention("f").data, model: [{ role: "user", content: "f" }] });
 			await opened.harness.close(context);
@@ -433,14 +431,14 @@ describe("data-only writes", () => {
 			{ type: "write", entry: { kind: "note", model: [{ role: "user", content: "m", timestamp: 0 }] } },
 			context,
 		);
-		const target = (await allEntries(root)).find((entry) => entry.kind === "pi.user")!;
+		const target = (await allEntries(root)).find(entry => entry.kind === "pi.user")!;
 		const edit = await root.submit(
 			{ type: "write", entry: { kind: "redact", edits: [{ target: target.id, action: "omit" }] } },
 			context,
 		);
 		const note = await root.submit({ type: "write", entry: { kind: "note", data: "n" } }, context);
 		expect((await note.status(context)).status).toBe("done");
-		expect((await inboxItems(harness, root)).map((item) => [item.id, item.mode])).toEqual([
+		expect((await inboxItems(harness, root)).map(item => [item.id, item.mode])).toEqual([
 			[followUp.id, "followUp"],
 			[model.id, "write"],
 			[edit.id, "write"],

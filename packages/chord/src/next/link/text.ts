@@ -78,7 +78,7 @@ function ownTuple(message: Message): string {
 			// Optional trailing fields: an absent one in the middle is null, absent ones at the end are left out.
 			const optional = [principal ?? null, incarnation ?? null, chain ?? null, limit ?? null];
 			while (optional.length > 0 && optional.at(-1) === null) optional.pop();
-			const rest = optional.map((field) => `,${json(field)}`).join("");
+			const rest = optional.map(field => `,${json(field)}`).join("");
 			return `${head},${partText(message.params)},${json([address.kind, address.params])}${rest}]`;
 		}
 		case "release":
@@ -149,7 +149,7 @@ function withPayload(head: string, part: Part | undefined, segments: readonly Ui
 	if (part === undefined) return head;
 	const prefix = `${head.slice(0, -1)},${partText(part)}`;
 	if (segments === undefined) return `${prefix}]`;
-	return `${prefix},${json(segments.map((segment) => segment.byteLength))}]`;
+	return `${prefix},${json(segments.map(segment => segment.byteLength))}]`;
 }
 
 /**
@@ -186,7 +186,7 @@ function fromFields(fields: unknown[], rest: Uint8Array): Message {
 			arity(6, 7, 8, 9, 10);
 			const address = list(f[5]);
 			if (address.length !== 2) throw new Error("text: an address is a pair");
-			const [principal, incarnation, chain, limit] = [6, 7, 8, 9].map((index) => f[index] ?? null);
+			const [principal, incarnation, chain, limit] = [6, 7, 8, 9].map(index => f[index] ?? null);
 			return {
 				kind: "hold",
 				hold: field(0),
@@ -258,7 +258,7 @@ function fromFields(fields: unknown[], rest: Uint8Array): Message {
 			};
 		case "f": {
 			arity(3, 4);
-			const causeKind = CAUSE_KINDS.find((each) => each[0] === f[1]);
+			const causeKind = CAUSE_KINDS.find(each => each[0] === f[1]);
 			if (causeKind === undefined) throw new Error("text: an unknown failure kind");
 			// The schema check after decoding establishes the wire error.
 			const error = f[2] as Extract<Message, { kind: "error" }>["error"];
@@ -316,7 +316,7 @@ function payload<K extends string>(
 	}
 	const lengths = list(fields[1]);
 	let offset = 0;
-	const segments = lengths.map((length) => {
+	const segments = lengths.map(length => {
 		if (!Number.isSafeInteger(length) || (length as number) < 0) throw new Error("text: a segment length");
 		const segment = rest.subarray(offset, offset + (length as number));
 		offset += length as number;
@@ -333,7 +333,7 @@ function list(value: unknown): unknown[] {
 
 /** A list of `[index, value]` pairs. */
 function pairs(value: unknown): [unknown, unknown][] {
-	return list(value).map((pair) => {
+	return list(value).map(pair => {
 		const entry = list(pair);
 		if (entry.length !== 2) throw new Error("text: expected a pair");
 		return entry as [unknown, unknown];

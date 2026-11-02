@@ -86,12 +86,12 @@ export type TableDefinitionWrite = Extract<TableWrite, { readonly kind: "table" 
 
 /** Stages a `table` write: the table created when the store does not have it yet, its record replaced otherwise. */
 export function stageTable(write: TableDefinitionWrite): StagedWrite {
-	return { order: "write", apply: async (step) => [await applyTable(step, write)] };
+	return { order: "write", apply: async step => [await applyTable(step, write)] };
 }
 
 /** Stages an `index` write. */
 export function stageIndex(write: Extract<TableWrite, { readonly kind: "index" }>): StagedWrite {
-	return { order: "write", apply: async (step) => [await applyIndex(step, write)] };
+	return { order: "write", apply: async step => [await applyIndex(step, write)] };
 }
 
 /** Stages one edit of the migration of `table` to `version` as its `alter`, `index` or `dropIndex` write. */
@@ -101,11 +101,11 @@ export function stageEdit(table: string, version: number, edit: TableEdit): Stag
 			return stageIndex({ kind: "index", table, name: edit.name, columns: edit.columns });
 		case "dropIndex": {
 			const write = { kind: "dropIndex", table, name: edit.name } as const;
-			return { order: "write", apply: async (step) => [await applyDropIndex(step, write)] };
+			return { order: "write", apply: async step => [await applyDropIndex(step, write)] };
 		}
 		default: {
 			const write = { kind: "alter", table, version, edit } as const;
-			return { order: "write", apply: async (step) => [await applyAlter(step, write)] };
+			return { order: "write", apply: async step => [await applyAlter(step, write)] };
 		}
 	}
 }
@@ -115,7 +115,7 @@ export function stagePut(sql: string, table: string, row: EncodedRow, version: n
 	const write: TableWrite = { kind: "put", table, row: row.row, version, columns: row.columns };
 	return {
 		order: "write",
-		apply: async (step) => {
+		apply: async step => {
 			await step.run(sql, ...row.params);
 			return [write];
 		},
@@ -135,12 +135,12 @@ export function stageUpdate(
 	version?: number,
 ): StagedWrite {
 	const stamped = version === undefined ? {} : { version };
-	return counted(statement, (count) => ({ kind: "update", table, key, set, columns, count, ...stamped }));
+	return counted(statement, count => ({ kind: "update", table, key, set, columns, count, ...stamped }));
 }
 
 /** Stages a `delete` of one row by key; its count is recorded. */
 export function stageDelete(statement: Statement, table: string, key: StoredKey): StagedWrite {
-	return counted(statement, (count) => ({ kind: "delete", table, key, count }));
+	return counted(statement, count => ({ kind: "delete", table, key, count }));
 }
 
 /**
@@ -156,18 +156,18 @@ export function stageUpdateWhere(
 	version?: number,
 ): StagedWrite {
 	const stamped = version === undefined ? {} : { version };
-	return counted(statement, (count) => ({ kind: "updateWhere", table, where, set, columns, count, ...stamped }));
+	return counted(statement, count => ({ kind: "updateWhere", table, where, set, columns, count, ...stamped }));
 }
 
 /** Stages a `deleteWhere`: one statement, its count recorded. */
 export function stageDeleteWhere(statement: Statement, table: string, where: WhereNode): StagedWrite {
-	return counted(statement, (count) => ({ kind: "deleteWhere", table, where, count }));
+	return counted(statement, count => ({ kind: "deleteWhere", table, where, count }));
 }
 
 function counted(statement: Statement, record: (count: number) => TableWrite): StagedWrite {
 	return {
 		order: "write",
-		apply: async (step) => [record(await step.runCounted(statement.sql, ...statement.params))],
+		apply: async step => [record(await step.runCounted(statement.sql, ...statement.params))],
 	};
 }
 

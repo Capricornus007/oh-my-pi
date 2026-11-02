@@ -112,7 +112,7 @@ describe("running's list", () => {
 		const { batch, list } = running();
 		const count = new Derive([list], ([value]) => (value as JsonValue[]).length, batch);
 		count.attach(
-			(source) => source as Running,
+			source => source as Running,
 			() => {},
 		);
 		expect(count.value).toBe(0);

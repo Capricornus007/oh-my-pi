@@ -83,7 +83,7 @@ function dryRun(candidate: Candidate): void {
 	const values = new Map<unknown, unknown>(migrated);
 	const derives = [...run.decls.derives].sort(([, a], [, b]) => a.seq - b.seq);
 	for (const [name, derived] of derives) {
-		const value = derived.compute((source) => (values.has(source) ? values.get(source) : candidateValue(source)));
+		const value = derived.compute(source => (values.has(source) ? values.get(source) : candidateValue(source)));
 		for (const schema of exposed.get(derived) ?? [])
 			assertValid("state", `${object.address}: derivation ${name}`, schema, value);
 		values.set(derived, value);
@@ -159,7 +159,7 @@ const ABORTED_ROOTS_GRACE = 1000;
 /** Resolves true once `ready()` holds (checked whenever retirement-relevant state changes), false after `ms`. */
 function until(host: HostImpl, ready: () => boolean, ms: number): Promise<boolean> {
 	if (ready()) return Promise.resolve(true);
-	return new Promise<boolean>((resolve) => {
+	return new Promise<boolean>(resolve => {
 		const timer = setTimeout(() => {
 			stop();
 			resolve(false);
@@ -277,7 +277,7 @@ export class Reload {
 
 	/** Builds the candidate service table: unchanged services plus everything the given facets serve. */
 	load(): void {
-		const replaced = new Set([...this.facets.map((facet) => facet.name), ...(this.options.remove ?? [])]);
+		const replaced = new Set([...this.facets.map(facet => facet.name), ...(this.options.remove ?? [])]);
 		const current = this.host.current.services;
 		this.services = new Map([...current].filter(([, service]) => !replaced.has(service.facet)));
 		for (const facet of this.facets) {
@@ -351,14 +351,14 @@ export class Reload {
 	async prepareAll(): Promise<void> {
 		for (;;) {
 			const todo = [...this.host.objects.values()].filter(
-				(object) =>
+				object =>
 					this.changed.has(object.typeName) &&
 					!this.candidates.has(object) &&
 					object.service !== this.services.get(object.typeName) &&
 					(object.status === "live" || object.status === "activating"),
 			);
 			if (todo.length === 0) return;
-			await Promise.allSettled(todo.map((object) => object.ready));
+			await Promise.allSettled(todo.map(object => object.ready));
 			this.#alive();
 			for (const object of todo) {
 				if (object.status === "live" && object.service !== this.services.get(object.typeName)) {
@@ -398,8 +398,7 @@ export class Reload {
 		}
 		const deferred = new Set<ResourceImpl>();
 		for (const resource of run.created.resources) {
-			if (resource.exclusive || resource.deps.some((dep) => deferred.has(dep as ResourceImpl)))
-				deferred.add(resource);
+			if (resource.exclusive || resource.deps.some(dep => deferred.has(dep as ResourceImpl))) deferred.add(resource);
 		}
 		for (const resource of deferred) {
 			candidate.atGate.push(resource);
@@ -408,7 +407,7 @@ export class Reload {
 		}
 		if (deferred.size > 0) candidate.reasons.push("exclusive resource replaced");
 		await object.open(
-			run.created.resources.filter((resource) => !deferred.has(resource)),
+			run.created.resources.filter(resource => !deferred.has(resource)),
 			run.created.refs,
 			this.abort.signal,
 		);
@@ -456,11 +455,11 @@ export class Reload {
 	 */
 	async gate(): Promise<void> {
 		this.gated = [...this.candidates.values()].filter(
-			(candidate) => candidate.reasons.length > 0 && candidate.object.status === "live",
+			candidate => candidate.reasons.length > 0 && candidate.object.status === "live",
 		);
 		const drained = this.gated.map(({ object }) => {
 			const grandfathered = new Set(object.leases.keys());
-			return new Promise<void>((resolve) => {
+			return new Promise<void>(resolve => {
 				object.gate = { grandfathered, queue: [], drained: resolve };
 				object.stopTasks();
 				if (grandfathered.size === 0) resolve();
@@ -470,7 +469,7 @@ export class Reload {
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		const timedOut = await Promise.race([
 			Promise.all(drained).then(() => false),
-			new Promise<boolean>((resolve) => {
+			new Promise<boolean>(resolve => {
 				timer = setTimeout(() => resolve(true), deadline);
 			}),
 		]);

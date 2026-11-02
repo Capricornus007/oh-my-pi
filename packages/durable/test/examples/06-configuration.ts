@@ -27,7 +27,7 @@ function exampleTool(name: string, description: string): AppTool {
 		name,
 		description,
 		parameters: obj({ path: str() }),
-		execute: async (args) => ({ output: [{ type: "text", text: `${name} ${args.path}` }] }),
+		execute: async args => ({ output: [{ type: "text", text: `${name} ${args.path}` }] }),
 	});
 	return { ...tool, snippet: `Use ${name} for files.` };
 }
@@ -40,7 +40,7 @@ const Search = defineExtension<AppTool>({ name: "search", tools: [grep] });
 // Sections see the offered tools as app tools, so one can render their snippets.
 const Snippets = defineExtension<AppTool>({
 	name: "snippets",
-	sections: [section("tool_snippets", (input) => input.agent.tools.map((tool) => tool.snippet).join("\n"))],
+	sections: [section("tool_snippets", input => input.agent.tools.map(tool => tool.snippet).join("\n"))],
 });
 
 const registry = createRegistry<AppTool>();
@@ -63,7 +63,7 @@ const root = await harness.root(context);
 
 // A new conversation stores no choices and follows the host: every installed
 // extension, all of their tools.
-const tools = async () => (await root.agent(context)).tools.map((tool) => tool.name);
+const tools = async () => (await root.agent(context)).tools.map(tool => tool.name);
 console.log("default tools:", await tools());
 
 // configure() stores choices in the conversation's pi.agent document, one

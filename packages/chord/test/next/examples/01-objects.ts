@@ -22,7 +22,7 @@ const Clock = local("example.clock", { version: 1, params: {}, members: { starte
 
 // A facet is a plugin's setup for one host. It serves types with factories; a factory only declares and returns the
 // implementation: a watchable per state member, an async function per method.
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Clock, () => {
 		console.log("clock: created at load");
 		return { started: constant(Date.now()) };
@@ -37,7 +37,7 @@ const facet = defineFacet((host) => {
 });
 
 // onError receives background errors, such as a watch listener that throws.
-const host = createHost({ onError: (error) => console.error("background error:", error) });
+const host = createHost({ onError: error => console.error("background error:", error) });
 // load runs every setup and activates the types with empty params before it resolves.
 await host.load([{ name: "@example/greeter", facet }], context);
 

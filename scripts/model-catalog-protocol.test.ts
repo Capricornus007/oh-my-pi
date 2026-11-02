@@ -107,7 +107,7 @@ test("validates stored indexes and drops publication metadata", () => {
 	assert.deepEqual(
 		parseModelCatalogIndex({
 			...index,
-			catalogs: index.catalogs.map((catalog) => ({ ...catalog, sourceCommit: "abc", modelCount: 1 })),
+			catalogs: index.catalogs.map(catalog => ({ ...catalog, sourceCommit: "abc", modelCount: 1 })),
 		}),
 		index,
 	);

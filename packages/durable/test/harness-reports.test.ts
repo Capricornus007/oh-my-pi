@@ -60,10 +60,7 @@ describe("reports", () => {
 		});
 		const { harness, reports } = await open([Faulty]);
 		const root = await harness.root(context);
-		const id = await root.commit(
-			(tx) => tx.createTask(Faulty, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await root.commit(tx => tx.createTask(Faulty, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();
 		expect((await harness.waitForTask(id, context)).state.outcome.status).toBe("faulted");
 		await eventually(() => reports.length === 2);
@@ -98,7 +95,7 @@ describe("reports", () => {
 		const old = defineExtension({ name: "old-extension", tasks: [Old] });
 		registry.install(old);
 		const root = await harness.root(context);
-		const id = await root.commit((tx) => tx.createTask(Old, null, { ownership: { kind: "conversation" } }), context);
+		const id = await root.commit(tx => tx.createTask(Old, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();
 		await started.promise;
 		registry.uninstall(old);
@@ -154,7 +151,7 @@ describe("reports", () => {
 		);
 		const root = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
 		await (await root.submit({ type: "input", content: "hi" }, context)).wait(context);
-		const infoOf = (message: string) => reports.find((report) => report.message === message)?.info;
+		const infoOf = (message: string) => reports.find(report => report.message === message)?.info;
 		const generation = { kind: "pi.generation", conversationId: root.id };
 		expect(infoOf("env")).toMatchObject({ kind: "host_error", callback: "env", task: generation });
 		expect(infoOf("section")).toMatchObject({ kind: "extension_error", extension: "sections", task: generation });
@@ -195,7 +192,7 @@ describe("reports", () => {
 		});
 		registry.install(defineExtension({ name: "tools", tools: [echo] }));
 		registry.install(
-			defineExtension({ name: "wraps", wraps: [wrapTool(echo, (tool) => ({ ...tool, name: "renamed" }))] }),
+			defineExtension({ name: "wraps", wraps: [wrapTool(echo, tool => ({ ...tool, name: "renamed" }))] }),
 		);
 		harness.observeCommits({
 			advance: () => {
@@ -205,12 +202,12 @@ describe("reports", () => {
 		});
 		const root = await harness.root(context);
 		await root.agent(context);
-		await root.commit((tx) => tx.createTask(Sleeper, null, { ownership: { kind: "conversation" } }), context);
+		await root.commit(tx => tx.createTask(Sleeper, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();
 		await eventually(() =>
-			["alarm", "no timers"].every((message) => reports.some((report) => report.message === message)),
+			["alarm", "no timers"].every(message => reports.some(report => report.message === message)),
 		);
-		const infoOf = (message: string) => reports.find((report) => report.message === message)?.info;
+		const infoOf = (message: string) => reports.find(report => report.message === message)?.info;
 		expect(infoOf("Wrapper renamed echo to renamed")).toEqual({
 			kind: "extension_error",
 			conversationId: root.id,
@@ -222,7 +219,7 @@ describe("reports", () => {
 
 		const failure = new Error("disk gone");
 		storage.failNextCommit(failure);
-		await root.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), context).catch(() => {});
+		await root.commit(tx => tx.createConversation({ ownership: { kind: "ownerless" } }), context).catch(() => {});
 		await harness.closed;
 		expect(infoOf("disk gone")).toEqual({ kind: "storage_failed" });
 	});

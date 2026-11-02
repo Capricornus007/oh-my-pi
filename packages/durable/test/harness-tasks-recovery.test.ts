@@ -42,7 +42,7 @@ async function createIn<S extends { phase: string }, R>(
 	task: Task<null, S, R, object>,
 ): Promise<TaskId<R>> {
 	const root = await harness.root(context);
-	return root.commit((tx) => tx.createTask(task, null, { ownership: { kind: "conversation" } }), context);
+	return root.commit(tx => tx.createTask(task, null, { ownership: { kind: "conversation" } }), context);
 }
 
 /** Fake external service whose operations are idempotent by request key. */
@@ -118,7 +118,7 @@ describe("task recovery", () => {
 		const first = await openTasks(await openNodeSqliteStorage(path), [Transfer]);
 		const root = await first.harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Transfer, { amount: 7 }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Transfer, { amount: 7 }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		first.harness.resume();
@@ -156,7 +156,7 @@ describe("task recovery", () => {
 		const first = await openTasks(await openNodeSqliteStorage(path), [Transfer], { now });
 		const root = await first.harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Transfer, { amount: 7 }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Transfer, { amount: 7 }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		first.harness.resume();
@@ -276,7 +276,7 @@ describe("task crash recovery", () => {
 	async function recover(storage: ControlledStorage, log: Log): Promise<{ harness: OpenHarness; id: TaskId }> {
 		storage.crash();
 		const { harness } = await openTasks(storage, [crashTask(log, { blockAbort: false })]);
-		const page = await harness.commit((tx) => tx.scanTasks({ kind: "test.crash" }, 1), context);
+		const page = await harness.commit(tx => tx.scanTasks({ kind: "test.crash" }, 1), context);
 		return { harness, id: page.items[0]!.id };
 	}
 
@@ -534,7 +534,7 @@ describe("blocked tasks", () => {
 		});
 		const { harness } = await openTasks(new MemoryStorage(), []);
 		const root = await harness.root(context);
-		const id = await root.commit(async (tx) => {
+		const id = await root.commit(async tx => {
 			const created = await tx.createTask(versioned(1, "x"), null, { ownership: { kind: "conversation" } });
 			(await tx.doc(Scratch, created)).n = 1;
 			return created;
@@ -796,7 +796,7 @@ describe("definition handover", () => {
 					await runtime.commit(() => ({ status: "running", checkpoint: { phase: "b" } }), ctx);
 					// Hold the line with an unrelated commit so the handover commit queues behind it.
 					held = storage.holdCommits();
-					void harnessRef!.commit(async (tx) => {
+					void harnessRef!.commit(async tx => {
 						await tx.appendEntry(task.conversationId, { kind: "blocker" });
 					}, ctx);
 				},
@@ -848,8 +848,8 @@ describe("definition handover", () => {
 		held!.release();
 		expect(await aborting).toBe("marked");
 		expect((await harness.waitForTask(id, context)).state.outcome).toEqual({ status: "aborted", reason: "new" });
-		const states = storage.commits.flatMap((writes) =>
-			writes.flatMap((write) =>
+		const states = storage.commits.flatMap(writes =>
+			writes.flatMap(write =>
 				write.type === "task" && write.value.id === id
 					? [`${write.value.state.status}${write.value.abortRequested ? "+mark" : ""}`]
 					: [],

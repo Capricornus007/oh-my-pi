@@ -49,7 +49,7 @@ class ControlledSettlementDatabase implements SqliteDatabase {
 		const mode = this.mode;
 		this.mode = "immediate";
 		if (mode === "immediate") return this.delegate.transaction(callback);
-		const settlement = this.delegate.transaction(async (transaction) => {
+		const settlement = this.delegate.transaction(async transaction => {
 			const value = await callback(transaction);
 			if (mode === "reject") throw new Error("controlled settlement rejection");
 			return value;
@@ -159,7 +159,7 @@ describe("portable SQLite facade settlement", () => {
 		const closed = storage.close(BACKGROUND_CONTEXT);
 		// A repeated close settles only when the database is closed.
 		expect(storage.close(BACKGROUND_CONTEXT)).toBe(closed);
-		expect((await scan).items.map((item) => item.id)).toEqual([entryId]);
+		expect((await scan).items.map(item => item.id)).toEqual([entryId]);
 		expect((await entry)?.entry.kind).toBe("probe");
 		expect(await head).toBeUndefined();
 		await closed;

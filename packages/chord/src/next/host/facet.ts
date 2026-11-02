@@ -116,7 +116,7 @@ export function setUp<P extends Principal>(
 	const self: FacetSelf = {
 		contribute: (registry, value) => {
 			assertOpen("self.contribute");
-			if (contributions.some((each) => each.registry.name === registry.name)) {
+			if (contributions.some(each => each.registry.name === registry.name)) {
 				throw new Error(`${name}: registry ${registry.name} is contributed to twice`);
 			}
 			contributions.push({ registry: registry as Registry<unknown, unknown>, value });

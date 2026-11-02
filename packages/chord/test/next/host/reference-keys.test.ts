@@ -37,7 +37,7 @@ const Viewer = local("app.viewer", { version: 1, params: { id: int() }, members:
 async function served(which: () => string) {
 	const providers: Record<string, KeyedHandle<N>> = {};
 	const exposers: Self[] = [];
-	const { host } = await loaded((h) => {
+	const { host } = await loaded(h => {
 		h.serve(Provider, ({ id }, self) => {
 			const notes = self.state(Notes);
 			providers[id] = notes;
@@ -58,7 +58,7 @@ async function served(which: () => string) {
 	const set = (id: string, n: number) =>
 		providers[id]!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = n;
 			},
 			context,
@@ -84,7 +84,7 @@ describe("a failed object's held keys", () => {
 		await delivered();
 		expect(exposer.state.value.kind).toBe("failed");
 		expect([viewer.value.value, viewer.double.value, keyWatch.value]).toEqual([{ n: 1 }, 2, { n: 1 }]);
-		expect([values, keyed].map((calls) => calls.map((call) => call.kind))).toEqual([["failed"], ["failed"]]);
+		expect([values, keyed].map(calls => calls.map(call => call.kind))).toEqual([["failed"], ["failed"]]);
 		expect(valuesOf(direct)).toEqual([{ n: 3 }]);
 		await host.close(context);
 	});
@@ -143,7 +143,7 @@ describe("re-binding when a new attempt goes live", () => {
 		await seed.host.get(Durable, {}, context);
 		await memos!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 10;
 			},
 			context,
@@ -153,7 +153,7 @@ describe("re-binding when a new attempt goes live", () => {
 		let runs = 0;
 		const exposers: Self[] = [];
 		const { host } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Provider, (_, self) => ({ notes: self.state(Notes) }));
 				serveDurable(h);
 				h.serve(Exposer, (_, self) => {
@@ -206,7 +206,7 @@ async function cold(which: () => string) {
 	const store = await memoryStore();
 	let seeded: KeyedHandle<N> | undefined;
 	const seed = await loaded(
-		(h) =>
+		h =>
 			h.serve(ColdProvider, (_, self) => {
 				seeded = self.state(Stored);
 				return { notes: seeded };
@@ -218,7 +218,7 @@ async function cold(which: () => string) {
 	await seed.host.get(ColdProvider, {}, context);
 	await seeded!.change(
 		"k",
-		(draft) => {
+		draft => {
 			draft.n = 1;
 		},
 		context,
@@ -228,7 +228,7 @@ async function cold(which: () => string) {
 	const providers: Record<string, KeyedHandle<N>> = {};
 	const exposers: Self[] = [];
 	const { host, errors } = await loaded(
-		(h) => {
+		h => {
 			h.serve(ColdProvider, (_, self) => {
 				providers.a = self.state(Stored);
 				return { notes: providers.a };
@@ -254,7 +254,7 @@ async function cold(which: () => string) {
 	await host.get(Provider, { id: "b" }, context);
 	await providers.b!.change(
 		"k",
-		(draft) => {
+		draft => {
 			draft.n = 2;
 		},
 		context,
@@ -300,18 +300,18 @@ describe("a key whose first pin still loads", () => {
 		expect([viewer.value.value, viewer.double.value]).toEqual([{ n: 2 }, 4]);
 		expect([pinsOf(providers.a!), pinsOf(providers.b!)]).toEqual([undefined, 1]);
 		// The pin's failed load parked the viewer (a dependency failure is not its own): nothing failed it.
-		expect(errors.filter((error) => error.kind === "activation_failed").length).toBe(0);
+		expect(errors.filter(error => error.kind === "activation_failed").length).toBe(0);
 		const values = changesOf(await viewer.value.watch(context));
 		await providers.a!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 3;
 			},
 			context,
 		);
 		await providers.b!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 4;
 			},
 			context,
@@ -331,7 +331,7 @@ describe("a key whose first pin still loads", () => {
 		fail();
 		gate.resolve();
 		await delivered();
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect(exposer.state.value.kind).toBe("failed");
 		expect(viewer.state.value).toMatchObject({ kind: "failed", cause: { kind: "waiting" } });
 		viewer.release();
@@ -359,7 +359,7 @@ describe("a keyed watch whose object closes while it is set up", () => {
 	it("rejects with the object's end error, whichever microtask the close lands in", async () => {
 		for (let gap = 0; gap < 40; gap++) {
 			let notes: KeyedHandle<N> | undefined;
-			const { host } = await loaded((h) =>
+			const { host } = await loaded(h =>
 				h.serve(Exposer, (_, self) => {
 					notes = self.state(Notes);
 					return { notes };
@@ -368,7 +368,7 @@ describe("a keyed watch whose object closes while it is set up", () => {
 			const exposer = await host.get(Exposer, {}, context);
 			await notes!.change(
 				"a",
-				(draft) => {
+				draft => {
 					draft.n = 1;
 				},
 				context,
@@ -391,7 +391,7 @@ describe("chains and releases", () => {
 		let which = "a";
 		const middles: Self[] = [];
 		const providers: Record<string, KeyedHandle<N>> = {};
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Provider, ({ id }, self) => {
 				const notes = self.state(Notes);
 				providers[id] = notes;
@@ -409,7 +409,7 @@ describe("chains and releases", () => {
 			await host.get(Provider, { id }, context);
 			await providers[id]!.change(
 				"k",
-				(draft) => {
+				draft => {
 					draft.n = id === "a" ? 1 : 2;
 				},
 				context,
@@ -421,13 +421,13 @@ describe("chains and releases", () => {
 		failLive(attempted, middles[0]!, new ChordError({ code: "unavailable", message: "boom" }));
 		await providers.a!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 3;
 			},
 			context,
 		);
 		await delivered();
-		expect([viewer.value.value, values.map((call) => call.kind)]).toEqual([{ n: 1 }, ["failed"]]);
+		expect([viewer.value.value, values.map(call => call.kind)]).toEqual([{ n: 1 }, ["failed"]]);
 		which = "b";
 		middle.retry();
 		(await host.get(Exposer, {}, context)).release();
@@ -451,7 +451,7 @@ describe("chains and releases", () => {
 			viewer.release();
 			(await host.get(Exposer, {}, context)).release();
 			// The viewer's teardown releases its references.
-			await new Promise((resolve) => setTimeout(resolve, 10));
+			await new Promise(resolve => setTimeout(resolve, 10));
 			expect([pins("a"), pins("b")]).toEqual([undefined, undefined]);
 			const kept = [new WeakRef(viewer), new WeakRef(providers.a!)];
 			await host.close(context);
@@ -473,16 +473,12 @@ describe("a key whose first pin still loads at startup (scenario 20, Astra)", ()
 		const Reader = local("app.pin-reader", { version: 1, params: {}, members: { value: Schema } });
 		const gate = Promise.withResolvers<void>();
 		const original = ChordObject.prototype.pinKey;
-		const spy = vi.spyOn(ChordObject.prototype, "pinKey").mockImplementation(async function (
-			this: ChordObject,
-			member,
-			key,
-			version,
-			ctx,
-		) {
-			await gate.promise;
-			return original.call(this, member, key, version, ctx);
-		});
+		const spy = vi
+			.spyOn(ChordObject.prototype, "pinKey")
+			.mockImplementation(async function (this: ChordObject, member, key, version, ctx) {
+				await gate.promise;
+				return original.call(this, member, key, version, ctx);
+			});
 		const host = createHost({ onError: () => {} });
 		let done = false;
 		const loading = host
@@ -490,7 +486,7 @@ describe("a key whose first pin still loads at startup (scenario 20, Astra)", ()
 				[
 					{
 						name: "@test/pin",
-						facet: defineFacet((h) => {
+						facet: defineFacet(h => {
 							h.serve(Store, (_, self) => ({ notes: self.state(Data) }));
 							h.serve(Reader, (_, self) => ({ value: self.get(Store, {}).notes.at("k") }));
 						}),
@@ -526,13 +522,13 @@ describe("a released key leaves its document (final review)", () => {
 			params: {},
 			members: { rows: keyed(obj({ n: int() })), set: method() },
 		});
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Type, (_, self) => {
 				const rows = self.state(Rows);
 				const set = async (ctx: Context) => {
 					await rows.change(
 						"a",
-						(draft) => {
+						draft => {
 							draft.n = 2;
 						},
 						ctx,
@@ -569,7 +565,7 @@ describe("keys across a restart and a failed re-pin (Astra's coverage note)", ()
 
 	/** Serves `Keys` over the persisted `Stored` (its handle kept in `handles`), with a native opened by `open`. */
 	const serveKeys = (handles: KeyedHandle<N>[], open: () => Promise<void>) =>
-		defineFacet((h) =>
+		defineFacet(h =>
 			h.serve(Keys, (_, self) => {
 				self.open(open, () => {});
 				const notes = self.state(Stored);
@@ -587,7 +583,7 @@ describe("keys across a restart and a failed re-pin (Astra's coverage note)", ()
 		const change = (n: number) =>
 			handles.at(-1)!.change(
 				"k",
-				(draft) => {
+				draft => {
 					draft.n = n;
 				},
 				context,
@@ -622,7 +618,7 @@ describe("keys across a restart and a failed re-pin (Astra's coverage note)", ()
 		await seed.get(Keys, {}, context);
 		await seeded[0]!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 1;
 			},
 			context,
@@ -631,7 +627,7 @@ describe("keys across a restart and a failed re-pin (Astra's coverage note)", ()
 		// A new host: `Keys`' key is in the store only; the exposer re-exposes provider `b` (in memory) first.
 		const handles: KeyedHandle<N>[] = [];
 		let b: KeyedHandle<N> | undefined;
-		const providers = defineFacet((h) => {
+		const providers = defineFacet(h => {
 			h.serve(Keys, (_, self) => {
 				const notes = self.state(Stored);
 				handles.push(notes);
@@ -643,7 +639,7 @@ describe("keys across a restart and a failed re-pin (Astra's coverage note)", ()
 			});
 		});
 		const exposing = (which: "keys" | "b") =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Exposer, (_, self) => {
 					self.state(Own);
 					const notes = which === "keys" ? self.get(Keys, {}).notes : self.get(Provider, { id: "b" }).notes;
@@ -661,7 +657,7 @@ describe("keys across a restart and a failed re-pin (Astra's coverage note)", ()
 		await host.get(Provider, { id: "b" }, context);
 		await b!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 2;
 			},
 			context,

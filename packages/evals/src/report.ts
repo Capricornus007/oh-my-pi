@@ -308,7 +308,7 @@ function operationalTotal(
 	runs: readonly EvalObservation[],
 	select: (observation: EvalObservation) => number | undefined,
 ): OperationalMetricTotal {
-	const values = runs.flatMap((run) => {
+	const values = runs.flatMap(run => {
 		const value = select(run);
 		return value === undefined ? [] : [value];
 	});
@@ -319,7 +319,7 @@ function operationalTotal(
 }
 
 function variantTotals(observations: readonly EvalObservation[], variant: DocumentationVariant): VariantTotals {
-	const runs = observations.filter((observation) => observation.variant === variant);
+	const runs = observations.filter(observation => observation.variant === variant);
 	return {
 		variant,
 		runs: runs.length,
@@ -353,7 +353,7 @@ function comparisonFlags(pairs: readonly Pair[], controlPassRate: number | null,
 		treatment.add(String(pair.treatment.score >= 1));
 		outcomes.set(treatmentKey, treatment);
 	}
-	if ([...outcomes.values()].some((values) => values.size > 1)) flags.push("flaky");
+	if ([...outcomes.values()].some(values => values.size > 1)) flags.push("flaky");
 	return flags;
 }
 
@@ -466,10 +466,10 @@ export function formatEvalComparisonReport(report: EvalComparisonReport): string
 	}
 	lines.push("  Operational totals");
 	for (const totals of report.operationalTotals) {
-		const tokens = operationalMetric(totals.totalTokens, totals.runs, (total) => `${total} tokens`);
-		const tools = operationalMetric(totals.toolCalls, totals.runs, (total) => `${total} tools`);
-		const latency = operationalMetric(totals.totalMs, totals.runs, (total) => `${(total / 1000).toFixed(2)}s`);
-		const cost = operationalMetric(totals.estimatedCostUsd, totals.runs, (total) => `$${total.toFixed(4)} cost`);
+		const tokens = operationalMetric(totals.totalTokens, totals.runs, total => `${total} tokens`);
+		const tools = operationalMetric(totals.toolCalls, totals.runs, total => `${total} tools`);
+		const latency = operationalMetric(totals.totalMs, totals.runs, total => `${(total / 1000).toFixed(2)}s`);
+		const cost = operationalMetric(totals.estimatedCostUsd, totals.runs, total => `$${total.toFixed(4)} cost`);
 		lines.push(`    ${totals.variant}: ${totals.runs} runs, ${tokens}, ${tools}, ${latency}, ${cost}`);
 	}
 	if (report.blockedPairs.length > 0) {

@@ -6,7 +6,7 @@ import { loaded } from "../support.ts";
 describe("the member check (Q14)", () => {
 	it("refuses an inherited property for a member", async () => {
 		const Named = local("app.named", { version: 1, params: { id: int() }, members: { toString: method() } });
-		const { host } = await loaded((h) => h.serve(Named, () => ({}) as never));
+		const { host } = await loaded(h => h.serve(Named, () => ({}) as never));
 		await expect(host.get(Named, { id: 1 }, context)).rejects.toThrow(
 			"app.named(1): toString: a method is a function",
 		);
@@ -15,7 +15,7 @@ describe("the member check (Q14)", () => {
 	it("names a derive in errors by its member when exposed, else by its position", async () => {
 		const Named = local("app.named", { version: 1, params: { n: int() }, members: { label: int() } });
 		const bad = { value: 1 };
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Named, ({ n }, self) => {
 				const inner = self.derive(n === 1 ? [] : [bad as never], () => 1);
 				return { label: self.derive(n === 1 ? [inner, bad as never] : [inner], () => 2) };

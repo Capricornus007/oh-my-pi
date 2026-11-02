@@ -166,7 +166,7 @@ function watchCalls(executor: SqliteExecutor, calls: CheckCalls): SqliteExecutor
 		}
 	};
 	return {
-		exec: (sql) => watched(() => executor.exec(sql)),
+		exec: sql => watched(() => executor.exec(sql)),
 		run: (sql, ...params) => watched(() => executor.run(sql, ...params)),
 		runCounted: (sql, ...params) => watched(() => executor.runCounted(sql, ...params)),
 		get: (sql, ...params) => watched(() => executor.get(sql, ...params)),
@@ -224,7 +224,7 @@ export class SqliteStorage implements Storage {
 		const seqs: Seq[] = [];
 		let refused: { readonly error: unknown } | undefined;
 		let candidateNextId = this.nextId;
-		await this.db.transaction(async (transaction) => {
+		await this.db.transaction(async transaction => {
 			const metadata = await this.readMetadata(transaction);
 			let next = metadata.next_seq;
 			// Whether a database call of a batch's checks failed: then the failure is an unknown outcome, not a refusal.
@@ -332,7 +332,7 @@ export class SqliteStorage implements Storage {
 			...params,
 		);
 		return page(
-			rows.map((row) => parseJson<ConversationRecord>(row.record)),
+			rows.map(row => parseJson<ConversationRecord>(row.record)),
 			limit,
 			start.order,
 		);
@@ -459,7 +459,7 @@ export class SqliteStorage implements Storage {
 				`SELECT record FROM ${this.schema.tables.entries} WHERE ${clauses.join(" AND ")} ORDER BY id DESC LIMIT ?`,
 				...params,
 			);
-			values.push(...rows.map((row) => parseJson<EntryRecord>(row.record)));
+			values.push(...rows.map(row => parseJson<EntryRecord>(row.record)));
 			if (values.length > limit || conversation.parent === undefined) break;
 			upper = upper === undefined ? conversation.parent.at : Math.min(upper, conversation.parent.at);
 			if (query.minEntryId !== undefined && upper < query.minEntryId) break;
@@ -504,7 +504,7 @@ export class SqliteStorage implements Storage {
 				`SELECT record FROM ${this.schema.tables.entries} WHERE ${clauses.join(" AND ")} ORDER BY id ASC LIMIT ?`,
 				...params,
 			);
-			values.push(...rows.map((row) => parseJson<EntryRecord>(row.record)));
+			values.push(...rows.map(row => parseJson<EntryRecord>(row.record)));
 			if (values.length > limit) break;
 		}
 		return page(values, limit, "ascending");
@@ -553,7 +553,7 @@ export class SqliteStorage implements Storage {
 			...params,
 		);
 		return page(
-			rows.map((row) => parseJson<StoredTask>(row.record)),
+			rows.map(row => parseJson<StoredTask>(row.record)),
 			limit,
 			start.order,
 		);
@@ -590,7 +590,7 @@ export class SqliteStorage implements Storage {
 			...params,
 		);
 		return page(
-			rows.map((row) => parseJson<SubmissionRecord>(row.record)),
+			rows.map(row => parseJson<SubmissionRecord>(row.record)),
 			limit,
 			start.order,
 		);
@@ -635,7 +635,7 @@ export class SqliteStorage implements Storage {
 	async document(id: DocumentId, at: DocumentPoint, _context: Context): Promise<StoredDocument | undefined> {
 		this.assertOpen();
 		// The record and revision queries must observe one committed state; a commit between them can replace the base.
-		return this.db.transaction((transaction) => this.materializeDocument(transaction, id, at));
+		return this.db.transaction(transaction => this.materializeDocument(transaction, id, at));
 	}
 
 	async scanDocuments(
@@ -664,7 +664,7 @@ export class SqliteStorage implements Storage {
 			...params,
 		);
 		return page(
-			rows.map((row) => parseJson<DocumentRecord>(row.record)),
+			rows.map(row => parseJson<DocumentRecord>(row.record)),
 			limit,
 		);
 	}
@@ -679,7 +679,7 @@ export class SqliteStorage implements Storage {
 
 	private async closeDatabase(): Promise<void> {
 		if (this.admittedReads > 0) {
-			await new Promise<void>((resolve) => {
+			await new Promise<void>(resolve => {
 				this.readsDrained = resolve;
 			});
 		}

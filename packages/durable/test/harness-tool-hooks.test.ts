@@ -77,7 +77,7 @@ async function open(path: string, setup: ChatSetup) {
 
 /** Let deferred progress commits (`persistWithinMs: 0`) reach Storage before a crash. */
 function stored(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 50));
+	return new Promise(resolve => setTimeout(resolve, 50));
 }
 
 const Parameters = obj({ text: opt(str()) });
@@ -101,22 +101,22 @@ const DONE = fauxAssistantMessage([fauxText("done")]);
 
 function results(entries: readonly EntryRecord[]): Map<string, ToolResultMessage> {
 	const messages = entries
-		.filter((entry) => ToolResultEntry.is(entry))
-		.map((entry) => entry.model![0] as ToolResultMessage);
-	return new Map(messages.map((message) => [message.toolCallId, message]));
+		.filter(entry => ToolResultEntry.is(entry))
+		.map(entry => entry.model![0] as ToolResultMessage);
+	return new Map(messages.map(message => [message.toolCallId, message]));
 }
 
 function text(message: ToolResultMessage | undefined): string {
-	return (message?.content ?? []).map((item) => (item.type === "text" ? item.text : "")).join("|");
+	return (message?.content ?? []).map(item => (item.type === "text" ? item.text : "")).join("|");
 }
 
 function codes(result: { readonly diagnostics?: readonly { readonly code?: string }[] }): (string | undefined)[] {
-	return (result.diagnostics ?? []).map((diagnostic) => diagnostic.code);
+	return (result.diagnostics ?? []).map(diagnostic => diagnostic.code);
 }
 
 async function diagnosticsOf(entries: readonly EntryRecord[], callId: string): Promise<(string | undefined)[]> {
 	const entry = entries.find(
-		(each) => ToolResultEntry.is(each) && (each.model![0] as ToolResultMessage).toolCallId === callId,
+		each => ToolResultEntry.is(each) && (each.model![0] as ToolResultMessage).toolCallId === callId,
 	);
 	return codes((entry?.data ?? {}) as { diagnostics?: { code?: string }[] });
 }
@@ -148,7 +148,7 @@ describe("afterTool on results the call phase decides", () => {
 		);
 		const seen: Seen[] = [];
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: (call) => {
+			beforeTool: call => {
 				if (call.id === "block") return { block: "not today" };
 				if (call.id === "rewrite") return { arguments: { text: { not: "a string" } } };
 				return undefined;
@@ -176,7 +176,7 @@ describe("afterTool on results the call phase decides", () => {
 		const settled = await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(settled.status).toBe("done");
 		expect(ran).toBe(0);
-		const byId = new Map(seen.map((each) => [each.call.id, each]));
+		const byId = new Map(seen.map(each => [each.call.id, each]));
 		expect([...byId.keys()].sort()).toEqual(["block", "invalid", "rewrite", "unavailable"]);
 		expect(codes(byId.get("unavailable")!.result)).toEqual(["tool_unavailable"]);
 		expect(codes(byId.get("invalid")!.result)).toEqual(["invalid_arguments"]);
@@ -242,7 +242,7 @@ describe("afterTool on results the call phase decides", () => {
 			tool("echo", async () => ({ output: [], control: { terminate: true } })),
 		);
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: (call) => (call.id === "c2" ? { block: "no" } : undefined),
+			beforeTool: call => (call.id === "c2" ? { block: "no" } : undefined),
 			afterTool: (_call, result) => ({ ...result, control: { terminate: true } }),
 		});
 		setup.faux.setResponses([calls(["echo", {}, "c1"], ["echo", {}, "c2"]), DONE]);
@@ -273,7 +273,7 @@ describe("afterTool on results the call phase decides", () => {
 		);
 		const seen: ToolHookCall[] = [];
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: (call) => (call.arguments.text === "secret" ? { block: "no secrets" } : undefined),
+			beforeTool: call => (call.arguments.text === "secret" ? { block: "no secrets" } : undefined),
 			afterTool: (call, result) => {
 				if (call.parent === undefined) return undefined;
 				seen.push(call);
@@ -289,14 +289,14 @@ describe("afterTool on results the call phase decides", () => {
 		setup.faux.setResponses([calls(["batch", {}, "c1"]), DONE]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		expect(seen.map((call) => call.id)).toEqual(["c1/1", "c1/2", "c1/3"]);
-		expect(seen.every((call) => call.parent?.callId === "c1")).toBe(true);
-		expect(nested.map((result) => [result.isError, codes(result)])).toEqual([
+		expect(seen.map(call => call.id)).toEqual(["c1/1", "c1/2", "c1/3"]);
+		expect(seen.every(call => call.parent?.callId === "c1")).toBe(true);
+		expect(nested.map(result => [result.isError, codes(result)])).toEqual([
 			[true, ["invalid_arguments", "hooked"]],
 			[true, ["blocked", "hooked"]],
 			[true, ["tool_unavailable", "hooked"]],
 		]);
-		expect(nested.map((result) => result.details)).toEqual([
+		expect(nested.map(result => result.details)).toEqual([
 			{ hooked: "c1/1" },
 			{ hooked: "c1/2" },
 			{ hooked: "c1/3" },
@@ -330,8 +330,8 @@ describe("afterTool on results the call phase decides", () => {
 			}),
 		);
 		addHooks(setup.registry, ToolTask, {
-			beforeTool: (call) => (call.parent === undefined ? undefined : { block: "no" }),
-			afterTool: (call) =>
+			beforeTool: call => (call.parent === undefined ? undefined : { block: "no" }),
+			afterTool: call =>
 				call.parent === undefined
 					? undefined
 					: { output: [{ type: "text", text: `fine ${call.name}` }], structuredOutput: { ok: false } },
@@ -339,7 +339,7 @@ describe("afterTool on results the call phase decides", () => {
 		setup.faux.setResponses([calls(["batch", {}, "c1"]), DONE]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		expect(nested.map((result) => [result.isError, result.structuredOutput])).toEqual([
+		expect(nested.map(result => [result.isError, result.structuredOutput])).toEqual([
 			[false, "fine plain"],
 			[false, undefined],
 		]);
@@ -393,7 +393,7 @@ describe("afterTool on results rebuilt from the slot", () => {
 
 		opened = await open(path, setup);
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
-		expect(seen.map((each) => [each.call.id, codes(each.result)]).sort()).toEqual([
+		expect(seen.map(each => [each.call.id, codes(each.result)]).sort()).toEqual([
 			["c1", ["interrupted"]],
 			["c2", ["interrupted"]],
 		]);
@@ -430,7 +430,7 @@ describe("afterTool on results rebuilt from the slot", () => {
 		await first.started.promise;
 		await root.abort(context);
 		expect((await submission.wait(context)).status).toBe("unanswered");
-		expect(seen.map((each) => [each.call.id, codes(each.result)])).toEqual([["c1", ["aborted"]]]);
+		expect(seen.map(each => [each.call.id, codes(each.result)])).toEqual([["c1", ["aborted"]]]);
 		const messages = results(await allEntries(root));
 		expect(messages.get("c1")).toMatchObject({ isError: true, details: { hooked: true } });
 		expect(messages.get("c2")?.details).toBeUndefined();
@@ -456,7 +456,7 @@ describe("afterTool on results rebuilt from the slot", () => {
 		const entries = await allEntries(root);
 		expect(text(results(entries).get("c1")).startsWith(`work ${"o".repeat(40)}`)).toBe(true);
 		expect(await diagnosticsOf(entries, "c1")).toEqual(["aborted"]);
-		expect(setup.reports.map((error) => (error as Error).message)).toContain("hook failed");
+		expect(setup.reports.map(error => (error as Error).message)).toContain("hook failed");
 		await harness.close(context);
 	});
 
@@ -491,7 +491,7 @@ describe("afterTool on results rebuilt from the slot", () => {
 		// One restart, at the limit minus one: the attempt the scheduler would fault when cut off runs no hooks.
 		opened = await open(path, setup);
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("unanswered");
-		expect(seen.map((each) => codes(each.result))).toEqual([["aborted"]]);
+		expect(seen.map(each => codes(each.result))).toEqual([["aborted"]]);
 		const entries = await allEntries(opened.root);
 		expect(text(results(entries).get("c1")).startsWith(`work ${"o".repeat(40)}`)).toBe(true);
 		expect(await diagnosticsOf(entries, "c1")).toEqual(["aborted"]);
@@ -575,7 +575,7 @@ describe("afterTool on results rebuilt from the slot", () => {
 
 		opened = await open(path, setup);
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
-		expect(seen.map((each) => [each.call.id, codes(each.result)])).toEqual([["c1/1", ["abandoned"]]]);
+		expect(seen.map(each => [each.call.id, codes(each.result)])).toEqual([["c1/1", ["abandoned"]]]);
 		await opened.harness.close(context);
 	});
 
@@ -608,7 +608,7 @@ describe("afterTool on results rebuilt from the slot", () => {
 		// Cut off once, at the limit: the task ends itself, and the hooks run on its result.
 		opened = await open(path, setup);
 		await hanging.promise;
-		expect(seen.map((each) => codes(each.result))).toEqual([["restart_limit"]]);
+		expect(seen.map(each => codes(each.result))).toEqual([["restart_limit"]]);
 		opened.kill();
 
 		// Past the limit: ends without the hooks.
@@ -640,7 +640,7 @@ describe("calls to tools the request did not offer", () => {
 		setup.faux.setResponses([calls(["ghost", {}, "c1"]), DONE]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		expect(seen.map((each) => each.id)).toEqual(["c1"]);
+		expect(seen.map(each => each.id)).toEqual(["c1"]);
 		expect(await harness.getTask(seen[0]!.taskId, context)).toMatchObject({
 			kind: "pi.tool",
 			input: { kind: "model", callId: "c1", unoffered: true },
@@ -693,8 +693,8 @@ describe("calls to tools the request did not offer", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(order).toEqual(["a", "hook c1", "hook c2", "b", "hook c3"]);
-		const resets = (await allEntries(root)).filter((entry) => ResetEntry.is(entry));
-		expect(resets.map((entry) => (entry.model?.[0] as { content: string }).content)).toEqual(["from c3"]);
+		const resets = (await allEntries(root)).filter(entry => ResetEntry.is(entry));
+		expect(resets.map(entry => (entry.model?.[0] as { content: string }).content)).toEqual(["from c3"]);
 		await harness.close(context);
 	});
 
@@ -703,7 +703,7 @@ describe("calls to tools the request did not offer", () => {
 		const setup = chatSetup();
 		const seen: string[] = [];
 		addHooks(setup.registry, ToolTask, {
-			afterTool: (call) => {
+			afterTool: call => {
 				seen.push(call.id);
 				return undefined;
 			},
@@ -752,7 +752,7 @@ describe("calls to tools the request did not offer", () => {
 			await started.promise;
 			const live = (await opened.harness.snapshot(LiveDoc, ROOT_CONVERSATION_ID, context))!;
 			const generation = live.run!.taskId;
-			expect(live.tools?.map((slot) => [slot.callId, slot.unoffered])).toEqual([
+			expect(live.tools?.map(slot => [slot.callId, slot.unoffered])).toEqual([
 				["c1", undefined],
 				["c2", true],
 			]);

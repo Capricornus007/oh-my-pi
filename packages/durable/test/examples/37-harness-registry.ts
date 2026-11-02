@@ -65,14 +65,14 @@ const Transcript = local("example.transcript", { version: 1, params: {}, members
 
 // 2. The core facet: the harness object opens Durable on the store with its extensions read from the registry.
 const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(":memory:")), context);
-const core = defineFacet((host) => {
+const core = defineFacet(host => {
 	host.serve(Extensions, { compose: (table, { report }) => snapshotOf(table, report) });
-	host.serve(Harnesses, { compose: (table) => table.at(-1)?.value.value });
+	host.serve(Harnesses, { compose: table => table.at(-1)?.value.value });
 	host.serve(Core, (_, self) => {
 		// A declared dependency: the object activates (and opens Durable) once the registry has a value.
 		const extensions = self.registry(Extensions);
 		const harness = self.open(
-			async (open) => {
+			async open => {
 				const opened = await Harness.open(
 					await StoreStorage.open(store, Core.name, open),
 					{ models: createModels(), registry: registryReader(extensions, open) },
@@ -87,18 +87,18 @@ const core = defineFacet((host) => {
 		// Following its own task graph, the object fails with its Session (S1), and its retry opens the next Harness.
 		self.follow((observer, ctx) => harness.value.observeTaskGraph(observer, ctx));
 		return {
-			greet: async (ctx) => {
+			greet: async ctx => {
 				// The composed snapshot, read at use: is the task's extension installed?
 				if (extensions.value.task(Greet.definition.name) === undefined) return "no greeter installed";
 				const root = await harness.value.conversation(ROOT_CONVERSATION_ID, ctx);
 				const id = await root!.commit(
-					(tx) => tx.createTask(Greet, undefined, { ownership: { kind: "conversation" } }),
+					tx => tx.createTask(Greet, undefined, { ownership: { kind: "conversation" } }),
 					ctx,
 				);
 				harness.value.resume();
 				return JSON.stringify((await harness.value.waitForTask(id, ctx)).state.outcome);
 			},
-			close: async (ctx) => {
+			close: async ctx => {
 				await harness.value.close(ctx);
 				return null;
 			},
@@ -111,7 +111,7 @@ const core = defineFacet((host) => {
 		const view = self.follow(async (observer, ctx) =>
 			harness.value?.observeConversation(ROOT_CONVERSATION_ID, observer, ctx),
 		);
-		return { kinds: self.derive([view], ([v]) => v.entries.map((entry) => entry.kind)) };
+		return { kinds: self.derive([view], ([v]) => v.entries.map(entry => entry.kind)) };
 	});
 });
 
@@ -123,7 +123,7 @@ const Greet = defineTask<undefined, { phase: "run" }, string>({
 	initial: () => ({ phase: "run" }),
 	phases: {
 		run: async (_task, runtime, taskContext) => {
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				await tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "example.greeted", data: {} });
 				return { status: "terminal", outcome: { status: "completed", result: "hello" } };
 			}, taskContext);
@@ -140,7 +140,7 @@ const copycat = defineFacet((_, self) =>
 
 const host = createHost({
 	store,
-	onError: (error) => console.log("onError:", error.kind, error.kind === "registry_conflict" ? error.message : ""),
+	onError: error => console.log("onError:", error.kind, error.kind === "registry_conflict" ? error.message : ""),
 });
 await host.load(
 	[
@@ -156,16 +156,16 @@ await host.load(
 const harness = host.hold(Core, {}, context);
 const transcript = host.hold(Transcript, {}, context);
 console.log("greet:", await harness.greet(context));
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("transcript:", transcript.kinds.value);
 
 // 6. The Session closes: both objects fail; a retry of the harness object opens the next Harness (on the same store:
 //    the transcript is still there), whose contribution wakes the follower.
 await harness.close(context).catch((error: Error) => console.log("close:", error.message));
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("transcript after the close:", transcript.state.value.kind);
 harness.retry();
-await new Promise((resolve) => setTimeout(resolve, 50));
+await new Promise(resolve => setTimeout(resolve, 50));
 console.log("transcript after the retry:", transcript.state.value.kind, transcript.kinds.value);
 
 await host.close(context);

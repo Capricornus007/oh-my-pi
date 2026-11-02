@@ -21,7 +21,7 @@ describe("providers", () => {
 
 	it("one per host: a second serve leaves its plugin out at load, reported", async () => {
 		const host = createHost({ onError: () => {} });
-		const serve = defineFacet((h) => h.serve(Names, { compose: (table) => table.length }));
+		const serve = defineFacet(h => h.serve(Names, { compose: table => table.length }));
 		const { failed } = await host.load(
 			[
 				{ name: "@app/a", facet: serve },
@@ -41,7 +41,7 @@ describe("providers", () => {
 	});
 
 	it("a provider without compose leaves its plugin out at load (plugin code is not type-checked)", async () => {
-		const { host, failed } = await loadedPlugins({ "@app/a": (h) => h.serve(Names, {} as never) });
+		const { host, failed } = await loadedPlugins({ "@app/a": h => h.serve(Names, {} as never) });
 		expect(failed).toEqual([
 			{
 				plugin: "@app/a",
@@ -55,7 +55,7 @@ describe("providers", () => {
 		const host = createHost({ onError: () => {} });
 		const waiting = host.registry(Names, context);
 		await host.load(
-			[{ name: "@app/a", facet: defineFacet((h) => h.serve(Names, { compose: (t) => t.length })) }],
+			[{ name: "@app/a", facet: defineFacet(h => h.serve(Names, { compose: t => t.length })) }],
 			context,
 		);
 		const value = await waiting;
@@ -67,11 +67,11 @@ describe("providers", () => {
 	it("are served only while the setup runs", async () => {
 		let later: Parameters<Parameters<typeof defineFacet>[0]>[0] | undefined;
 		const { host } = await loadedPlugins({
-			"@app/a": (h) => {
+			"@app/a": h => {
 				later = h;
 			},
 		});
-		expect(() => later!.serve(Names, { compose: (t) => t.length })).toThrow(
+		expect(() => later!.serve(Names, { compose: t => t.length })).toThrow(
 			"@app/a: host.serve is valid only in the facet's setup",
 		);
 		await host.close(context);

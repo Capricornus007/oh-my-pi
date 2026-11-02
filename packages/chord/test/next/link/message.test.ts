@@ -190,7 +190,7 @@ function plain(message: Message): Message {
 		case "bound":
 			return {
 				...message,
-				holds: message.holds.map((entry) => ({
+				holds: message.holds.map(entry => ({
 					...entry,
 					members: entry.members.map(({ member, value }) => ({ member, value: partText(value) })),
 				})),
@@ -198,7 +198,7 @@ function plain(message: Message): Message {
 		case "state":
 			return {
 				...message,
-				holds: message.holds.map((entry) => ({
+				holds: message.holds.map(entry => ({
 					...entry,
 					members: entry.members.map(({ member, ops }) => ({ member, ops: partText(ops) })),
 				})),
@@ -210,7 +210,7 @@ function plain(message: Message): Message {
 
 forEachCodec(() => {
 	describe("messages", () => {
-		it.each(EVERY_KIND)("round-trip %j and pass the message schema", (message) => {
+		it.each(EVERY_KIND)("round-trip %j and pass the message schema", message => {
 			const codec = testCodec();
 			const decoded = checkMessage(codec.decode(codec.encode(message)), context);
 			expect(plain(decoded)).toEqual(message);
@@ -348,9 +348,9 @@ describe("the binary codec", () => {
 			hold: 0,
 			cause: { kind, error },
 		});
-		expect(
-			["transient", "broken", "waiting"].map((kind) => binaryCodec.encode(failed(kind as "waiting"))[2]),
-		).toEqual([0, 1, 2]);
+		expect(["transient", "broken", "waiting"].map(kind => binaryCodec.encode(failed(kind as "waiting"))[2])).toEqual([
+			0, 1, 2,
+		]);
 		const unknown = binaryCodec.encode(failed("waiting"));
 		unknown[2] = 3;
 		expect(() => binaryCodec.decode(unknown)).toThrow("an unknown failure kind");
@@ -613,7 +613,7 @@ describe("the binary codec's long strings", () => {
 });
 
 describe("the binary codec's short strings", () => {
-	it.each([0, 1, 41, 42, 43])("round-trip at %i three-byte characters, around the one-byte length", (length) => {
+	it.each([0, 1, 41, 42, 43])("round-trip at %i three-byte characters, around the one-byte length", length => {
 		const type = "€".repeat(length);
 		const message: Message = {
 			kind: "hold",

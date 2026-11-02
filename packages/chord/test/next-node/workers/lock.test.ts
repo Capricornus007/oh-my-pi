@@ -14,11 +14,11 @@ describe("processLock", () => {
 		const name = `chord-test-lock-${process.pid}-${Date.now()}`;
 		const first = await processLock(name, context);
 		let taken = false;
-		const second = processLock(name, context).then((lock) => {
+		const second = processLock(name, context).then(lock => {
 			taken = true;
 			return lock;
 		});
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		expect(taken).toBe(false);
 		const released = Date.now();
 		await first.release();

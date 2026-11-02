@@ -14,7 +14,7 @@ function exampleTool(name: string, description: string) {
 		name,
 		description,
 		parameters: obj({ path: str() }),
-		execute: async (args) => ({ output: [{ type: "text", text: `${name} ${args.path}` }] }),
+		execute: async args => ({ output: [{ type: "text", text: `${name} ${args.path}` }] }),
 	});
 }
 
@@ -23,7 +23,7 @@ const registry = createRegistry();
 registry.install(defineExtension({ name: "files", tools: [read, exampleTool("grep", "Search files")] }));
 const harness = await Harness.open(new MemoryStorage(), { models: createModels(), registry }, context);
 const root = await harness.root(context);
-const tools = async () => (await root.agent(context)).tools.map((tool) => `${tool.name}: ${tool.description}`);
+const tools = async () => (await root.agent(context)).tools.map(tool => `${tool.name}: ${tool.description}`);
 
 // Reloading is installing a new object with the same name: it replaces the old
 // one in place, in one publication, so no conversation ever sees it missing.
@@ -36,7 +36,7 @@ console.log("after reload:", await tools());
 // wrapping extension is selected, and survives reloads of the wrapped tool.
 const Audit = defineExtension({
 	name: "audit",
-	wraps: [wrapTool(read, (tool) => ({ ...tool, description: `${tool.description} (audited)` }))],
+	wraps: [wrapTool(read, tool => ({ ...tool, description: `${tool.description} (audited)` }))],
 });
 registry.install(Audit);
 console.log("with audit:", await tools());

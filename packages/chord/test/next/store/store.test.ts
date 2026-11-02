@@ -49,7 +49,7 @@ async function created(store: ChordStore): Promise<number> {
 /** A staged write whose step fails in the backend: its own code throws, a refusal. */
 const BROKEN: StagedWrite = {
 	order: "write",
-	apply: (step) =>
+	apply: step =>
 		step.run("INSERT INTO no_such_table VALUES (1)").then(() => [{ kind: "document.retire", id: 0, revision: 0 }]),
 };
 
@@ -161,7 +161,7 @@ describe("refusals and unknown outcomes (D4)", () => {
 	it("a step whose own code throws is refused: the commit rejects with that error, nothing is adopted, the store goes on", async () => {
 		const store = await memoryStore();
 		const told: unknown[] = [];
-		store.attach({ failed: (error) => told.push(error), batch: new Batch(() => {}, undefined) });
+		store.attach({ failed: error => told.push(error), batch: new Batch(() => {}, undefined) });
 		const { adopted, fence } = recording();
 		const error = await rejection(store.commit([BROKEN], fence, context));
 		expect(String(error)).toContain("no such table");
@@ -180,7 +180,7 @@ describe("refusals and unknown outcomes (D4)", () => {
 		async (at, write) => {
 			const { store, fail } = await faultyStore();
 			const told: unknown[] = [];
-			store.attach({ failed: (error) => told.push(error), batch: new Batch(() => {}, undefined) });
+			store.attach({ failed: error => told.push(error), batch: new Batch(() => {}, undefined) });
 			fail(at);
 			const writes = write === undefined ? [createDocument(ADDRESS, BASE, "{}")] : [write];
 			expect(await rejection(store.commit(writes, recording().fence, context))).toMatchObject({
@@ -242,7 +242,7 @@ describe("refusals and unknown outcomes (D4)", () => {
 		const store = await memoryStore();
 		await created(store);
 		const counts = await store.readTransaction(
-			async (executor) => [
+			async executor => [
 				await executor.get("SELECT count(*) AS n FROM chord_documents"),
 				await executor.get("SELECT 1 AS one"),
 			],
@@ -261,7 +261,7 @@ describe("the id allocator (D3)", () => {
 	/** A staged write raising the allocator above `id`, as an adapter's explicit id does. */
 	const raising = (id: number): StagedWrite => ({
 		order: "write",
-		apply: async (step) => {
+		apply: async step => {
 			step.ids.raise(id);
 			return [];
 		},
@@ -325,7 +325,7 @@ describe("close", () => {
 		const create = createDocument(ADDRESS, BASE, "{}");
 		const held: StagedWrite = {
 			order: "create",
-			apply: async (step) => {
+			apply: async step => {
 				entered.resolve();
 				await gate.promise;
 				return create.apply(step);
@@ -359,7 +359,7 @@ describe("a commit series", () => {
 				unchecked([]),
 				{
 					// The check reads through its step: it sees the first commit's creation.
-					check: async (step) => void seen.push((await findDocument(step, ADDRESS))?.id),
+					check: async step => void seen.push((await findDocument(step, ADDRESS))?.id),
 					writes: [createDocument({ ...ADDRESS, key: "b" }, BASE, "{}")],
 				},
 			],
@@ -376,10 +376,10 @@ describe("a commit series", () => {
 		expect(store.lastSeq).toBe(2);
 		expect(telemetry.counts()["chord.store.commits"]).toBe(2);
 		const outbox = await store.read(
-			(executor) => executor.all<{ seq: number }>("SELECT seq FROM chord_outbox"),
+			executor => executor.all<{ seq: number }>("SELECT seq FROM chord_outbox"),
 			context,
 		);
-		expect(outbox.map((row) => row.seq)).toEqual([1, 2]);
+		expect(outbox.map(row => row.seq)).toEqual([1, 2]);
 	});
 
 	it("stops at a check that refuses: the commits before it are stored, it and the ones after are not", async () => {
@@ -395,17 +395,17 @@ describe("a commit series", () => {
 				},
 				unchecked([createDocument({ ...ADDRESS, key: "c" }, BASE, "{}")]),
 			],
-			(index) => receipts.push(index),
+			index => receipts.push(index),
 			context,
 		);
 		expect(result).toEqual({ stored: 1, refused: refusal });
 		expect(receipts).toEqual([0]);
 		expect(store.lastSeq).toBe(1);
 		const keys = await store.read(
-			(executor) => executor.all<{ key: string }>("SELECT key FROM chord_documents ORDER BY id"),
+			executor => executor.all<{ key: string }>("SELECT key FROM chord_documents ORDER BY id"),
 			context,
 		);
-		expect(keys.map((row) => row.key)).toEqual([""]);
+		expect(keys.map(row => row.key)).toEqual([""]);
 		// The store goes on at the next seq.
 		const { adopted, fence } = recording();
 		await store.commit([createDocument({ ...ADDRESS, key: "b" }, BASE, "{}")], fence, context);
@@ -419,7 +419,7 @@ describe("a commit series", () => {
 			[
 				unchecked([createDocument(ADDRESS, BASE, "{}")]),
 				{
-					check: async (step) => {
+					check: async step => {
 						await step.get("SELECT * FROM no_such_table").catch(() => {});
 						throw own;
 					},
@@ -441,7 +441,7 @@ describe("a commit series", () => {
 		const error = await rejection(
 			store.commitSeries(
 				[unchecked([createDocument(ADDRESS, BASE, "{}")]), unchecked([BROKEN])],
-				(index) => receipts.push(index),
+				index => receipts.push(index),
 				context,
 			),
 		);
@@ -462,7 +462,7 @@ describe("a commit series", () => {
 		// A delta committed alone is four statements with an outbox, the metadata among them; a series writes it once.
 		expect(telemetry.counts()).toEqual({ "chord.store.commits": 3, "chord.store.statements": 3 * 3 + 1 });
 		const meta = await store.read(
-			(executor) => executor.get<{ last_seq: number }>("SELECT last_seq FROM chord_meta"),
+			executor => executor.get<{ last_seq: number }>("SELECT last_seq FROM chord_meta"),
 			context,
 		);
 		expect(meta?.last_seq).toBe(4);
@@ -477,13 +477,13 @@ describe("a commit series", () => {
 		async (at, write) => {
 			const { store, fail } = await faultyStore();
 			const told: unknown[] = [];
-			store.attach({ failed: (error) => told.push(error), batch: new Batch(() => {}, undefined) });
+			store.attach({ failed: error => told.push(error), batch: new Batch(() => {}, undefined) });
 			fail(at);
 			const receipts: number[] = [];
 			const second = write ?? createDocument({ ...ADDRESS, key: "b" }, BASE, "{}");
 			const series = store.commitSeries(
 				[unchecked([createDocument(ADDRESS, BASE, "{}")]), unchecked([second])],
-				(index) => receipts.push(index),
+				index => receipts.push(index),
 				context,
 			);
 			expect(await rejection(series)).toMatchObject({ code: "unavailable", reason: "storage_failed" });
@@ -502,7 +502,7 @@ describe("a commit series", () => {
 		const seen: (number | undefined)[] = [];
 		const sees: StagedWrite = {
 			order: "write",
-			apply: async (step) => {
+			apply: async step => {
 				seen.push(step.table(TABLE)?.version);
 				return [];
 			},

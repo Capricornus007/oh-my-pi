@@ -24,15 +24,15 @@ type Planned = { readonly sections: Record<string, string | null>; readonly omit
 /** Plan against the current context, append the plan, and check that replay then yields `desired` in order. */
 async function apply(conversation: Conversation, desired: Record<string, string>): Promise<Planned[]> {
 	const drafts = planSystemEntries(await conversation.context(context), new Map(Object.entries(desired)), [], 7);
-	await conversation.commit(async (tx) => {
+	await conversation.commit(async tx => {
 		for (const draft of drafts) await tx.appendEntry(SystemEntry, conversation.id, draft);
 	}, context);
 	const replayed = replaySections((await conversation.context(context)).messages);
 	expect([...replayed]).toEqual(Object.entries(desired));
-	return drafts.map((draft) => {
+	return drafts.map(draft => {
 		const message = draft.model![0] as SystemMessage;
 		expect(message).toMatchObject({ role: "system", content: "", timestamp: 7 });
-		const omit = draft.edits?.map((edit) => {
+		const omit = draft.edits?.map(edit => {
 			expect(edit.action).toBe("omit");
 			return edit.target;
 		});
@@ -47,12 +47,12 @@ async function root(): Promise<Conversation> {
 
 async function lastSystemId(conversation: Conversation): Promise<EntryId> {
 	const page = await conversation.entries({}, 100, undefined, context);
-	return page.items.find((entry) => entry.kind === "pi.system")!.id;
+	return page.items.find(entry => entry.kind === "pi.system")!.id;
 }
 
 async function marker(conversation: Conversation, head: EntryId | "self"): Promise<EntryId> {
 	return conversation.commit(
-		async (tx) => (await tx.appendEntry(conversation.id, { kind: "summary", head, model: [user("summary")] })).id,
+		async tx => (await tx.appendEntry(conversation.id, { kind: "summary", head, model: [user("summary")] })).id,
 		context,
 	);
 }
@@ -85,7 +85,7 @@ describe("system prompt preparation", () => {
 			defineExtension({
 				name: "git",
 				wraps: [
-					wrapSection("cwd", (inner) => ({
+					wrapSection("cwd", inner => ({
 						...inner,
 						render: async (value, ctx) => `${await inner.render(value, ctx)} (git)`,
 					})),
@@ -97,16 +97,16 @@ describe("system prompt preparation", () => {
 			["failing", "<failing>\nold\n</failing>"],
 			["cwd", "stale"],
 		]);
-		const agent = resolveAgent(undefined, registry.snapshot(), resolveSettings(undefined), (error) => {
+		const agent = resolveAgent(undefined, registry.snapshot(), resolveSettings(undefined), error => {
 			throw error;
 		});
-		const desired = await renderSections(agent.sections, input, shown, (error) => reports.push(error), context);
+		const desired = await renderSections(agent.sections, input, shown, error => reports.push(error), context);
 		expect([...desired]).toEqual([
 			["preamble", "You are helpful."],
 			["cwd", "<cwd>\n/repo (git)\n</cwd>"],
 			["failing", "<failing>\nold\n</failing>"],
 		]);
-		expect(reports.map((error) => (error as Error).message)).toEqual(["render failed", "also failed"]);
+		expect(reports.map(error => (error as Error).message)).toEqual(["render failed", "also failed"]);
 	});
 
 	it("propagates section errors after cancellation", async () => {
@@ -171,7 +171,7 @@ describe("system prompt preparation", () => {
 		const conversation = await root();
 		await apply(conversation, { a: "1", b: "2" });
 		await conversation.commit(
-			(tx) => tx.appendEntry(conversation.id, { kind: "pi.user", model: [user("hi")] }),
+			tx => tx.appendEntry(conversation.id, { kind: "pi.user", model: [user("hi")] }),
 			context,
 		);
 		await apply(conversation, { a: "1", b: "20" });
@@ -223,16 +223,16 @@ describe("tool loadout preparation", () => {
 			tools,
 			7,
 		);
-		await conversation.commit(async (tx) => {
+		await conversation.commit(async tx => {
 			for (const draft of drafts) await tx.appendEntry(SystemEntry, conversation.id, draft);
 		}, context);
 		const offered = getCurrentTools((await conversation.context(context)).messages);
 		expect(offered).toEqual(tools.map(toToolDeclaration));
-		return drafts.map((draft) => {
+		return drafts.map(draft => {
 			const message = draft.model![0] as SystemMessage;
 			return {
-				...(message.toolsRemoved === undefined ? {} : { removed: message.toolsRemoved.map((tool) => tool.name) }),
-				...(message.toolsAdded === undefined ? {} : { added: message.toolsAdded.map((tool) => tool.name) }),
+				...(message.toolsRemoved === undefined ? {} : { removed: message.toolsRemoved.map(tool => tool.name) }),
+				...(message.toolsAdded === undefined ? {} : { added: message.toolsAdded.map(tool => tool.name) }),
 				...(message.sections === undefined ? {} : { sections: message.sections }),
 			};
 		});

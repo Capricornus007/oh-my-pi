@@ -11,7 +11,7 @@ function idle() {
 	const evicted: string[] = [];
 	const slot = { evict: (resident: Resident) => void evicted.push(resident.key) };
 
-	const residency = new Residency((sweep) => {
+	const residency = new Residency(sweep => {
 		sweep();
 	});
 	const resident = (key: string) => new Resident(slot, key, track({}), undefined, 1);

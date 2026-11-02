@@ -11,7 +11,7 @@ describe("StdioTransport", () => {
 		const transport = new StdioTransport({
 			command: process.execPath,
 			args: [fixture],
-			onStderr: (chunk) => stderr.push(chunk),
+			onStderr: chunk => stderr.push(chunk),
 		});
 		const client = new McpClient({ name: "stdio-test", version: "1.0.0" });
 		await client.connect(transport);
@@ -20,7 +20,7 @@ describe("StdioTransport", () => {
 			content: [{ type: "text", text: "hello" }],
 		});
 		expect(transport.pid).toBeTypeOf("number");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect(stderr.join("")).toContain("stdio fixture ready");
 		expect(transport.stderr).toContain("stdio fixture ready");
 		await client.close();
@@ -41,7 +41,7 @@ describe("StdioTransport", () => {
 			for (let i = 0; i < 100 && grandchild === undefined; i++) {
 				const match = /grandchild (\d+)/.exec(transport.stderr);
 				if (match) grandchild = Number(match[1]);
-				else await new Promise((resolve) => setTimeout(resolve, 10));
+				else await new Promise(resolve => setTimeout(resolve, 10));
 			}
 			expect(grandchild).toBeTypeOf("number");
 
@@ -52,7 +52,7 @@ describe("StdioTransport", () => {
 			for (let i = 0; i < 100 && alive; i++) {
 				try {
 					process.kill(grandchild as number, 0);
-					await new Promise((resolve) => setTimeout(resolve, 20));
+					await new Promise(resolve => setTimeout(resolve, 20));
 				} catch {
 					alive = false;
 				}

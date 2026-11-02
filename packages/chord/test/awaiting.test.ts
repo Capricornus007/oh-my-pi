@@ -6,7 +6,7 @@ import { describe, it } from "vitest";
 import { type Ctx, createHost, type Host, hostNamed, isChordError, memoryLinkPair, remote } from "../src/index.ts";
 import { CountingLink } from "./fixtures/counting.ts";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 200): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -22,7 +22,7 @@ const Slow = remote("t.e8-slow", {
 /** A server whose `Slow` object goes live when `open()` is called; a browser whose link counts frames. */
 function setup(readyTimeout?: number) {
 	let open = () => {};
-	const opened = new Promise<void>((resolve) => {
+	const opened = new Promise<void>(resolve => {
 		open = resolve;
 	});
 	const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
@@ -52,7 +52,7 @@ describe("awaited gets", () => {
 		const second = browser.get(Slow, {});
 		await sleep(5);
 		abort.abort();
-		await assert.rejects(first, (error) => isChordError(error, "aborted"));
+		await assert.rejects(first, error => isChordError(error, "aborted"));
 		await sleep(5);
 		assert.equal(link.count("sent", "release"), 0, "the other awaiting get keeps the hold");
 		open();
@@ -71,7 +71,7 @@ describe("awaited gets", () => {
 			pending = ctx.get(Slow, {});
 			pending.catch(() => {});
 		});
-		await assert.rejects(pending!, (error) => isChordError(error, "aborted"));
+		await assert.rejects(pending!, error => isChordError(error, "aborted"));
 		await until(() => link.count("sent", "release") === 1);
 		open();
 		await server.close();
@@ -81,7 +81,7 @@ describe("awaited gets", () => {
 		const { server, browser, link } = setup(30);
 		await assert.rejects(
 			browser.get(Slow, {}),
-			(error) => isChordError(error, "unavailable") && error.reason === "ready_timeout",
+			error => isChordError(error, "unavailable") && error.reason === "ready_timeout",
 		);
 		await until(() => link.count("sent", "release") === 1);
 		await server.close();

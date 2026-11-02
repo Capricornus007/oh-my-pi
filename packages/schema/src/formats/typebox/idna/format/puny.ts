@@ -131,7 +131,7 @@ export function Encode(input: string): string {
 	const basicLength = basic.length;
 	const result = basicLength > 0 ? [basic, "-"] : [];
 	// Extract unicode codepoints
-	const codePoints = Array.from(input, (char) => char.codePointAt(0)!);
+	const codePoints = Array.from(input, char => char.codePointAt(0)!);
 	let n = PUNYCODE_INITIAL_N;
 	let delta = 0;
 	let bias = PUNYCODE_INITIAL_BIAS;

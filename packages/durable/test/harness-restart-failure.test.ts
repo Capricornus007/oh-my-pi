@@ -82,7 +82,7 @@ async function live(harness: Harness): Promise<Readonly<LiveState>> {
 /** Every `pi.live` value from now on, as memory adopts it. */
 function liveValues(harness: Harness): LiveState[] {
 	const values: LiveState[] = [];
-	followCommits(harness, (publication) => {
+	followCommits(harness, publication => {
 		for (const change of publication.changes) {
 			if (change.type === "document" && change.record.kind === "pi.live" && change.kind === "change") {
 				values.push(change.value as LiveState);
@@ -94,7 +94,7 @@ function liveValues(harness: Harness): LiveState[] {
 
 /** Let deferred progress commits (`persistWithinMs: 0`) reach Storage before a crash. */
 function stored(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 50));
+	return new Promise(resolve => setTimeout(resolve, 50));
 }
 
 /** A setup whose model streams a long answer slowly; partials are stored as soon as they are committed. */
@@ -148,8 +148,8 @@ describe("a generation interrupted while the model answers (#11139)", () => {
 		setup.settings.retry = { enabled: true, maxRetries: 2, baseDelayMs: 1 };
 		const sent: string[][] = [];
 		setup.faux.setResponses([
-			(request) => {
-				sent.push(request.messages.map((message) => message.role));
+			request => {
+				sent.push(request.messages.map(message => message.role));
 				return fauxAssistantMessage("answer");
 			},
 		]);
@@ -160,14 +160,14 @@ describe("a generation interrupted while the model answers (#11139)", () => {
 		opened.harness.resume();
 		expect((await settled(opened.harness, id)).status).toBe("done");
 		// The backoff showed in `pi.live` with why.
-		const retry = values.find((value) => value.generation?.retry !== undefined)?.generation;
+		const retry = values.find(value => value.generation?.retry !== undefined)?.generation;
 		expect(retry).toEqual({
 			attempt: 1,
 			retry: { at: expect.any(Number), error: "The host stopped while the model was answering, on attempt 1" },
 		});
-		expect(values.some((value) => value.generation?.attempt === 2)).toBe(true);
+		expect(values.some(value => value.generation?.attempt === 2)).toBe(true);
 		const entries = await allEntries(opened.root);
-		expect(entries.map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.assistant"]);
+		expect(entries.map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.assistant"]);
 		const converted = entries[1]!.model![0] as AssistantMessage;
 		expect(converted.stopReason).toBe("aborted");
 		expect(textOf(converted)).toBe(partial);
@@ -229,8 +229,8 @@ describe("a generation interrupted while the model answers (#11139)", () => {
 			error: { message: text, detail: { reason: "interrupted" } },
 		});
 		const entries = await allEntries(opened.root);
-		expect(entries.map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.assistant"]);
-		expect(entries.slice(1).map((entry) => (entry.model![0] as AssistantMessage).stopReason)).toEqual([
+		expect(entries.map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.assistant"]);
+		expect(entries.slice(1).map(entry => (entry.model![0] as AssistantMessage).stopReason)).toEqual([
 			"aborted",
 			"aborted",
 		]);
@@ -388,7 +388,7 @@ describe("other tasks cut off restartLimit times in a row (#11139)", () => {
 		);
 		const answers: FauxResponseStep[] = [
 			() => fauxAssistantMessage([fauxToolCall("heavy", {}, { id: "c1" })], { stopReason: "toolUse" }),
-			(request) => {
+			request => {
 				const result = request.messages.at(-1) as ToolResultMessage;
 				return fauxAssistantMessage(`saw: ${textOf(result)}`);
 			},
@@ -407,7 +407,7 @@ describe("other tasks cut off restartLimit times in a row (#11139)", () => {
 		}
 		expect((await settled(opened.harness, id)).status).toBe("done");
 		expect(runs).toBe(2);
-		const result = (await allEntries(opened.root)).find((entry) => entry.kind === "pi.tool-result")!;
+		const result = (await allEntries(opened.root)).find(entry => entry.kind === "pi.tool-result")!;
 		const message = result.model![0] as ToolResultMessage;
 		expect(message.isError).toBe(true);
 		expect(result.data).toMatchObject({
@@ -421,7 +421,7 @@ describe("other tasks cut off restartLimit times in a row (#11139)", () => {
 		});
 		// The slot's partial output is kept, as for an interrupted call.
 		expect(textOf(message)).toContain("partial");
-		const toolTask = (await opened.harness.commit((tx) => tx.scanTasks({ kind: "pi.tool" }, 10), context)).items[0]!;
+		const toolTask = (await opened.harness.commit(tx => tx.scanTasks({ kind: "pi.tool" }, 10), context)).items[0]!;
 		expect(toolTask.state).toMatchObject({
 			status: "terminal",
 			outcome: { status: "failed", error: { detail: { reason: "restart_limit" } } },
@@ -532,14 +532,14 @@ describe("crash edges (#11139)", () => {
 		opened.harness.resume();
 		const answer = await settled(opened.harness, id);
 		expect(answer.status).toBe("done");
-		expect(values.find((value) => value.generation?.retry !== undefined)?.generation).toEqual({
+		expect(values.find(value => value.generation?.retry !== undefined)?.generation).toEqual({
 			attempt: 1,
 			retry: {
 				at: expect.any(Number),
 				error: "The host stopped while the deferred answer was fetched, on attempt 1",
 			},
 		});
-		expect(values.some((value) => value.generation?.attempt === 2 && value.generation.deferred !== undefined)).toBe(
+		expect(values.some(value => value.generation?.attempt === 2 && value.generation.deferred !== undefined)).toBe(
 			true,
 		);
 		// One request, polled twice: the provider's job is neither dropped nor submitted again.
@@ -608,9 +608,9 @@ describe("crash edges (#11139)", () => {
 		const values = liveValues(opened.harness);
 		opened.harness.resume();
 		expect((await settled(opened.harness, id)).status).toBe("done");
-		const charged = values.filter((value) => value.generation?.retry !== undefined);
-		expect(charged.map((value) => value.generation?.attempt)).toEqual([1]);
-		expect((await allEntries(opened.root)).map((entry) => entry.kind)).toEqual([
+		const charged = values.filter(value => value.generation?.retry !== undefined);
+		expect(charged.map(value => value.generation?.attempt)).toEqual([1]);
+		expect((await allEntries(opened.root)).map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.assistant",
 			"pi.assistant",
@@ -639,7 +639,7 @@ describe("crash edges (#11139)", () => {
 			runFailure: { taskId, inputs: [id], reason: "restart_limit", detail: text, first: expect.any(Number) },
 		});
 		const entries = await allEntries(opened.root);
-		expect(entries.map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant"]);
+		expect(entries.map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant"]);
 		expect(textOf(entries[1]!.model![0])).toBe(partial);
 		expect(setup.faux.state.callCount).toBe(0);
 		await opened.harness.close(context);
@@ -663,7 +663,7 @@ describe("crash edges (#11139)", () => {
 			reason: "restart_limit",
 			detail: "The generation was interrupted 3 times in a row in its request phase",
 		});
-		expect((await allEntries(opened.root)).map((entry) => entry.kind)).toEqual(["pi.user"]);
+		expect((await allEntries(opened.root)).map(entry => entry.kind)).toEqual(["pi.user"]);
 		expect((await live(opened.harness)).generation).toBeUndefined();
 		await opened.harness.close(context);
 	});
@@ -702,7 +702,7 @@ describe("crash edges (#11139)", () => {
 			status: "faulted",
 			error: { detail: { reason: "restart_limit" } },
 		});
-		await waitFor(() => setup.infos.some((info) => info.kind === "task_faulted"));
+		await waitFor(() => setup.infos.some(info => info.kind === "task_faulted"));
 		expect(setup.infos).toContainEqual(expect.objectContaining({ kind: "task_faulted", reason: "restart_limit" }));
 		await opened.harness.close(context);
 	});

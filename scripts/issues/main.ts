@@ -54,14 +54,14 @@ async function view() {
 	const state = await triage.state();
 	const items = corpus
 		.all()
-		.filter((issue) => issue.createdAt >= state.inboxSince)
+		.filter(issue => issue.createdAt >= state.inboxSince)
 		.sort((a, b) => b.number - a.number)
-		.map((issue) => {
+		.map(issue => {
 			const entry = state.issues[issue.number];
 			const result = entry?.result
 				? {
 						...entry.result,
-						duplicates: entry.result.duplicates.map((dup) => {
+						duplicates: entry.result.duplicates.map(dup => {
 							const other = corpus.get(dup.number);
 							return { ...dup, title: other?.title ?? "", status: other ? issueStatus(other) : "" };
 						}),
@@ -138,7 +138,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const priority = body.priority as Priority | null | undefined;
 		const category = body.category as string | null | undefined;
 		if (priority != null && !PRIORITIES.includes(priority)) return send(res, 400, '{"error":"bad priority"}');
-		if (category != null && !triage.categories.some((c) => c.name === category)) {
+		if (category != null && !triage.categories.some(c => c.name === category)) {
 			return send(res, 400, '{"error":"bad category"}');
 		}
 		const numbers = Array.isArray(body.numbers) ? body.numbers.map(Number) : [Number(body.number)];

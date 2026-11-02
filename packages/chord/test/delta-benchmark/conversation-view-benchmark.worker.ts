@@ -193,7 +193,7 @@ const config = scenarioConfig(scenario);
 
 function cloneTrusted<T>(value: T): T {
 	if (value === null || typeof value !== "object") return value;
-	if (Array.isArray(value)) return value.map((child) => cloneTrusted(child)) as T;
+	if (Array.isArray(value)) return value.map(child => cloneTrusted(child)) as T;
 	const result = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>;
 	for (const key of Object.keys(value)) {
 		Object.defineProperty(result, key, {
@@ -350,14 +350,11 @@ function initialDocuments(): Record<DocumentKey, JsonObject> {
 			required: ["path"],
 		},
 	}));
-	const inboxItems = Array.from(
-		{ length: 16 },
-		(_, index): InboxItem => ({
-			id: index + 1,
-			mode: index % 3 === 0 ? "steer" : "followUp",
-			text: payloadText(960 + (index % 4) * 48, 40_000 + index),
-		}),
-	);
+	const inboxItems = Array.from({ length: 16 }, (_, index): InboxItem => ({
+		id: index + 1,
+		mode: index % 3 === 0 ? "steer" : "followUp",
+		text: payloadText(960 + (index % 4) * 48, 40_000 + index),
+	}));
 	const liveTools = Array.from({ length: 8 }, (_, index) => ({
 		callId: `initial-call-${index}`,
 		name: index % 2 === 0 ? "read" : "bash",
@@ -370,7 +367,7 @@ function initialDocuments(): Record<DocumentKey, JsonObject> {
 			schema: "pico5.doc.config.provisional.v0",
 			model: { provider: "anthropic", modelId: "claude-sonnet-provisional" },
 			thinkingLevel: "medium",
-			selectedTools: tools.slice(0, 12).map((tool) => tool.name),
+			selectedTools: tools.slice(0, 12).map(tool => tool.name),
 			sections,
 			tools,
 			temperature: 0.2,
@@ -458,7 +455,7 @@ let aggregate = rebuildExpectedView();
 const initialAggregateBytes = Buffer.byteLength(JSON.stringify(aggregate));
 let conversationSequence = 0;
 const documentSequences = Object.fromEntries(
-	(Object.keys(documentTrackers) as DocumentKey[]).map((key) => [key, 0]),
+	(Object.keys(documentTrackers) as DocumentKey[]).map(key => [key, 0]),
 ) as Record<DocumentKey, number>;
 let conversationWatches: Array<Watch<ConversationView>> = [];
 let documentWatches: DocumentWatch[] = [];
@@ -636,7 +633,7 @@ function planCommit(index: number): CommitPlan {
 	if (cycle < 70) {
 		docs.push({
 			key: "live",
-			mutate: (draft) => {
+			mutate: draft => {
 				const live = draft as unknown as Draft<LiveDoc>;
 				const limit = 4_096 + (index % 8) * 4_096;
 				const chunk = payloadText(384 + (index % 5) * 64, 100_000 + index);
@@ -651,7 +648,7 @@ function planCommit(index: number): CommitPlan {
 	} else if (cycle < 90) {
 		docs.push({
 			key: "live",
-			mutate: (draft) => {
+			mutate: draft => {
 				const live = draft as unknown as Draft<LiveDoc>;
 				const slot = live.tools[index % live.tools.length]!;
 				slot.status = cycle % 4 === 0 ? "completed" : "running";
@@ -663,7 +660,7 @@ function planCommit(index: number): CommitPlan {
 	} else if (cycle < 94) {
 		docs.push({
 			key: "inbox",
-			mutate: (draft) => {
+			mutate: draft => {
 				const inbox = draft as unknown as Draft<InboxDoc>;
 				inbox.items.push({
 					id: 1_000_000 + index,
@@ -678,7 +675,7 @@ function planCommit(index: number): CommitPlan {
 		docs.push(
 			{
 				key: "live",
-				mutate: (draft) => {
+				mutate: draft => {
 					const live = draft as unknown as Draft<LiveDoc>;
 					live.status = cycle === 94 ? "admitting" : "ready";
 					live.generation.stage = cycle === 94 ? "requesting" : "completed";
@@ -687,7 +684,7 @@ function planCommit(index: number): CommitPlan {
 			},
 			{
 				key: "turn",
-				mutate: (draft) => {
+				mutate: draft => {
 					const turn = draft as unknown as Draft<TurnDoc>;
 					turn.stage = cycle === 94 ? "requesting" : "idle";
 					turn.message = cycle === 94 ? payloadText(720, 130_000 + index) : "";
@@ -698,7 +695,7 @@ function planCommit(index: number): CommitPlan {
 	} else if (cycle === 96) {
 		docs.push({
 			key: "config",
-			mutate: (draft) => {
+			mutate: draft => {
 				const configDoc = draft as unknown as Draft<ConfigDoc>;
 				configDoc.thinkingLevel = index % 200 === 96 ? "high" : "medium";
 				configDoc.temperature = 0.15 + (Math.floor(index / 100) % 4) * 0.05;
@@ -711,7 +708,7 @@ function planCommit(index: number): CommitPlan {
 		docs.push(
 			{
 				key: "preferences",
-				mutate: (draft) => {
+				mutate: draft => {
 					const preferences = draft as unknown as Draft<PreferencesDoc>;
 					preferences.theme = index % 200 === 97 ? "dim" : "dark";
 					preferences.compactTools = !preferences.compactTools;
@@ -721,7 +718,7 @@ function planCommit(index: number): CommitPlan {
 			},
 			{
 				key: "turn",
-				mutate: (draft) => {
+				mutate: draft => {
 					const turn = draft as unknown as Draft<TurnDoc>;
 					turn.stage = "configured";
 					turn.revision += 1;
@@ -732,7 +729,7 @@ function planCommit(index: number): CommitPlan {
 		docs.push(
 			{
 				key: "live",
-				mutate: (draft) => {
+				mutate: draft => {
 					const live = draft as unknown as Draft<LiveDoc>;
 					live.status = "retrying";
 					live.generation.stage = "retrying";
@@ -743,7 +740,7 @@ function planCommit(index: number): CommitPlan {
 			},
 			{
 				key: "turn",
-				mutate: (draft) => {
+				mutate: draft => {
 					const turn = draft as unknown as Draft<TurnDoc>;
 					turn.stage = "retrying";
 					turn.revision += 1;
@@ -754,7 +751,7 @@ function planCommit(index: number): CommitPlan {
 		docs.push(
 			{
 				key: "audit",
-				mutate: (draft) => {
+				mutate: draft => {
 					const audit = draft as unknown as Draft<AuditDoc>;
 					audit.commits += 1;
 					audit.note = `unmounted-${index}`;
@@ -762,7 +759,7 @@ function planCommit(index: number): CommitPlan {
 			},
 			{
 				key: "config",
-				mutate: (draft) => {
+				mutate: draft => {
 					const configDoc = draft as unknown as Draft<ConfigDoc>;
 					configDoc.model = {
 						provider: configDoc.model.provider,
@@ -984,13 +981,13 @@ function registerDocumentWatch(key: DocumentKey, started: boolean): void {
 function verifyAndDropConversationWatch(watch: Watch<ConversationView>): void {
 	verifySnapshotUnchanged(watch);
 	if (watch.started) assert.equal(watch.deliveredSequence, conversationSequence);
-	conversationWatches = conversationWatches.filter((candidate) => candidate !== watch);
+	conversationWatches = conversationWatches.filter(candidate => candidate !== watch);
 }
 
 function verifyAndDropDocumentWatch(watch: DocumentWatch): void {
 	verifySnapshotUnchanged(watch);
 	if (watch.started) assert.equal(watch.deliveredSequence, documentSequences[watch.key]);
-	documentWatches = documentWatches.filter((candidate) => candidate !== watch);
+	documentWatches = documentWatches.filter(candidate => candidate !== watch);
 }
 
 await collect();
@@ -1009,7 +1006,7 @@ for (let index = 0; index < commitTarget; index++) {
 		if (current !== undefined) verifyAndDropConversationWatch(current);
 		registerConversationWatch(true);
 		const key = DOCUMENT_WATCH_KEYS[Math.floor((index + 1) / churnInterval) % DOCUMENT_WATCH_KEYS.length]!;
-		const currentDocument = documentWatches.find((watch) => watch.key === key);
+		const currentDocument = documentWatches.find(watch => watch.key === key);
 		if (currentDocument !== undefined) verifyAndDropDocumentWatch(currentDocument);
 		registerDocumentWatch(key, true);
 	}
@@ -1059,8 +1056,8 @@ const finalQueuedOperationReferences =
 	conversationWatches.reduce((total, watch) => total + watch.pendingOperationCount, 0) +
 	documentWatches.reduce((total, watch) => total + watch.pendingOperationCount, 0);
 const finalUniqueQueuedBatches = new Set([
-	...conversationWatches.flatMap((watch) => watch.queue),
-	...documentWatches.flatMap((watch) => watch.queue),
+	...conversationWatches.flatMap(watch => watch.queue),
+	...documentWatches.flatMap(watch => watch.queue),
 ]).size;
 assert.equal(finalQueueReferences, queuedFrameReferences);
 assert.equal(finalQueuedOperationReferences, queuedOperationReferences);
@@ -1078,7 +1075,7 @@ const releasedHeap = process.memoryUsage().heapUsed;
 const releaseHeapMiB = (releasedHeap - baselineHeap) / MiB;
 
 const phaseDistributions = Object.fromEntries(
-	(Object.keys(phaseSamples) as PhaseName[]).map((name) => [name, distribution(phaseSamples[name])]),
+	(Object.keys(phaseSamples) as PhaseName[]).map(name => [name, distribution(phaseSamples[name])]),
 ) as Record<PhaseName, Distribution>;
 const checksum =
 	aggregate.entries.length +

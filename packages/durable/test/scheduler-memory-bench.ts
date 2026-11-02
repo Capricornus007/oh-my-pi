@@ -31,7 +31,7 @@ const Hold = defineTask<{ name: string }, { phase: "hold" }, null>({
 	initial: () => ({ phase: "hold" }),
 	phases: {
 		hold: async (task, runtime, ctx) => {
-			await new Promise<void>((resolve) => waiting.set(task.input.name, resolve));
+			await new Promise<void>(resolve => waiting.set(task.input.name, resolve));
 			await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
 		},
 	},
@@ -40,7 +40,7 @@ const Hold = defineTask<{ name: string }, { phase: "hold" }, null>({
 });
 
 async function release(name: string): Promise<void> {
-	while (!waiting.has(name)) await new Promise((resolve) => setTimeout(resolve, 0));
+	while (!waiting.has(name)) await new Promise(resolve => setTimeout(resolve, 0));
 	waiting.get(name)!();
 	waiting.delete(name);
 }
@@ -68,14 +68,14 @@ async function run(cycles: number) {
 		const root = await harness.root(context);
 		harness.resume();
 		const parent = await root.commit(
-			(tx) => tx.createTask(Hold, { name: "parent" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "parent" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const heapBefore = await retainedBytes();
 		let first: ConversationId | undefined;
 		const started = performance.now();
 		for (let n = 0; n < cycles; n++) {
-			const { tool, inner, child } = await root.commit(async (tx) => {
+			const { tool, inner, child } = await root.commit(async tx => {
 				const tool = await tx.createTask(
 					Hold,
 					{ name: `tool${n}` },
@@ -102,7 +102,7 @@ async function run(cycles: number) {
 		const readsBefore = reads.count;
 		const old = (await harness.conversation(first!, context))!;
 		const late = await old.commit(
-			(tx) => tx.createTask(Hold, { name: "late" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "late" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await release("late");

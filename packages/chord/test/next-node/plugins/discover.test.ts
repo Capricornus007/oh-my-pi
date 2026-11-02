@@ -89,7 +89,7 @@ describe("discovery", () => {
 		const dir = await writePlugin(elsewhere, "linked", "@test/linked", { "worker.ts": "" });
 		await symlink(dir, join(root, "link"));
 		const { plugins } = await discoverPlugins([root], { kinds: KINDS }, context);
-		expect(plugins.map((each) => [each.name, each.dir])).toEqual([["@test/linked", await realpath(dir)]]);
+		expect(plugins.map(each => [each.name, each.dir])).toEqual([["@test/linked", await realpath(dir)]]);
 		expect(plugins[0]!.facets).toEqual({ worker: join(await realpath(dir), "worker.ts") });
 	});
 });

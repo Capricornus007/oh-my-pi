@@ -53,10 +53,7 @@ const NoteDoc = defineDoc<{ text: string }>({
 const Message = defineEntry("message");
 
 async function append(conversation: Conversation, text: string): Promise<EntryRecord> {
-	return conversation.commit(
-		(tx) => tx.appendEntry(conversation.id, { kind: "message", model: [user(text)] }),
-		context,
-	);
+	return conversation.commit(tx => tx.appendEntry(conversation.id, { kind: "message", model: [user(text)] }), context);
 }
 
 async function allEntries(conversation: Conversation, order?: ScanOrder): Promise<string[]> {
@@ -86,7 +83,7 @@ describe("Harness root and conversations", () => {
 		expect(root.id).toBe(ROOT_CONVERSATION_ID);
 		expect(storage.commits).toHaveLength(1);
 		// Conversation, five built-in documents, and the init note.
-		expect(storage.commits[0]!.map((write) => write.type)).toEqual([
+		expect(storage.commits[0]!.map(write => write.type)).toEqual([
 			"conversation",
 			"document.create",
 			"document.create",
@@ -102,7 +99,7 @@ describe("Harness root and conversations", () => {
 		expect(await harness.snapshot(AgentDoc, root.id, context)).toEqual({ thinkingLevel: "high" });
 		const agent = await root.agent(context);
 		expect(agent.thinkingLevel).toBe("high");
-		expect(agent.tools.map((each) => each.name)).toEqual(["read", "bash"]);
+		expect(agent.tools.map(each => each.name)).toEqual(["read", "bash"]);
 		expect(await harness.snapshot(NoteDoc, root.id, context)).toEqual({ text: "root note" });
 
 		const again = await harness.root(context, { agent: { thinkingLevel: "low" }, init: () => expect.unreachable() });
@@ -121,7 +118,7 @@ describe("Harness root and conversations", () => {
 		const fork = await root.fork(entry.id, { ownership: { kind: "ownerless" } }, context);
 		const providerSessionIds = await Promise.all(
 			[root, child, fork].map(
-				async (conversation) => (await first.harness.snapshot(ProviderDoc, conversation.id, context))?.sessionId,
+				async conversation => (await first.harness.snapshot(ProviderDoc, conversation.id, context))?.sessionId,
 			),
 		);
 		// Regression coverage for #10424: a fork must not inherit its parent's provider identity.
@@ -144,7 +141,7 @@ describe("Harness root and conversations", () => {
 		await expect(
 			Promise.all(
 				[root.id, child.id, fork.id].map(
-					async (id) => (await first.harness.snapshot(ProviderDoc, id, context))?.sessionId,
+					async id => (await first.harness.snapshot(ProviderDoc, id, context))?.sessionId,
 				),
 			),
 		).resolves.toEqual(providerSessionIds);
@@ -188,7 +185,7 @@ describe("Harness root and conversations", () => {
 		// A conversation on the default selection follows installs live.
 		addTool(registry, tool("bash"));
 		const names = async (conversation: Conversation) =>
-			(await conversation.agent(context)).tools.map((each) => each.name);
+			(await conversation.agent(context)).tools.map(each => each.name);
 		expect(await names(created)).toEqual(["read", "bash"]);
 		await harness.close(context);
 	});
@@ -237,7 +234,7 @@ describe("Harness root and conversations", () => {
 		const root = await harness.root(context);
 		await append(root, "r1");
 		const [r2] = await root.commit(
-			async (tx) => [
+			async tx => [
 				await tx.appendEntry(root.id, { kind: "message", model: [user("r2")] }),
 				await tx.appendEntry(root.id, { kind: "message", model: [user("r3")] }),
 			],
@@ -260,7 +257,7 @@ describe("Harness root and conversations", () => {
 			undefined,
 			context,
 		);
-		expect(bounded.items.map((entry) => entry.id)).toEqual([c1.id, r2!.id]);
+		expect(bounded.items.map(entry => entry.id)).toEqual([c1.id, r2!.id]);
 		expect(Message.is(bounded.items[0])).toBe(true);
 		expect(Message.is(undefined)).toBe(false);
 		await harness.close(context);
@@ -277,13 +274,13 @@ describe("Harness root and conversations", () => {
 			abort: async () => {},
 		});
 		const taskId = await conversation.commit(
-			(tx) => tx.createTask(task, { n: 1 }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(task, { n: 1 }, { ownership: { kind: "conversation" } }),
 			context,
 		);
-		const record = await harness.commit((tx) => tx.task(taskId), context);
+		const record = await harness.commit(tx => tx.task(taskId), context);
 		expect(record?.conversationId).toBe(conversation.id);
 		await expect(
-			harness.commit((tx) => tx.createTask(task, { n: 2 }, { ownership: { kind: "conversation" } }), context),
+			harness.commit(tx => tx.createTask(task, { n: 2 }, { ownership: { kind: "conversation" } }), context),
 		).rejects.toThrow("requires options.conversationId");
 		await harness.close(context);
 	});
@@ -310,7 +307,7 @@ describe("Harness root and conversations", () => {
 		});
 		// A raw creation in a commit, as in a tool, and a fork, which already has the asOf copies.
 		const raw = await harness.commit(
-			async (tx) => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
+			async tx => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
 			context,
 		);
 		const entry = await append(root, "hello");
@@ -340,7 +337,7 @@ describe("Harness agent", () => {
 		registry.install(defineExtension({ name: "coding", tools: [read, bash, edit] }));
 		const root = await harness.root(context);
 		const stored = () => harness.snapshot(AgentDoc, root.id, context);
-		const offered = async () => (await root.agent(context)).tools.map((each) => each.name);
+		const offered = async () => (await root.agent(context)).tools.map(each => each.name);
 		expect(await root.agent(context)).toMatchObject({ thinkingLevel: "off", tools: [read, bash, edit] });
 		expect((await root.agent(context)).model).toBeUndefined();
 
@@ -382,7 +379,7 @@ describe("Harness agent", () => {
 			phases: { never: async () => {} },
 			abort: async () => {},
 		});
-		const ids = await root.commit(async (tx) => {
+		const ids = await root.commit(async tx => {
 			const taskId = await tx.createTask(owner, {}, { ownership: { kind: "conversation" } });
 			const plain = await tx.createConversation({ ownership: { kind: "ownerless" } });
 			const owned = await tx.createConversation({ ownership: { kind: "task", taskId } });
@@ -410,10 +407,9 @@ describe("Harness agent", () => {
 		expect((await harness.snapshot(AgentDoc, ids.owned, context))?.thinkingLevel).toBeUndefined();
 
 		// A task-owned fork keeps its as-of copy of its fork parent, not its owner's agent.
-		const at = await root.commit(async (tx) => (await tx.appendEntry(ids.plain, { kind: "note" })).id, context);
+		const at = await root.commit(async tx => (await tx.appendEntry(ids.plain, { kind: "note" })).id, context);
 		const fork = await root.commit(
-			async (tx) =>
-				(await tx.forkConversation(ids.plain, at, { ownership: { kind: "task", taskId: ids.taskId } })).id,
+			async tx => (await tx.forkConversation(ids.plain, at, { ownership: { kind: "task", taskId: ids.taskId } })).id,
 			context,
 		);
 		expect(await harness.snapshot(AgentDoc, fork, context)).toEqual({});
@@ -427,7 +423,7 @@ describe("Harness agent", () => {
 	it("reads an absent agent for conversations a plain Session created without writing", async () => {
 		const storage = new ControlledStorage();
 		const id = await createSession(storage).commit(
-			async (tx) => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
+			async tx => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
 			context,
 		);
 		const { harness } = await openHarness(storage, ["read"]);
@@ -460,11 +456,11 @@ describe("Harness lifecycle", () => {
 	it("forwards generic Session document APIs", async () => {
 		const { harness } = await openHarness(new MemoryStorage());
 		const root = await harness.root(context);
-		const entry = await root.commit(async (tx) => {
+		const entry = await root.commit(async tx => {
 			(await tx.doc(NoteDoc, root.id)).text = "first";
 			return tx.appendEntry(root.id, { kind: "message", model: [user("m")] });
 		}, context);
-		await harness.commit(async (tx) => {
+		await harness.commit(async tx => {
 			(await tx.doc(NoteDoc, root.id)).text = "second";
 		}, context);
 		expect(await harness.snapshot(NoteDoc, root.id, context)).toEqual({ text: "second" });

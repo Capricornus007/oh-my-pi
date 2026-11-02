@@ -91,7 +91,7 @@ describe("telemetry schemas", () => {
 		const startSpan = createTypedSpanStarter(telemetryContext, [operationSchema, requestSchema]);
 
 		const result = await startSpan("operation", { kind: "read" }, (_operationSpan, startChildSpan) =>
-			startChildSpan("request", { provider: "example" }, (requestSpan) => {
+			startChildSpan("request", { provider: "example" }, requestSpan => {
 				requestSpan.setAttributes({ response: "cached" });
 				return 42;
 			}),
@@ -100,8 +100,8 @@ describe("telemetry schemas", () => {
 		expect(result).toBe(42);
 		expectTypeOf(result).toEqualTypeOf<number>();
 		const spans = telemetryContext.getSpans();
-		const operationSpan = spans.find((span) => span.name === "operation");
-		const requestSpan = spans.find((span) => span.name === "request");
+		const operationSpan = spans.find(span => span.name === "operation");
+		const requestSpan = spans.find(span => span.name === "request");
 		expect(operationSpan?.parentId).toBeNull();
 		expect(requestSpan?.parentId).toBe(operationSpan?.id);
 
@@ -139,10 +139,10 @@ describe("NOOP_TELEMETRY_CONTEXT", () => {
 	it("admits callbacks synchronously and reuses one inert span", async () => {
 		let admitted = false;
 		let firstSpan: TelemetrySpan | undefined;
-		const result = NOOP_TELEMETRY_CONTEXT.startSpan({ name: "first" }, async (span) => {
+		const result = NOOP_TELEMETRY_CONTEXT.startSpan({ name: "first" }, async span => {
 			admitted = true;
 			firstSpan = span;
-			const child = await span.startSpan({ name: "child" }, (childSpan) => childSpan);
+			const child = await span.startSpan({ name: "child" }, childSpan => childSpan);
 			expect(child).toBe(span);
 			return 42;
 		});
@@ -173,7 +173,7 @@ describe("NOOP_TELEMETRY_CONTEXT", () => {
 	it("ignores typed recording payloads", async () => {
 		const result = await NOOP_TELEMETRY_CONTEXT.startSpan(
 			{ name: "operation", attributes: { kind: "test" } },
-			(span) => {
+			span => {
 				span.addEvent("event", { count: 1 });
 				span.setAttributes({ complete: true });
 				span.setStatus({ status: "error", error: { name: "Expected", message: "test" } });

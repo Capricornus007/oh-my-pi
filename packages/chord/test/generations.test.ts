@@ -14,7 +14,7 @@ const gc = runInNewContext("gc") as () => void;
 /** Tracks which sentinels are still reachable. */
 function tracker() {
 	const alive = new Set<number>();
-	const registry = new FinalizationRegistry<number>((id) => alive.delete(id));
+	const registry = new FinalizationRegistry<number>(id => alive.delete(id));
 	return {
 		alive,
 		track<T extends object>(id: number, value: T): T {
@@ -31,7 +31,7 @@ function tracker() {
 			const deadline = Date.now() + timeout;
 			do {
 				gc();
-				await new Promise((resolve) => setTimeout(resolve, 10));
+				await new Promise(resolve => setTimeout(resolve, 10));
 				if (sorted().join() === expected.join()) break;
 			} while (Date.now() < deadline);
 			return sorted();
@@ -55,7 +55,7 @@ describe("generation GC", () => {
 			const sentinel = generations.track(generation, { generation });
 			return {
 				name: "store",
-				setup: (api) =>
+				setup: api =>
 					api.serve(Store, (_input, _principal, self) => {
 						const count = self.state("count", num(), 0);
 						return { count, get: () => sentinel.generation };
@@ -80,7 +80,7 @@ describe("generation GC", () => {
 			const sentinel = generations.track(generation, { generation });
 			return {
 				name: "store",
-				setup: (api) =>
+				setup: api =>
 					api.serve(
 						Store,
 						(_input, _principal, self) => {
@@ -92,8 +92,8 @@ describe("generation GC", () => {
 								close: () => void sentinel.generation,
 							});
 							self.on("count", count, () => void sentinel.generation);
-							self.task(async (ctx) => {
-								await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
+							self.task(async ctx => {
+								await new Promise<void>(resolve => ctx.signal.addEventListener("abort", () => resolve()));
 								void sentinel.generation;
 							});
 							self.register(Routes, { generation: () => sentinel.generation });
@@ -119,18 +119,18 @@ describe("generation GC", () => {
 			const sentinel = generations.track(generation, { generation });
 			return {
 				name: "store",
-				setup: (api) =>
+				setup: api =>
 					api.serve(
 						Store,
 						(_input, _principal, self) => {
 							const count = self.state("count", num(), 0);
-							self.task(async (ctx) => {
-								await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
+							self.task(async ctx => {
+								await new Promise<void>(resolve => ctx.signal.addEventListener("abort", () => resolve()));
 								void sentinel.generation;
 							});
 							return {
 								count,
-								get: (ctx) => {
+								get: ctx => {
 									ctx.signal.addEventListener("abort", () => void sentinel.generation);
 									return sentinel.generation;
 								},
@@ -143,7 +143,7 @@ describe("generation GC", () => {
 		await host.install(facet(0));
 		for (let generation = 1; generation <= RELOADS; generation++) {
 			await host.reload([facet(generation)]);
-			assert.equal(await host.root(async (ctx) => (await ctx.get(Store, {})).get(ctx)), generation);
+			assert.equal(await host.root(async ctx => (await ctx.get(Store, {})).get(ctx)), generation);
 		}
 		assert.deepEqual(await generations.collect([RELOADS]), [RELOADS]);
 		await host.close();
@@ -157,7 +157,7 @@ describe("generation GC", () => {
 			members: { id: method(undefined, num()) },
 		});
 		const host = createHost({ self: { kind: "host" }, onError: () => {} });
-		host.serve(Item, (input) => {
+		host.serve(Item, input => {
 			// The normalized input is held by the object: it stands for the object.
 			const { id } = objects.track(input.id, input);
 			return { id: () => id };
@@ -169,7 +169,7 @@ describe("generation GC", () => {
 			ref.release();
 		};
 		for (let id = 0; id < 50; id++) await use(id);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		assert.deepEqual(await objects.collect([]), []);
 		await host.close();
 	});

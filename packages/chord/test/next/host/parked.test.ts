@@ -29,14 +29,14 @@ async function gated() {
 	const gate = Promise.withResolvers<void>();
 	const log: string[] = [];
 	const self: { ref?: Held<typeof Gated> } = {};
-	const { host } = await loaded((h) =>
+	const { host } = await loaded(h =>
 		h.serve(Gated, (_, attempt) => {
 			attempt.open(
 				() => gate.promise,
 				() => {},
 			);
 			return {
-				log: async (text) => {
+				log: async text => {
 					log.push(text);
 					if (text === "release") self.ref?.release();
 					if (text === "call") void self.ref?.log("from a handler", context);

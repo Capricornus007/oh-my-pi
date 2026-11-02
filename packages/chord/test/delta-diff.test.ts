@@ -108,7 +108,7 @@ describe("immutable revision diff", () => {
 	});
 
 	it("emits payload-free splices for scattered removals", () => {
-		const [a, b, c, d, e] = ["a", "b", "c", "d", "e"].map((id) => ({ id }));
+		const [a, b, c, d, e] = ["a", "b", "c", "d", "e"].map(id => ({ id }));
 		expectDiff({ values: [a, b, c, d, e] }, { values: [a, c, e] }, [
 			["p", ["values"], 1, 1, []],
 			["p", ["values"], 2, 1, []],
@@ -126,8 +126,8 @@ describe("immutable revision diff", () => {
 	});
 
 	it("does not field-diff unrelated shifted objects with common fields", () => {
-		const before = [1, 2, 3].map((value) => ({ type: "row", value }));
-		const after = [2, 3, 4].map((value) => ({ type: "row", value }));
+		const before = [1, 2, 3].map(value => ({ type: "row", value }));
+		const after = [2, 3, 4].map(value => ({ type: "row", value }));
 		expectDiff({ values: before }, { values: after }, [
 			["p", ["values"], 0, 1, []],
 			["p", ["values"], 2, 0, [{ type: "row", value: 4 }]],
@@ -160,7 +160,7 @@ describe("immutable revision diff", () => {
 		]);
 	});
 
-	it.each([256 * 1024, 1024 * 1024])("does not retain a %i-byte removed-neighbor payload", (size) => {
+	it.each([256 * 1024, 1024 * 1024])("does not retain a %i-byte removed-neighbor payload", size => {
 		const payload = "x".repeat(size);
 		const retained = [
 			{ id: "a", payload },
@@ -181,7 +181,7 @@ describe("immutable revision diff", () => {
 		expect(before.values).toEqual(retained);
 	});
 
-	it.each([1_001, 10_000])("keeps push, pop, and middle removal narrow at %,i items", (size) => {
+	it.each([1_001, 10_000])("keeps push, pop, and middle removal narrow at %,i items", size => {
 		const values = Array.from({ length: size }, (_, value) => ({ value }));
 		const appended = { value: size };
 		expectDiff({ values }, { values: [...values, appended] }, [["p", ["values"], size, 0, [appended]]]);
@@ -201,7 +201,7 @@ describe("immutable revision diff", () => {
 			changed.push(index);
 		}
 		const operations = diffRevisions({ values }, { values: after });
-		expect(operations).toEqual(changed.map((index) => ["s", ["values", index, "value"], -index]));
+		expect(operations).toEqual(changed.map(index => ["s", ["values", index, "value"], -index]));
 		expect(JSON.stringify(operations).length).toBeLessThan(7_500);
 		expect(applyImmutable({ values }, operations)).toEqual({ values: after });
 	});

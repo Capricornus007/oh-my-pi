@@ -18,8 +18,8 @@ describe("keyedEntries", () => {
 		const conflicts: RegistryConflict[] = [];
 		const map = keyedEntries(
 			table,
-			(value) => value.routes,
-			(conflict) => conflicts.push(conflict),
+			value => value.routes,
+			conflict => conflicts.push(conflict),
 		);
 		expect([...map]).toEqual([
 			["/x", { value: "one", plugin: "@a/one" }],
@@ -31,7 +31,7 @@ describe("keyedEntries", () => {
 
 describe("orderedEntries", () => {
 	it("lists every entry's items in table order, with their plugin and type", () => {
-		expect(orderedEntries(table, (value) => value.items)).toEqual([
+		expect(orderedEntries(table, value => value.items)).toEqual([
 			{ value: "late", plugin: "@a/one" },
 			{ value: "first", plugin: "@a/one" },
 			{ value: "second", plugin: "@b/two", type: "b.store" },
@@ -40,7 +40,7 @@ describe("orderedEntries", () => {
 
 	it("sorts by `orderOf`, table order kept among equals", () => {
 		const order = (item: string) => (item === "first" ? 0 : 1);
-		expect(orderedEntries(table, (value) => value.items, order).map(({ value }) => value)).toEqual([
+		expect(orderedEntries(table, value => value.items, order).map(({ value }) => value)).toEqual([
 			"first",
 			"late",
 			"second",

@@ -109,13 +109,13 @@ async function pluginAt(
 		return { kind: "problem", error: `package.json: ${JSON.stringify(name)} is not a valid plugin name` };
 	}
 	const external = chord?.external ?? [];
-	if (!Array.isArray(external) || !external.every((each) => typeof each === "string")) {
+	if (!Array.isArray(external) || !external.every(each => typeof each === "string")) {
 		return { kind: "problem", error: "package.json: chord.external is not a list of package names" };
 	}
 	const files = new Set(await readdir(dir));
 	const facets: Record<string, string> = {};
 	for (const kind of kinds) {
-		const named = FACET_EXTENSIONS.map((extension) => `${kind}${extension}`).filter((file) => files.has(file));
+		const named = FACET_EXTENSIONS.map(extension => `${kind}${extension}`).filter(file => files.has(file));
 		if (named.length > 1) return { kind: "problem", error: `two ${kind} facets: ${named.join(", ")}` };
 		if (named.length === 1) facets[kind] = join(dir, named[0]!);
 	}

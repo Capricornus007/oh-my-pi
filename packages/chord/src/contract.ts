@@ -358,16 +358,18 @@ type Returned<R> = [R] extends [Schema] ? Static<R> | Promise<Static<R>> : void 
 type Resolved<R> = [R] extends [Schema] ? Static<R> : undefined;
 
 /** A method's handler; `P` is the app's principal type (`ctx.principal`). */
-export type MethodImplementation<M, P = unknown> = M extends MethodSpec<infer A, infer R>
-	? [A] extends [Schema]
-		? (args: Static<A>, ctx: Ctx<P>) => Returned<R>
-		: (ctx: Ctx<P>) => Returned<R>
-	: never;
-export type Call<M> = M extends MethodSpec<infer A, infer R>
-	? [A] extends [Schema]
-		? (args: Static<A>, ctx?: Ctx) => Promise<Resolved<R>>
-		: (ctx?: Ctx) => Promise<Resolved<R>>
-	: never;
+export type MethodImplementation<M, P = unknown> =
+	M extends MethodSpec<infer A, infer R>
+		? [A] extends [Schema]
+			? (args: Static<A>, ctx: Ctx<P>) => Returned<R>
+			: (ctx: Ctx<P>) => Returned<R>
+		: never;
+export type Call<M> =
+	M extends MethodSpec<infer A, infer R>
+		? [A] extends [Schema]
+			? (args: Static<A>, ctx?: Ctx) => Promise<Resolved<R>>
+			: (ctx?: Ctx) => Promise<Resolved<R>>
+		: never;
 
 /** Whether `contract`'s method `name` takes no arguments (it is called as `ref.name(ctx)`). */
 export function takesNoArgs(contract: AnyContract, name: string): boolean {
@@ -414,22 +416,24 @@ type LocalMembers<D> = D extends { readonly members: infer M extends Readonly<Re
 export type InputOf<C> = C extends { readonly def: { readonly input: infer I extends Schema } } ? Static<I> : never;
 
 /** What a factory returns for contract C; its methods' `ctx.principal` is `P`. */
-export type ImplementationOf<C, P = unknown> = C extends RemoteContract<infer D>
-	? { [K in keyof D["variants"]]: VariantImplementation<K, D["variants"][K], P> }[keyof D["variants"]]
-	: C extends LocalContract<infer D>
-		? { readonly [K in keyof LocalMembers<D>]: LocalImplementationMember<LocalMembers<D>[K], P> } & Record<
-				string,
-				unknown
-			>
-		: never;
+export type ImplementationOf<C, P = unknown> =
+	C extends RemoteContract<infer D>
+		? { [K in keyof D["variants"]]: VariantImplementation<K, D["variants"][K], P> }[keyof D["variants"]]
+		: C extends LocalContract<infer D>
+			? { readonly [K in keyof LocalMembers<D>]: LocalImplementationMember<LocalMembers<D>[K], P> } & Record<
+					string,
+					unknown
+				>
+			: never;
 
 /**
  * What `get` returns for contract C. A remote type's reference is a union discriminated by `variant`: another variant's
  * members are reachable only after narrowing (`if (ref.variant === "editor") ref.add(…)`). A local type's reference has
  * its members.
  */
-export type Ref<C extends AnyContract = AnyContract> = C extends RemoteContract<infer D>
-	? { [K in keyof D["variants"]]: VariantRef<C, K, D["variants"][K]> }[keyof D["variants"]]
-	: C extends LocalContract<infer D>
-		? RefBase<C> & { readonly [K in keyof LocalMembers<D>]: LocalRefMember<LocalMembers<D>[K]> }
-		: never;
+export type Ref<C extends AnyContract = AnyContract> =
+	C extends RemoteContract<infer D>
+		? { [K in keyof D["variants"]]: VariantRef<C, K, D["variants"][K]> }[keyof D["variants"]]
+		: C extends LocalContract<infer D>
+			? RefBase<C> & { readonly [K in keyof LocalMembers<D>]: LocalRefMember<LocalMembers<D>[K]> }
+			: never;

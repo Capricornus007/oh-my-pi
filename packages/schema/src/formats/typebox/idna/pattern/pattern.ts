@@ -95,7 +95,7 @@ export const RE_PVALID_EXCEPTIONS = /[\u{00df}\u{03c2}\u{06fd}\u{06fe}\u{0f0b}\u
 // Composite Patterns
 // -------------------------------------------------------------------
 export const RE_EUROPEAN_NUMBER = new RegExp(
-	[RE_ASCII_DIGIT, RE_EXT_ARABIC_INDIC_DIGIT].map((regexp) => regexp.source).join("|"),
+	[RE_ASCII_DIGIT, RE_EXT_ARABIC_INDIC_DIGIT].map(regexp => regexp.source).join("|"),
 	"u",
 );
 
@@ -110,7 +110,7 @@ export const RE_PERMITTED_CATEGORY = new RegExp(
 		RE_CONTEXTO_EXCEPTIONS,
 		RE_PVALID_EXCEPTIONS,
 	]
-		.map((regexp) => regexp.source)
+		.map(regexp => regexp.source)
 		.join("|"),
 	"u",
 );

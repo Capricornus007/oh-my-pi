@@ -45,11 +45,11 @@ function prober(names: readonly string[]) {
 }
 
 async function offered(root: Conversation): Promise<string[]> {
-	return (await root.agent(context)).tools.map((each) => each.name);
+	return (await root.agent(context)).tools.map(each => each.name);
 }
 
 async function callable(root: Conversation): Promise<string[]> {
-	return (await root.agent(context)).callable.map((each) => each.name);
+	return (await root.agent(context)).callable.map(each => each.name);
 }
 
 async function setupWith(tools: readonly ToolRegistration[]): Promise<ChatSetup> {
@@ -123,7 +123,7 @@ describe("who may call a tool", () => {
 		await root.configure({ modelTools: [read] }, context);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		const entries = await root.entries({}, 100, undefined, context);
-		const result = entries.items.find((entry) => entry.kind === "pi.tool-result");
+		const result = entries.items.find(entry => entry.kind === "pi.tool-result");
 		expect(JSON.stringify(result?.model)).toContain("Tool bash is not available");
 		await harness.close(context);
 	});

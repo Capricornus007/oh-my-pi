@@ -67,20 +67,20 @@ async function counted(path = ":memory:") {
 	const counts = { transactions: 0, statements: 0 };
 	const faults: Faults = { commit: false, fail: undefined, hold: undefined };
 	const backend: SqliteDatabase = {
-		exec: (sql) => db.exec(sql),
+		exec: sql => db.exec(sql),
 		run: (sql, ...params) => db.run(sql, ...params),
 		runCounted: (sql, ...params) => db.runCounted(sql, ...params),
 		get: (sql, ...params) => db.get(sql, ...params),
 		all: (sql, ...params) => db.all(sql, ...params),
 		close: () => db.close(),
-		transaction: (work) => {
+		transaction: work => {
 			counts.transactions++;
 			counts.statements = 0;
 			const { commit, fail, hold } = faults;
 			faults.commit = false;
 			faults.fail = undefined;
 			faults.hold = undefined;
-			return db.transaction(async (executor) => {
+			return db.transaction(async executor => {
 				const call = async <T>(sql: string, run: () => Promise<T>): Promise<T> => {
 					const index = ++counts.statements;
 					await hold?.(sql, index);
@@ -88,7 +88,7 @@ async function counted(path = ":memory:") {
 					return run();
 				};
 				const result = await work({
-					exec: (sql) => call(sql, () => executor.exec(sql)),
+					exec: sql => call(sql, () => executor.exec(sql)),
 					run: (sql, ...params) => call(sql, () => executor.run(sql, ...params)),
 					runCounted: (sql, ...params) => call(sql, () => executor.runCounted(sql, ...params)),
 					get: (sql, ...params) => call(sql, () => executor.get(sql, ...params)),
@@ -117,12 +117,12 @@ const entryWrite = (id: EntryId, kind = "m"): StorageWrite => ({
 });
 
 /** One macrotask: what can run before it has run. */
-const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+const macrotask = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
 /** The store's outbox commits, by seq. */
 async function outboxSeqs(store: ChordStore): Promise<number[]> {
-	const rows = await store.read((executor) => executor.all<{ seq: number }>("SELECT seq FROM chord_outbox"), context);
-	return rows.map((row) => row.seq);
+	const rows = await store.read(executor => executor.all<{ seq: number }>("SELECT seq FROM chord_outbox"), context);
+	return rows.map(row => row.seq);
 }
 
 describe("one transaction per call", () => {
@@ -133,7 +133,7 @@ describe("one transaction per call", () => {
 		const last = store.lastSeq;
 		const receipts: [number, Seq][] = [];
 		const result = await storage.commit(
-			ids.map((id) => [entryWrite(id)]),
+			ids.map(id => [entryWrite(id)]),
 			(index, seq) => receipts.push([index, seq]),
 			context,
 		);
@@ -148,17 +148,17 @@ describe("one transaction per call", () => {
 			expect((await storage.entry(id, context))?.commitSeq).toBe(last + 1 + index);
 		}
 		const outbox = await store.read(
-			(executor) => executor.all<{ seq: number }>("SELECT seq FROM chord_outbox WHERE seq > ?", last),
+			executor => executor.all<{ seq: number }>("SELECT seq FROM chord_outbox WHERE seq > ?", last),
 			context,
 		);
-		expect(outbox.map((row) => row.seq)).toEqual([last + 1, last + 2, last + 3]);
+		expect(outbox.map(row => row.seq)).toEqual([last + 1, last + 2, last + 3]);
 		await store.close(context);
 	});
 
 	it("writes the metadata once per call: three statements per entry append, plus one (cost guard)", async () => {
 		const { store, storage, counts } = await counted();
 		const telemetry = new InMemoryTelemetryContext();
-		const span = await telemetry.startSpan({ name: "test" }, (each) => each);
+		const span = await telemetry.startSpan({ name: "test" }, each => each);
 		const metered = withTelemetry(span, context);
 		const statements = (): number =>
 			telemetry
@@ -171,7 +171,7 @@ describe("one transaction per call", () => {
 		const ids = [await storage.mintId<EntryId>(), await storage.mintId<EntryId>(), await storage.mintId<EntryId>()];
 		const before = counts.transactions;
 		await storage.commit(
-			ids.map((id) => [entryWrite(id)]),
+			ids.map(id => [entryWrite(id)]),
 			() => {},
 			metered,
 		);
@@ -189,7 +189,7 @@ describe("refusals: the batches before the refused one stand", () => {
 		const receipts: number[] = [];
 		const result = await storage.commit(
 			[[entryWrite(first)], [entryWrite(first, "again")], [entryWrite(after)]],
-			(index) => receipts.push(index),
+			index => receipts.push(index),
 			context,
 		);
 		expect(result.stored).toBe(1);
@@ -216,7 +216,7 @@ describe("refusals: the batches before the refused one stand", () => {
 					{ type: "document.retire", id: document },
 				],
 			],
-			(index) => receipts.push(index),
+			index => receipts.push(index),
 			context,
 		);
 		expect(result.stored).toBe(1);
@@ -246,12 +246,12 @@ describe("refusals: the batches before the refused one stand", () => {
 		async (_name, malformed) => {
 			const batches: StorageWrite[][] = [
 				[{ type: "conversation", value: { id: idFromNumber<ConversationId>(100) } }],
-				malformed.map((write) => ({ ...write, id: idFromNumber<DocumentId>(write.id) })) as StorageWrite[],
+				malformed.map(write => ({ ...write, id: idFromNumber<DocumentId>(write.id) })) as StorageWrite[],
 			];
 			const outcomes = [];
 			for (const storage of [new MemoryStorage(), await openStoreStorage(":memory:")]) {
 				const receipts: number[] = [];
-				const result = await storage.commit(batches, (index) => receipts.push(index), context);
+				const result = await storage.commit(batches, index => receipts.push(index), context);
 				const conversation = await storage.conversation(idFromNumber<ConversationId>(100), context);
 				outcomes.push({ stored: result.stored, refused: String(result.refused), receipts, conversation });
 				await storage.close(context);
@@ -306,7 +306,7 @@ describe("refusals: the batches before the refused one stand", () => {
 		);
 		const last = store.lastSeq;
 		const receipts: number[] = [];
-		const result = await storage.commit(calls(document), (index) => receipts.push(index), context);
+		const result = await storage.commit(calls(document), index => receipts.push(index), context);
 		expect(result.stored).toBe(1);
 		expect(String(result.refused)).toContain(message);
 		expect([receipts, store.lastSeq]).toEqual([[0], last + 1]);
@@ -321,7 +321,7 @@ describe("refusals: the batches before the refused one stand", () => {
 		// No integer: the Session never sends one (Storage trusts it); the store's columns refuse it at staging.
 		const result = await storage.commit(
 			[[entryWrite(entry)], [entryWrite(idFromNumber<EntryId>(1.5))]],
-			(index) => receipts.push(index),
+			index => receipts.push(index),
 			context,
 		);
 		expect(result.stored).toBe(1);
@@ -375,10 +375,10 @@ describe("failures: a rollback rejects, an unknown outcome stops the store", () 
 		const last = store.lastSeq;
 		// The second batch's id check: its first read of the record ids.
 		let claimReads = 0;
-		faults.fail = (sql) => sql.includes("record_ids") && ++claimReads === 2;
+		faults.fail = sql => sql.includes("record_ids") && ++claimReads === 2;
 		const receipts: number[] = [];
 		await expect(
-			storage.commit([[entryWrite(first)], [entryWrite(second)]], (index) => receipts.push(index), context),
+			storage.commit([[entryWrite(first)], [entryWrite(second)]], index => receipts.push(index), context),
 		).rejects.toThrow("injected");
 		expect([receipts, store.lastSeq]).toEqual([[], last]);
 		expect(await storage.entry(first, context)).toBeUndefined();
@@ -395,8 +395,8 @@ describe("failures: a rollback rejects, an unknown outcome stops the store", () 
 		const receipts: number[] = [];
 		await expect(
 			storage.commit(
-				ids.map((id) => [entryWrite(id)]),
-				(index) => receipts.push(index),
+				ids.map(id => [entryWrite(id)]),
+				index => receipts.push(index),
 				context,
 			),
 		).rejects.toMatchObject({ code: "unavailable", reason: "storage_failed" });
@@ -487,7 +487,7 @@ describe("failures: a rollback rejects, an unknown outcome stops the store", () 
 
 	it.each(["valid", "refused"] as const)(
 		"rolls a 3-batch call back at a failure of any of its statements, as at a failed COMMIT, and reopens before it (third %s)",
-		async (third) => {
+		async third => {
 			// What MemoryStorage makes of the call: the outcome every retry must reach.
 			const memory = new MemoryStorage();
 			await commitWrites(memory, [{ type: "conversation", value: { id: ROOT_CONVERSATION_ID } }], context);
@@ -518,7 +518,7 @@ describe("failures: a rollback rejects, an unknown outcome stops the store", () 
 				else opened.faults.commit = true;
 				const receipts: number[] = [];
 				const error = await opened.storage
-					.commit(batches(third), (each) => receipts.push(each), context)
+					.commit(batches(third), each => receipts.push(each), context)
 					.then(
 						() => undefined,
 						(rejection: unknown) => rejection,
@@ -541,7 +541,7 @@ describe("failures: a rollback rejects, an unknown outcome stops the store", () 
 				expect(await again.storage.mintId<EntryId>()).toBeGreaterThan(100);
 				// A retry reaches MemoryStorage's outcome.
 				expect(await outcomeOf(again.storage, third, last)).toEqual(expected);
-				expect(await outboxSeqs(again.store)).toEqual([...outbox, ...expected.seqs.map((seq) => last + seq)]);
+				expect(await outboxSeqs(again.store)).toEqual([...outbox, ...expected.seqs.map(seq => last + seq)]);
 				await again.store.close(context);
 			}
 		},
@@ -632,7 +632,7 @@ describe("publication", () => {
 		const host = createHost({ store, onError: () => {} });
 		const session = new SessionImpl(storage);
 		const events: string[] = [];
-		session.followCommits((commit) => {
+		session.followCommits(commit => {
 			if (commit.kind !== "stored") return;
 			const batch = store.batch!;
 			events.push(`publish ${commit.seq} running=${batch.running}`);
@@ -647,12 +647,12 @@ describe("publication", () => {
 			if (calls.length === 1) await gate.promise;
 			return commit(batches, receive, ctx);
 		};
-		const first = session.commit((tx) => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "a" }), context);
-		await new Promise((resolve) => setTimeout(resolve, 0));
-		const rest = [1, 2, 3].map((n) =>
-			session.commit((tx) => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: `b${n}` }), context),
+		const first = session.commit(tx => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: "a" }), context);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		const rest = [1, 2, 3].map(n =>
+			session.commit(tx => tx.appendEntry(ROOT_CONVERSATION_ID, { kind: `b${n}` }), context),
 		);
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		const before = counts.transactions;
 		gate.resolve();
 		await Promise.all([first, ...rest]);
@@ -660,7 +660,7 @@ describe("publication", () => {
 		expect(counts.transactions - before).toBe(2);
 		const seq = store.lastSeq;
 		expect(events).toEqual(
-			[seq - 3, seq - 2, seq - 1, seq].flatMap((each) => [`publish ${each} running=true`, `flush ${each}`]),
+			[seq - 3, seq - 2, seq - 1, seq].flatMap(each => [`publish ${each} running=true`, `flush ${each}`]),
 		);
 		await session.close(context);
 		await host.close(context);
@@ -710,7 +710,7 @@ describe("other users of the store", () => {
 		const release = Promise.withResolvers<void>();
 		// Held after the first batch's writes, in the second batch's check.
 		let claimReads = 0;
-		faults.hold = (sql) => {
+		faults.hold = sql => {
 			if (!sql.includes("record_ids") || ++claimReads !== 2) return undefined;
 			entered.resolve();
 			return release.promise;
@@ -760,7 +760,7 @@ describe("GC", () => {
 		};
 		const ref = await sent();
 		for (let round = 0; round < 10 && ref.deref() !== undefined; round++) {
-			await new Promise((resolve) => setImmediate(resolve));
+			await new Promise(resolve => setImmediate(resolve));
 			gc();
 		}
 		expect(ref.deref()).toBeUndefined();

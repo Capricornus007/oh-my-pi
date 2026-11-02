@@ -45,10 +45,10 @@ if (process.env.OPENAI_API_KEY === undefined) {
 		process.stdout.write(text.slice(printed.length));
 		printed = text;
 	};
-	liveWatch.start(async (call) => {
+	liveWatch.start(async call => {
 		if (call.kind !== "value") return;
 		const { value } = call;
-		const block = value?.generation?.message?.content.find((content) => content.type === "text");
+		const block = value?.generation?.message?.content.find(content => content.type === "text");
 		if (block?.type === "text") printText(block.text);
 	});
 	harness.resume();
@@ -58,10 +58,10 @@ if (process.env.OPENAI_API_KEY === undefined) {
 	await liveWatch.stop();
 	if (settledPoem.status === "done" && settledPoem.type === "input") {
 		// The last throttle window may not have been committed as a partial; the answer entry has the rest.
-		const entry = await root.commit((tx) => tx.entry(AssistantEntry, settledPoem.answer), context);
+		const entry = await root.commit(tx => tx.entry(AssistantEntry, settledPoem.answer), context);
 		const message = entry?.model?.[0];
 		const block =
-			message?.role === "assistant" ? message.content.find((content) => content.type === "text") : undefined;
+			message?.role === "assistant" ? message.content.find(content => content.type === "text") : undefined;
 		if (block?.type === "text") printText(block.text);
 		process.stdout.write("\n");
 	} else {

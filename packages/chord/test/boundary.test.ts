@@ -18,11 +18,11 @@ describe("package boundary", () => {
 		};
 		expect(
 			Object.keys(manifest.dependencies ?? {}).filter(
-				(name) => name.startsWith("@earendil-works/pi-") && !ALLOWED.has(name),
+				name => name.startsWith("@earendil-works/pi-") && !ALLOWED.has(name),
 			),
 		).toEqual([]);
 
-		const paths = (await readdir(sourceDirectory, { recursive: true })).filter((path) => path.endsWith(".ts")).sort();
+		const paths = (await readdir(sourceDirectory, { recursive: true })).filter(path => path.endsWith(".ts")).sort();
 		const violations: string[] = [];
 		for (const path of paths) {
 			const file = resolve(sourceDirectory, path);

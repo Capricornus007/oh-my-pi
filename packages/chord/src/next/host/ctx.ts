@@ -113,7 +113,7 @@ export function withLinkedAbortSignal(
 	const caller = context.abortSignal;
 	if (caller === undefined) return { context: withAbortSignal(signal, context), release: NOTHING };
 	const linked = new AbortController();
-	const listeners = [caller, signal].map((source) => {
+	const listeners = [caller, signal].map(source => {
 		const forward = (): void => {
 			release();
 			linked.abort(source.reason);

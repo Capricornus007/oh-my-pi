@@ -41,7 +41,7 @@ class HoldMarks extends MemoryStorage {
 		if (
 			batches
 				.flat()
-				.some((write) => write.type === "task" && write.value.id === this.target && write.value.abortRequested)
+				.some(write => write.type === "task" && write.value.id === this.target && write.value.abortRequested)
 		) {
 			this.held.resolve();
 			await this.release.promise;
@@ -78,11 +78,11 @@ describe("work below a cancelled owner", () => {
 		const { harness } = await openTasks(storage, [Dormant, Child]);
 		const root = await harness.root(context);
 		const parent = await root.commit(
-			(tx) => tx.createTask(Dormant, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Dormant, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const child = await root.commit(
-			(tx) => tx.createTask(Child, null, { ownership: { kind: "task", taskId: parent } }),
+			tx => tx.createTask(Child, null, { ownership: { kind: "task", taskId: parent } }),
 			context,
 		);
 		storage.target = child;
@@ -110,19 +110,19 @@ describe("work below a cancelled owner", () => {
 		const storage = new MemoryStorage();
 		const session = createSession(storage);
 		const conversation = await session.commit(
-			(tx) => tx.createConversation({ ownership: { kind: "ownerless" } }),
+			tx => tx.createConversation({ ownership: { kind: "ownerless" } }),
 			context,
 		);
 		const parent = await session.commit(
-			(tx) => tx.createTask(Dormant, null, { conversationId: conversation.id, ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Dormant, null, { conversationId: conversation.id, ownership: { kind: "conversation" } }),
 			context,
 		);
 		const failed = await session.commit(
-			(tx) => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: parent } }),
+			tx => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: parent } }),
 			context,
 		);
 		const child = await session.commit(
-			(tx) => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: parent } }),
+			tx => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: parent } }),
 			context,
 		);
 		// A restart-abandoned owner that waits failFast on a failed child and a live one.
@@ -163,20 +163,20 @@ describe("work below a cancelled owner", () => {
 		const storage = new MemoryStorage();
 		const session = createSession(storage);
 		const conversation = await session.commit(
-			(tx) => tx.createConversation({ ownership: { kind: "ownerless" } }),
+			tx => tx.createConversation({ ownership: { kind: "ownerless" } }),
 			context,
 		);
 		const top = await session.commit(
-			(tx) => tx.createTask(Dormant, null, { conversationId: conversation.id, ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Dormant, null, { conversationId: conversation.id, ownership: { kind: "conversation" } }),
 			context,
 		);
 		const middle = await session.commit(
-			(tx) => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: top }, abandonOnRestart: true }),
+			tx => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: top }, abandonOnRestart: true }),
 			context,
 		);
 		const Missing = defineTask<null, { phase: "work" }, null>({ ...Dormant.definition, name: "test.missing" });
 		const leaf = await session.commit(
-			(tx) => tx.createTask(Missing, null, { ownership: { kind: "task", taskId: middle } }),
+			tx => tx.createTask(Missing, null, { ownership: { kind: "task", taskId: middle } }),
 			context,
 		);
 		// Only Dormant is registered: the leaf waits for its definition under the restart cascade.
@@ -185,7 +185,7 @@ describe("work below a cancelled owner", () => {
 			harness.resume();
 			await eventually(async () => (await harness.getTask(leaf, context))?.abortReason === "restart");
 			await eventually(async () => {
-				const inspected = (await harness.inspect(context)).tasks.find((task) => task.record.id === leaf);
+				const inspected = (await harness.inspect(context)).tasks.find(task => task.record.id === leaf);
 				return inspected?.state.kind === "blocked";
 			});
 			expect((await harness.getTask(leaf, context))?.state.status).not.toBe("terminal");
@@ -207,11 +207,11 @@ describe("work below a cancelled owner", () => {
 		const storage = new MemoryStorage();
 		const session = createSession(storage);
 		const conversation = await session.commit(
-			(tx) => tx.createConversation({ ownership: { kind: "ownerless" } }),
+			tx => tx.createConversation({ ownership: { kind: "ownerless" } }),
 			context,
 		);
 		const holder = await session.commit(
-			(tx) =>
+			tx =>
 				tx.createTask(Dormant, null, {
 					conversationId: conversation.id,
 					ownership: { kind: "conversation" },
@@ -220,7 +220,7 @@ describe("work below a cancelled owner", () => {
 			context,
 		);
 		const child = await session.commit(
-			(tx) => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: holder } }),
+			tx => tx.createTask(Dormant, null, { ownership: { kind: "task", taskId: holder } }),
 			context,
 		);
 		const record = (await storage.task(holder, context))!;

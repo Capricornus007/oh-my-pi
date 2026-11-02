@@ -105,23 +105,23 @@ async function runFailing(
 }
 
 function textOutput(result: ToolExecutionResult): string {
-	return (result.output ?? []).flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
+	return (result.output ?? []).flatMap(part => (part.type === "text" ? [part.text] : [])).join("\n");
 }
 
 function diagnosticText(result: ToolExecutionResult): string {
-	return (result.diagnostics ?? []).map((diagnostic) => diagnostic.message).join("\n");
+	return (result.diagnostics ?? []).map(diagnostic => diagnostic.message).join("\n");
 }
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
 	let resolve = () => {};
-	const promise = new Promise<void>((resolvePromise) => {
+	const promise = new Promise<void>(resolvePromise => {
 		resolve = resolvePromise;
 	});
 	return { promise, resolve };
 }
 
 function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 class SlowReadExecutionEnv extends NodeExecutionEnv {
@@ -200,7 +200,7 @@ describe("durable tools", () => {
 	});
 
 	describe("read", () => {
-		it.each(["GIF87a", "GIF89a"])("detects the complete %s signature", (signature) => {
+		it.each(["GIF87a", "GIF89a"])("detects the complete %s signature", signature => {
 			expect(detectSupportedImageMimeType(Buffer.from(signature, "ascii"))).toBe("image/gif");
 		});
 
@@ -592,7 +592,7 @@ describe("durable tools", () => {
 				windowsOnly.env,
 			);
 			expect(result.streamed.join("")).toBe("ok");
-			expect(windowsOnly.commands.map((command) => command[0])).toEqual(["pwsh", "powershell"]);
+			expect(windowsOnly.commands.map(command => command[0])).toEqual(["pwsh", "powershell"]);
 			expect(String(windowsOnly.commands[1]?.at(-1))).toMatch(/\n\$x = 1\n\$x$/);
 
 			const none = programsEnv([], "");

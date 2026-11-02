@@ -30,7 +30,7 @@ const Work = defineTask<null, { phase: "work" }, null>({
 	initial: () => ({ phase: "work" }),
 	phases: {
 		work: async (_task, runtime, ctx) =>
-			runtime.commit(async (tx) => {
+			runtime.commit(async tx => {
 				(await tx.doc(UsageDoc, runtime.conversationId)).tools.bench = { input: 1 } as never;
 				return { status: "terminal", outcome: { status: "completed", result: null } };
 			}, ctx),
@@ -56,7 +56,7 @@ async function run(conversations: number, documentRetentionMs: number) {
 			const conversation = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 			first ??= conversation.id;
 			const task = await conversation.commit(
-				(tx) => tx.createTask(Work, null, { ownership: { kind: "conversation" } }),
+				tx => tx.createTask(Work, null, { ownership: { kind: "conversation" } }),
 				context,
 			);
 			const settled = await harness.waitForTask(task, context);
@@ -72,7 +72,7 @@ async function run(conversations: number, documentRetentionMs: number) {
 		const ms = Math.round(performance.now() - started);
 		// Wait past a short retention without committing, so only the timer can evict; then let its job run.
 		if (documentRetentionMs > 0 && documentRetentionMs < 1_000) {
-			await new Promise((resolve) => setTimeout(resolve, documentRetentionMs * 4));
+			await new Promise(resolve => setTimeout(resolve, documentRetentionMs * 4));
 		}
 		await (harness as unknown as SessionImpl).readOnLine(async () => {});
 		const heap = (await retainedBytes()) - heapBefore;

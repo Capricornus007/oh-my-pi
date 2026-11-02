@@ -17,9 +17,8 @@ import {
 	remote,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-const quiet = (errors: unknown[] = []) =>
-	createHost({ self: { kind: "host" }, onError: (error) => errors.push(error) });
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+const quiet = (errors: unknown[] = []) => createHost({ self: { kind: "host" }, onError: error => errors.push(error) });
 async function until(check: () => boolean): Promise<void> {
 	for (let attempt = 0; attempt < 200 && !check(); attempt++) await tick();
 	assert.ok(check(), "condition not reached");
@@ -54,7 +53,7 @@ function serveCounter(host: Host, log: string[] = [], options: { linger?: number
 				count,
 				conn,
 				add: (delta: number, ctx) => {
-					count.change(ctx, (draft) => {
+					count.change(ctx, draft => {
 						draft.n += delta;
 					});
 					return count.value.n;
@@ -74,7 +73,7 @@ describe("host: activation and lifetime", () => {
 		assert.equal(ref.status, "loading");
 		assert.throws(
 			() => ref.count.value,
-			(error) => isChordError(error, "not_ready"),
+			error => isChordError(error, "not_ready"),
 		);
 		const pending = ref.add(2);
 		await ref.ready;
@@ -83,7 +82,7 @@ describe("host: activation and lifetime", () => {
 		assert.deepEqual(ref.count.value, { n: 2 });
 		ref.release();
 		assert.equal(ref.status, "released");
-		await assert.rejects(ref.add(1), (error) => isChordError(error, "released"));
+		await assert.rejects(ref.add(1), error => isChordError(error, "released"));
 		await tick();
 		assert.deepEqual(log, ["factory a", "open a", "close a"]);
 	});
@@ -115,7 +114,7 @@ describe("host: activation and lifetime", () => {
 		await b.ready;
 		assert.deepEqual(b.count.value, { n: 5 });
 		b.release();
-		await new Promise((resolve) => setTimeout(resolve, 60));
+		await new Promise(resolve => setTimeout(resolve, 60));
 		assert.deepEqual(log, ["factory l", "open l", "close l"]);
 	});
 
@@ -128,7 +127,7 @@ describe("host: activation and lifetime", () => {
 			self.resource("r", {
 				version: 1,
 				open: ({ signal }) =>
-					new Promise<string>((resolve) => {
+					new Promise<string>(resolve => {
 						release = () => resolve("r");
 						signal.addEventListener("abort", () => log.push("abort seen"));
 					}),
@@ -174,7 +173,7 @@ describe("host: activation and lifetime", () => {
 		});
 		const parent = host.hold(Parent, {});
 		// A plain error from a dependency surfaces as `unavailable`, with the original as cause.
-		await assert.rejects(parent.ready, (error) => isChordError(error, "unavailable") && /boom/.test(error.message));
+		await assert.rejects(parent.ready, error => isChordError(error, "unavailable") && /boom/.test(error.message));
 		assert.equal(parent.status, "gone");
 		fail = false;
 		const retry = host.hold(Parent, {});
@@ -278,7 +277,7 @@ describe("host: activation and lifetime", () => {
 		const host = quiet();
 		const log: string[] = [];
 		serveCounter(host, log);
-		const value = await host.root(async (ctx) => {
+		const value = await host.root(async ctx => {
 			const counter = await ctx.get(Counter, { name: "c" });
 			return counter.add(3, ctx);
 		});
@@ -306,7 +305,7 @@ describe("host: declarations and methods", () => {
 		for (const kind of ["state", "resource", "listener"]) {
 			await assert.rejects(
 				host.hold(Twice, { kind }).ready,
-				(error) =>
+				error =>
 					isChordError(error, "invalid") &&
 					error.reason === "duplicate" &&
 					error.message.includes(`${kind} name x`),
@@ -327,7 +326,7 @@ describe("host: declarations and methods", () => {
 		});
 		const seen: unknown[] = [];
 		host.serve(Tool, () => ({
-			ping: (ctx) => {
+			ping: ctx => {
 				seen.push(typeof ctx.rootId);
 				return "ignored" as never;
 			},
@@ -339,7 +338,7 @@ describe("host: declarations and methods", () => {
 		const tool = host.hold(Tool, {});
 		await tool.ready;
 		assert.equal(await tool.ping(), undefined);
-		assert.equal(await host.root((ctx) => tool.count(ctx)), 3);
+		assert.equal(await host.root(ctx => tool.count(ctx)), 3);
 		assert.equal(await tool.note("hi"), undefined);
 		assert.deepEqual(seen, ["string", "hi", "string"]);
 	});
@@ -354,13 +353,13 @@ describe("host: declarations and methods", () => {
 		const seen: number[] = [];
 		const facet = (label: string): Facet => ({
 			name: "doubled",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					Doubled,
 					(_input, _principal, self) => {
 						const n = self.state("n", num(), 1);
-						const doubled = self.derive([n], (value) => value * 2);
-						self.on("doubled", doubled, (value) => {
+						const doubled = self.derive([n], value => value * 2);
+						self.on("doubled", doubled, value => {
 							seen.push(value);
 							void label;
 						});
@@ -375,7 +374,7 @@ describe("host: declarations and methods", () => {
 		});
 		await host.install(facet("v1"));
 		await until(() => seen.length === 1);
-		await host.root((ctx) => host.hold(Doubled, {}).set(5, ctx));
+		await host.root(ctx => host.hold(Doubled, {}).set(5, ctx));
 		await until(() => seen.length === 2);
 		assert.deepEqual(seen, [2, 10]);
 		// The reload makes a new derivation: the listener subscribes again and gets its current value once.
@@ -424,7 +423,7 @@ describe("host: lifetime", () => {
 	it("every get reaches the one object, created at serve for the host principal; another input is invalid", async () => {
 		const host = createHost({
 			self: { kind: "host" },
-			principalKey: (principal) => JSON.stringify(principal),
+			principalKey: principal => JSON.stringify(principal),
 			onError: () => {},
 		});
 		const created: unknown[] = [];
@@ -445,7 +444,7 @@ describe("host: lifetime", () => {
 		assert.deepEqual(guest.seen, created[0] && (created[0] as { principal: unknown }).principal);
 		assert.throws(
 			() => host.hold(Store, { scope: "other" }),
-			(error) => isChordError(error, "invalid"),
+			error => isChordError(error, "invalid"),
 		);
 		// References do not change its lifetime: released by everyone else, it stays until the host closes.
 		guest.release();
@@ -492,7 +491,7 @@ describe("host: principals, variants and disposal", () => {
 	it("keeps objects per principal key and enforces variants", async () => {
 		const host = createHost({
 			self: { kind: "host" },
-			principalKey: (principal) => (principal as { user: string }).user,
+			principalKey: principal => (principal as { user: string }).user,
 			onError: () => {},
 		});
 		const principals: unknown[] = [];
@@ -504,7 +503,7 @@ describe("host: principals, variants and disposal", () => {
 		assert.equal(viewer.variant, "viewer");
 		assert.deepEqual(viewer.shape?.members, ["view"]);
 		// @ts-expect-error A viewer has no edit: TypeScript refuses it, and so does the provider at runtime.
-		await assert.rejects(viewer.edit({ text: "x" }), (error) => isChordError(error, "not_in_variant"));
+		await assert.rejects(viewer.edit({ text: "x" }), error => isChordError(error, "not_in_variant"));
 		assert.ok(editor.variant === "editor");
 		assert.deepEqual(await editor.edit({ text: "x" }), { ok: true });
 		assert.deepEqual(editor.view.value, { text: "x" });
@@ -518,11 +517,11 @@ describe("host: principals, variants and disposal", () => {
 		assert.ok(editor.variant === "editor");
 		await assert.rejects(
 			editor.edit({ text: 1 } as never),
-			(error) => isChordError(error, "invalid") && error.reason === "args",
+			error => isChordError(error, "invalid") && error.reason === "args",
 		);
 		await assert.rejects(
 			editor.edit({ text: "bad" }),
-			(error) => isChordError(error, "invalid") && error.reason === "result",
+			error => isChordError(error, "invalid") && error.reason === "result",
 		);
 	});
 
@@ -535,8 +534,8 @@ describe("host: principals, variants and disposal", () => {
 			members: { wait: method() },
 		});
 		host.serve(Slow, () => ({
-			wait: (ctx) =>
-				new Promise<void>((resolve) =>
+			wait: ctx =>
+				new Promise<void>(resolve =>
 					ctx.signal.addEventListener("abort", () => {
 						seenAbort = true;
 						resolve();
@@ -547,11 +546,11 @@ describe("host: principals, variants and disposal", () => {
 		await ref.ready;
 		const call = ref.wait();
 		await tick();
-		await host.invalidatePrincipal((principal) => (principal as { user: string }).user === "u");
+		await host.invalidatePrincipal(principal => (principal as { user: string }).user === "u");
 		assert.equal(ref.status, "gone");
 		await call;
 		assert.ok(seenAbort);
-		await assert.rejects(ref.wait(), (error) => isChordError(error, "gone"));
+		await assert.rejects(ref.wait(), error => isChordError(error, "gone"));
 		const fresh = host.hold(Slow, {}, { principal: { user: "u" } });
 		await fresh.ready;
 		assert.equal(fresh.status, "live");
@@ -562,11 +561,11 @@ describe("host: principals, variants and disposal", () => {
 		serveDoc(host);
 		const editor = host.hold(Doc, { id: "3" }, { principal: { role: "editor" } }) as Ref<typeof Doc>;
 		const shapes: unknown[] = [];
-		editor.onShape((shape) => shapes.push(shape.variant));
+		editor.onShape(shape => shapes.push(shape.variant));
 		const events: unknown[] = [];
 		const values: unknown[] = [];
-		editor.view.events((event) => events.push(event.type === "ops" ? ["ops", event.ops] : [event.type, event.value]));
-		editor.view.subscribe((value) => values.push(value));
+		editor.view.events(event => events.push(event.type === "ops" ? ["ops", event.ops] : [event.type, event.value]));
+		editor.view.subscribe(value => values.push(value));
 		await editor.ready;
 		assert.ok(editor.variant === "editor");
 		await editor.edit({ text: "hi" });
@@ -604,7 +603,7 @@ describe("host: registries", () => {
 			{ lifetime: "host" },
 		);
 		const tables: string[][] = [];
-		host.registry(Routes).subscribe((table) => tables.push([...table.keys()]));
+		host.registry(Routes).subscribe(table => tables.push([...table.keys()]));
 		await tick();
 		await tick();
 		assert.deepEqual([...host.registry(Routes).table().keys()], ["GET /a", "GET /c", "GET /b"]);
@@ -634,7 +633,7 @@ describe("host: registries", () => {
 		}
 		await tick();
 		await tick();
-		assert.ok(errors.some((error) => /registry_conflict/.test(String(error))));
+		assert.ok(errors.some(error => /registry_conflict/.test(String(error))));
 	});
 });
 
@@ -665,7 +664,7 @@ describe("host: composition", () => {
 			const source = self.get(Source, {});
 			const copy = self.state("copy", num(), 0);
 			self.on("follow", source.n, (value, ctx) => copy.replace(ctx, value ?? 0));
-			const doubled = self.derive([source.n], (n) => (n ?? 0) * 2);
+			const doubled = self.derive([source.n], n => (n ?? 0) * 2);
 			return { copy, doubled };
 		});
 		const mirror = host.hold(Mirror, {});
@@ -682,7 +681,7 @@ describe("host: composition", () => {
 	it("ctx.get acts as the root principal at ingress and as the host inside objects", async () => {
 		const host = createHost({
 			self: { kind: "host" },
-			principalKey: (principal) => JSON.stringify(principal),
+			principalKey: principal => JSON.stringify(principal),
 			onError: () => {},
 		});
 		const seen: unknown[] = [];
@@ -704,7 +703,7 @@ describe("host: composition", () => {
 			seen.push(principal);
 			return { relay: async (ctx: Ctx) => (await ctx.get(Who, {})).ping(ctx) };
 		});
-		await host.root(async (ctx) => (await ctx.get(Front, {})).relay(ctx), { principal: { user: "guest" } });
+		await host.root(async ctx => (await ctx.get(Front, {})).relay(ctx), { principal: { user: "guest" } });
 		assert.deepEqual(seen, [{ user: "guest" }, { kind: "host" }]);
 	});
 
@@ -720,7 +719,7 @@ describe("host: composition", () => {
 			void source.set(1);
 			return {};
 		});
-		await assert.rejects(host.hold(Eager, {}).ready, (error) => isChordError(error, "not_ready"));
+		await assert.rejects(host.hold(Eager, {}).ready, error => isChordError(error, "not_ready"));
 	});
 
 	it("a ChordError from a factory keeps its code through dependents", async () => {
@@ -734,6 +733,6 @@ describe("host: composition", () => {
 			self.get(Secret, {});
 			return {};
 		});
-		await assert.rejects(host.hold(Page, {}).ready, (error) => isChordError(error, "forbidden"));
+		await assert.rejects(host.hold(Page, {}).ready, error => isChordError(error, "forbidden"));
 	});
 });

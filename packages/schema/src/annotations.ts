@@ -49,12 +49,12 @@ export function indirectAnnotating(slot: { check: AnnotatingCheck | undefined })
 
 /** A plain check in annotating position: it evaluates nothing that unevaluated* sees. */
 export function ignoreAnnotations(check: Check): AnnotatingCheck {
-	return (v) => check(v);
+	return v => check(v);
 }
 
 /** An annotating check run as a plain check, with fresh annotations. */
 export function withFreshAnnotations(check: AnnotatingCheck): Check {
-	return (v) => check(v, newAnnotations());
+	return v => check(v, newAnnotations());
 }
 
 /** `check` with `uri` pushed onto the dynamic scope while it runs. */

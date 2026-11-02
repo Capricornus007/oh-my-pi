@@ -32,7 +32,7 @@ const Coding = defineExtension({
 		// `tag: false` sends the text as is; by default it is wrapped in <key>...</key>.
 		section("preamble", () => "You are a coding agent.", { tag: false }),
 		// Sections see the environment built for this request, here its working directory.
-		section("cwd", (input) => input.env?.cwd),
+		section("cwd", input => input.env?.cwd),
 	],
 });
 const AgentsMd = defineExtension({
@@ -43,7 +43,7 @@ const AgentsMd = defineExtension({
 const Terse = defineExtension({
 	name: "terse",
 	wraps: [
-		wrapSection("preamble", (preamble) => ({
+		wrapSection("preamble", preamble => ({
 			...preamble,
 			render: async (input, renderContext) => `${await preamble.render(input, renderContext)} Be terse.`,
 		})),
@@ -77,7 +77,7 @@ const subagent = await harness.createConversation(
 
 async function systemEntries(conversation: Conversation) {
 	const page = await conversation.entries({}, 20, undefined, context);
-	return [...page.items].reverse().flatMap((entry) => (SystemEntry.is(entry) ? (entry.model ?? []) : []));
+	return [...page.items].reverse().flatMap(entry => (SystemEntry.is(entry) ? (entry.model ?? []) : []));
 }
 
 await (await root.submit({ type: "input", content: "Fix the build." }, context)).wait(context);

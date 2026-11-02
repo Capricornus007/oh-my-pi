@@ -30,7 +30,7 @@ export function applyBatch(store: ChordStore, commits: readonly OutboxCommit[], 
 	}
 	return store.replay(
 		(executor, catalog) => replay(store, checked, executor, catalog),
-		(error) => error instanceof Diverged,
+		error => error instanceof Diverged,
 	);
 }
 

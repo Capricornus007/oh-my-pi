@@ -144,7 +144,7 @@ function checkClassifierContext(context: unknown): ClassifierContext {
 	if (!isRecord(questions) || Object.keys(questions).length === 0) {
 		throw fail(`context.questions must map question IDs to questions, got ${describeValue(questions)}`);
 	}
-	const isStrings = (values: unknown[]) => values.length > 0 && values.every((value) => typeof value === "string");
+	const isStrings = (values: unknown[]) => values.length > 0 && values.every(value => typeof value === "string");
 	for (const [id, question] of Object.entries(questions)) {
 		const at = `context.questions.${id}`;
 		if (!isRecord(question)) throw fail(`${at} must be a question object, got ${describeValue(question)}`);
@@ -218,7 +218,7 @@ function resolveModel<TType extends "classifier" | "image">(
 	const resolved = models.getModelOfType(type, provider, id);
 	if (resolved !== undefined) return resolved;
 	const actualType = [...MODEL_TYPES].find(
-		(other) => other !== type && models.getModelOfType(other as ModelType, provider, id) !== undefined,
+		other => other !== type && models.getModelOfType(other as ModelType, provider, id) !== undefined,
 	);
 	throw new Error(
 		actualType

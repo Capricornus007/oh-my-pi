@@ -711,7 +711,7 @@ function ownKeys(node: OverlayNode): ArrayLike<string | symbol> {
 		}
 	}
 	if (existingKeysOnly) return Object.keys(nodeBase(node));
-	const keys = Object.keys(nodeBase(node)).filter((key) => !isObjectDeleted(node, key) && !node.readded?.has(key));
+	const keys = Object.keys(nodeBase(node)).filter(key => !isObjectDeleted(node, key) && !node.readded?.has(key));
 	const seen = new Set(keys);
 	if (node.writeKey !== undefined && !seen.has(node.writeKey)) {
 		keys.push(node.writeKey);
@@ -1123,7 +1123,7 @@ function replacePieceRange(node: OverlayNode, index: number, remove: number, ins
 }
 
 function mergePieces(pieces: Piece[]): void {
-	for (let index = 1; index < pieces.length; ) {
+	for (let index = 1; index < pieces.length;) {
 		const left = pieces[index - 1]!;
 		const right = pieces[index]!;
 		const sameSource =
@@ -1697,7 +1697,7 @@ function emitOperations(context: OverlayContext): Op[] {
 	const denseRegions = new Map<OverlayNode, DenseRegion[]>();
 	for (const [array, candidates] of denseIndices) {
 		const path = resolvePath(array);
-		if (path === undefined || path.some((segment) => typeof segment === "string" && RESERVED_SEGMENTS.has(segment))) {
+		if (path === undefined || path.some(segment => typeof segment === "string" && RESERVED_SEGMENTS.has(segment))) {
 			continue;
 		}
 		const regions = buildDenseRegions(candidates);
@@ -1709,7 +1709,7 @@ function emitOperations(context: OverlayContext): Op[] {
 		if (hasCoveringDenseRegion(node, path, denseRegions)) continue;
 		emissionPaths.set(node, path);
 		if (!Array.isArray(nodeBase(node)) && hasReservedMutation(node)) forcedFolds.set(node, path);
-		const reservedAt = path.findIndex((segment) => typeof segment === "string" && RESERVED_SEGMENTS.has(segment));
+		const reservedAt = path.findIndex(segment => typeof segment === "string" && RESERVED_SEGMENTS.has(segment));
 		if (reservedAt >= 0) {
 			let ancestor = node;
 			for (let depth = path.length; depth > reservedAt; depth--) ancestor = nodeParent(ancestor)!;
@@ -1859,7 +1859,7 @@ function buildDenseRegions(candidates: DenseCandidates): DenseRegion[] {
 	if (candidates.bits === undefined) return [];
 	const regions: DenseRegion[] = [];
 	const bits = candidates.bits;
-	for (let at = 0; at < bits.length; ) {
+	for (let at = 0; at < bits.length;) {
 		while (at < bits.length && bits[at] === 0) at += 1;
 		if (at === bits.length) break;
 		const start = at;
@@ -2008,7 +2008,7 @@ function elementArrayPlan(baseLength: number, pieces: readonly Piece[]): ArrayPl
 		}
 	}
 	const removeRuns: number[] = [];
-	for (let end = baseLength; end > 0; ) {
+	for (let end = baseLength; end > 0;) {
 		if (retained[end - 1] !== 0) {
 			end -= 1;
 			continue;
@@ -2023,7 +2023,7 @@ function elementArrayPlan(baseLength: number, pieces: readonly Piece[]): ArrayPl
 	let permutation: number[] | undefined;
 	if (targetBase.some((value, index) => value !== retainedBase[index])) {
 		const positions = new Map(retainedBase.map((value, index) => [value, index]));
-		permutation = targetBase.map((value) => positions.get(value)!);
+		permutation = targetBase.map(value => positions.get(value)!);
 	}
 	return { removeRuns, permutation, insertRuns: insertRunsOf(pieces) };
 }
@@ -2032,7 +2032,7 @@ function elementArrayPlan(baseLength: number, pieces: readonly Piece[]): ArrayPl
 function insertRunsOf(pieces: readonly Piece[]): number[] {
 	const insertRuns: number[] = [];
 	let logicalIndex = 0;
-	for (let pieceIndex = 0; pieceIndex < pieces.length; ) {
+	for (let pieceIndex = 0; pieceIndex < pieces.length;) {
 		const piece = pieces[pieceIndex]!;
 		if (piece.kind === "base") {
 			logicalIndex += piece.length;

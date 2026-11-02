@@ -68,7 +68,7 @@ function serveGated(h: FacetHost, gate: Promise<void>, closes: string[]): void {
 describe("load", () => {
 	it("runs every setup and activates the types with empty params before it resolves", async () => {
 		const factories = { info: vi.fn(() => ({ title: constant("t") })), page: vi.fn() };
-		const facet = defineFacet((host) => {
+		const facet = defineFacet(host => {
 			host.serve(Info, factories.info);
 			host.serve(Page, factories.page);
 		});
@@ -81,7 +81,7 @@ describe("load", () => {
 
 	it("leaves out and reports invalid and duplicate plugin names and double serves (the later); refuses a second load", async () => {
 		const empty = defineFacet(() => {});
-		const info = defineFacet((host) => host.serve(Info, () => ({ title: constant("t") })));
+		const info = defineFacet(host => host.serve(Info, () => ({ title: constant("t") })));
 		const loaded = async (facets: { readonly name: string; readonly facet: typeof empty }[]) => {
 			const host = createHost(noErrors);
 			const { failed } = await host.load(facets, context);
@@ -128,7 +128,7 @@ describe("load", () => {
 		const host = createHost(noErrors);
 		const got = host.get(Info, {}, context);
 		await host.load(
-			[{ name: "a", facet: defineFacet((h) => h.serve(Info, () => ({ title: constant("t") }))) }],
+			[{ name: "a", facet: defineFacet(h => h.serve(Info, () => ({ title: constant("t") }))) }],
 			context,
 		);
 		expect((await got).title.value).toBe("t");
@@ -140,7 +140,7 @@ describe("the start barrier", () => {
 
 	it("resolves once every host-lifetime object had its first outcome; a failed one is reported and retried", async () => {
 		let attempts = 0;
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Info, () => ({ title: constant("t") }));
 			h.serve(Counter, (_, self) => {
 				const attempt = ++attempts;
@@ -162,7 +162,7 @@ describe("the start barrier", () => {
 
 	it("is not held by a hanging open: its attempt is abandoned at readyTimeout", async () => {
 		const host = createHost({ ...noErrors, readyTimeout: 100 });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Info, (_, self) => {
 				self.open(
 					() => new Promise(() => {}),
@@ -186,7 +186,7 @@ describe("the start barrier", () => {
 		const CodeMode = local("app.codemode", { version: 1, params: {}, members: { n: int() } });
 		const opened = Promise.withResolvers<void>();
 		const host = createHost(noErrors);
-		const facet = defineFacet((h) => {
+		const facet = defineFacet(h => {
 			h.serve(Harness, (_, self) => {
 				self.open(
 					() => opened.promise,
@@ -210,7 +210,7 @@ describe("the start barrier", () => {
 	it("ends its pass at a local blocker's own failure: the dependent parked failed { waiting } has its first outcome", async () => {
 		const Harness = local("app.harness", { version: 1, params: {}, members: { n: int() } });
 		const CodeMode = local("app.codemode", { version: 1, params: {}, members: { n: int() } });
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Harness, (_, self) => {
 				self.open(
 					async () => {
@@ -235,7 +235,7 @@ describe("the start barrier", () => {
 		const [a, b] = memoryLinkPair();
 		host.connect(a, { principal: { kind: "server" }, codec: testCodec() }, context);
 		const parent = new RawPeer(b);
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(CodeMode, (_, self) => ({ n: self.get(Notes, { session: "S1" }).count })),
 		);
 		await host.load([{ name: "@app/codemode", facet }], context);
@@ -245,7 +245,7 @@ describe("the start barrier", () => {
 
 	it("is settled by host.close: an object of its cohort that ends before its first outcome settles it as ended", async () => {
 		const host = createHost(noErrors);
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Info, (_, self) => {
 				self.open(
 					() => new Promise(() => {}),
@@ -272,7 +272,7 @@ describe("the start barrier", () => {
 		const Missing = local("app.missing", { version: 1, params: {}, members: { n: int() } });
 		const gate = Promise.withResolvers<void>();
 		const host = createHost(noErrors);
-		const facet = defineFacet((h) => {
+		const facet = defineFacet(h => {
 			h.serve(Slow, (_, self) => {
 				self.open(
 					() => gate.promise,
@@ -309,7 +309,7 @@ describe("the start barrier", () => {
 		const Missing = local("app.missing", { version: 1, params: {}, members: {} });
 		const gate = Promise.withResolvers<void>();
 		const host = createHost(noErrors);
-		const facet = defineFacet((h) => {
+		const facet = defineFacet(h => {
 			h.serve(A, (_, self) => {
 				self.get(B, { id: 1 });
 				return {};
@@ -362,11 +362,11 @@ describe("startup across hosts (dependency model §6)", () => {
 
 	it("starts two hosts that would have deadlocked (Sol's probe): an acyclic graph needs no timeout", async () => {
 		const { server, errors } = await relayed({
-			server: (h) => {
+			server: h => {
 				h.serve(Bootstrap, (_, self) => ({ n: self.get(Agent, { session: "S1" }).n }));
 				h.serve(Catalog, () => ({ variant: "v", members: { n: constant(7) } }));
 			},
-			worker: (h) => {
+			worker: h => {
 				// The worker's own host object waits for the server's catalog during the worker's load.
 				h.serve(Agent, (_params, _principal, self) => ({ variant: "v", members: { n: self.get(Catalog, {}).n } }));
 			},
@@ -404,7 +404,7 @@ describe("startup across hosts (dependency model §6)", () => {
 		await transported();
 		expect(mine.state.value).toEqual({ kind: "loading" });
 		await worker.load(
-			[{ name: "@test/w", facet: defineFacet<TestPrincipal>((h) => serveNotes(h, PlacedNotes)) }],
+			[{ name: "@test/w", facet: defineFacet<TestPrincipal>(h => serveNotes(h, PlacedNotes)) }],
 			context,
 		);
 		expect((await child.next("bound")).holds[0]).toMatchObject({ hold: 0 });
@@ -423,7 +423,7 @@ describe("startup across hosts (dependency model §6)", () => {
 		const order: string[] = [];
 		let catalogs = 0;
 		const { tab } = await relayed({
-			server: (h) =>
+			server: h =>
 				h.serve(Catalog, (_params, _principal, self) => {
 					const attempt = ++catalogs;
 					self.open(
@@ -435,7 +435,7 @@ describe("startup across hosts (dependency model §6)", () => {
 					self.onLive(async () => void order.push("catalog"));
 					return { variant: "v", members: { n: constant(attempt) } };
 				}),
-			worker: (h) =>
+			worker: h =>
 				h.serve(Chat, (_params, _principal, self) => {
 					const catalog = self.get(Catalog, {});
 					self.onLive(async () => void order.push("chat"));
@@ -460,7 +460,7 @@ describe("startup across hosts (dependency model §6)", () => {
 
 describe("get", () => {
 	it("waits for an unserved type and a contract mismatch until its readyTimeout, then rejects with the cause", async () => {
-		const { host } = await loaded((h) => h.serve(Info, () => ({ title: constant("t") })));
+		const { host } = await loaded(h => h.serve(Info, () => ({ title: constant("t") })));
 		const quick = { readyTimeout: 5 };
 		expect(await rejection(host.get(Page, { id: 1 }, context, quick))).toEqual({
 			code: "unavailable",
@@ -475,7 +475,7 @@ describe("get", () => {
 	});
 
 	it("checks params with L1 (invalid/params)", async () => {
-		const { host } = await loaded((h) => h.serve(Page, ({ id }) => ({ id: constant(id) })));
+		const { host } = await loaded(h => h.serve(Page, ({ id }) => ({ id: constant(id) })));
 		// @ts-expect-error: a string is not an int
 		expect(await rejection(host.get(Page, { id: "x" }, context))).toMatchObject({
 			code: "invalid",
@@ -489,7 +489,7 @@ describe("deadlines of gets", () => {
 
 	it("reject with unavailable while no attempt has failed (the last failure: see attempt.test.ts)", async () => {
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => serveGated(h, gate.promise, []));
+		const { host } = await loaded(h => serveGated(h, gate.promise, []));
 		const waiting = rejection(host.get(Svc, { id: 1 }, context, { readyTimeout: 500 }));
 		await vi.advanceTimersByTimeAsync(500);
 		expect(await waiting).toEqual({ code: "unavailable", message: "app.svc(1): did not become live within 500 ms" });
@@ -505,7 +505,7 @@ describe("deadlines of gets", () => {
 	it("are per getter: the first to pass releases only its own reference, the attempt goes on for the other", async () => {
 		const gate = Promise.withResolvers<void>();
 		const closes: string[] = [];
-		const { host } = await loaded((h) => serveGated(h, gate.promise, closes), { readyTimeout: 10_000 });
+		const { host } = await loaded(h => serveGated(h, gate.promise, closes), { readyTimeout: 10_000 });
 		const early = rejection(host.get(Svc, { id: 1 }, context, { readyTimeout: 100 }));
 		const late = host.get(Svc, { id: 1 }, context, { readyTimeout: 1000 });
 		await vi.advanceTimersByTimeAsync(100);
@@ -519,7 +519,7 @@ describe("deadlines of gets", () => {
 describe("close", () => {
 	it("ends every object, the last to go live first, and rejects new calls", async () => {
 		const Outer = local("app.outer", { version: 1, params: {}, members: { title: str() } });
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Info, () => ({ title: constant("info") }));
 			h.serve(Outer, (_, self) => ({ title: self.get(Info, {}).title }));
 		});
@@ -547,7 +547,7 @@ describe("close", () => {
 
 	it("ends every object at once: calls fail released before any close ran", async () => {
 		const closing = Promise.withResolvers<void>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Counter, (_, self) => {
 				self.open(
 					async () => null,
@@ -570,7 +570,7 @@ describe("close", () => {
 	it("aborts a pending open and does not wait for it; its late value is closed with close", async () => {
 		const gate = Promise.withResolvers<void>();
 		const closes: string[] = [];
-		const { host } = await loaded((h) => serveGated(h, gate.promise, closes));
+		const { host } = await loaded(h => serveGated(h, gate.promise, closes));
 		const got = rejection(host.get(Svc, { id: 1 }, context));
 		await flushed();
 		await host.close(context);
@@ -582,7 +582,7 @@ describe("close", () => {
 
 	it("joins an ending running in the background", async () => {
 		const closing = Promise.withResolvers<void>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Svc, ({ id }, self) => {
 				self.open(
 					async () => null,
@@ -616,7 +616,7 @@ describe("close", () => {
 				},
 			);
 		};
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Svc, ({ id }, self) => {
 				open(self, `svc ${id}`);
 				return { n: constant(id) };
@@ -645,7 +645,7 @@ describe("close", () => {
 describe("close, its order and its races", () => {
 	it("returns one closing to every caller: a second close waits for the first", async () => {
 		const closing = Promise.withResolvers<void>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Counter, (_, self) => {
 				self.open(
 					async () => null,
@@ -671,7 +671,7 @@ describe("close, its order and its races", () => {
 		const Pair = local("app.pair", { version: 1, params: { id: int() }, members: { n: int() } });
 		const closing = Promise.withResolvers<void>();
 		const closes: string[] = [];
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Svc, ({ id }, self) => {
 				self.open(
 					async () => null,
@@ -716,7 +716,7 @@ describe("close, its order and its races", () => {
 				throw new Error("onError threw");
 			},
 		});
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Svc, ({ id }, self) => {
 				self.open(
 					async () => {
@@ -744,7 +744,7 @@ describe("close, its order and its races", () => {
 		fakeTimers();
 
 		it("ends an object waiting for its window and clears every timer", async () => {
-			const { host } = await loaded((h) =>
+			const { host } = await loaded(h =>
 				h.serve(Svc, (_, self) => {
 					self.open(
 						async () => {
@@ -774,7 +774,7 @@ describe("getters", () => {
 			cancel(new Error("cancelled"));
 			return { id: constant(1) };
 		});
-		const { host } = await loaded((h) => h.serve(Page, factory));
+		const { host } = await loaded(h => h.serve(Page, factory));
 		const [cancelled, kept] = await Promise.allSettled([
 			host.get(Page, { id: 1 }, cancellable),
 			host.get(Page, { id: 1 }, context),
@@ -828,11 +828,11 @@ forEachCodec(() => {
 
 		it("host.get acts as the host's principal; a host without one (a client) serves no remote type", async () => {
 			const factories: string[] = [];
-			const { server } = await linked((h) => serveAll(h, factories));
+			const { server } = await linked(h => serveAll(h, factories));
 			expect((await server.get(Who, { id: 1 }, context)).who.value).toBe("server");
 			const client = createHost<P>({ onError: () => {} });
 			const report = await client.load(
-				[{ name: "@test/app", facet: defineFacet<P>((h) => serveAll(h, [])) }],
+				[{ name: "@test/app", facet: defineFacet<P>(h => serveAll(h, [])) }],
 				context,
 			);
 			expect(report.failed).toEqual([
@@ -848,10 +848,7 @@ forEachCodec(() => {
 
 		it("a host without an address serves no remote type, whatever its principal", async () => {
 			const host = createHost<P>({ principal: { kind: "server" }, onError: () => {} });
-			const report = await host.load(
-				[{ name: "@test/app", facet: defineFacet<P>((h) => serveAll(h, [])) }],
-				context,
-			);
+			const report = await host.load([{ name: "@test/app", facet: defineFacet<P>(h => serveAll(h, [])) }], context);
 			expect(report.failed).toEqual([
 				{
 					plugin: "@test/app",
@@ -864,13 +861,13 @@ forEachCodec(() => {
 		});
 
 		it("ctx.get acts as ctx.principal: a guest's call gets the guest's view; a local handler's acts as the host", async () => {
-			const { server, client } = await linked((h) => serveAll(h, []), { child: { kind: "guest", session: "S1" } });
+			const { server, client } = await linked(h => serveAll(h, []), { child: { kind: "guest", session: "S1" } });
 			expect(await (await client.get(Gate, {}, context)).who(context)).toBe("guest");
 			expect(await (await server.get(Desk, {}, context)).who(context)).toBe("server");
 		});
 
 		it("self.get acts as a remote object's principal, a local object's as the host's", async () => {
-			const { server, client } = await linked((h) => serveAll(h, []), { child: { kind: "guest", session: "S1" } });
+			const { server, client } = await linked(h => serveAll(h, []), { child: { kind: "guest", session: "S1" } });
 			expect((await client.get(Outer, {}, context)).who.value).toBe("guest");
 			expect((await server.get(Inner, { id: 4 }, context)).who.value).toBe("server");
 		});
@@ -880,10 +877,10 @@ forEachCodec(() => {
 			const host = createHost<P>({
 				address: Server(),
 				principal: { kind: "guest", session: "S1" },
-				principalKey: (principal) => principal.kind,
+				principalKey: principal => principal.kind,
 				onError: () => {},
 			});
-			await host.load([{ name: "@test/app", facet: defineFacet<P>((h) => serveAll(h, factories)) }], context);
+			await host.load([{ name: "@test/app", facet: defineFacet<P>(h => serveAll(h, factories)) }], context);
 			const [a, b] = memoryLinkPair();
 			host.accept(a, { principal: { kind: "guest", session: "S2" }, codec: testCodec() }, context);
 			const peer = new RawPeer(b);
@@ -923,7 +920,7 @@ forEachCodec(() => {
 				hostAddress: () => Server(),
 				variants: { v: { state: { n: int() } } },
 			});
-			const { server } = await linked((h) =>
+			const { server } = await linked(h =>
 				h.serve(Empty, (_, principal) => {
 					factories.push(principal.kind);
 					return { variant: "v", members: { n: constant(1) } };
@@ -963,7 +960,7 @@ forEachCodec(() => {
 		});
 
 		it("close closes the links first: the consumer sees the link drop, no gone", async () => {
-			const { server, client } = await linked((h) => serveAll(h, []));
+			const { server, client } = await linked(h => serveAll(h, []));
 			const who = await client.get(Who, { id: 1 }, context);
 			const watch = await who.who.watch(context);
 			await server.close(context);
@@ -982,7 +979,7 @@ describe("host.registry and the host's close (fix round 1)", () => {
 		const host = createHost(noErrors);
 		await host.load([], context);
 		let outcome: unknown;
-		void rejection(host.registry(Absent, context, { readyTimeout: 60_000 })).then((error) => {
+		void rejection(host.registry(Absent, context, { readyTimeout: 60_000 })).then(error => {
 			outcome = error;
 		});
 		await flushed();
@@ -1008,7 +1005,7 @@ describe("the selected provider's own checks for a request made here (fix round 
 		const Consumer = remote("app.placed", { ...shape, hostAddress: () => Here() });
 		const Provider = remote("app.placed", { ...shape, hostAddress: () => Elsewhere() });
 		const host = createHost({ address: Here(), principal: { kind: "owner" }, onError: () => {} });
-		const facet = defineFacet((h) => h.serve(Provider, () => ({ variant: "view", members: { n: constant(1) } })));
+		const facet = defineFacet(h => h.serve(Provider, () => ({ variant: "view", members: { n: constant(1) } })));
 		await host.load([{ name: "@app/provider", facet }], context);
 		const ref = host.hold(Consumer, {}, context);
 		await flushed();
@@ -1030,7 +1027,7 @@ describe("the selected provider's own checks for a request made here (fix round 
 		});
 		const server = createHost({ address: Server(), principal: { kind: "server" }, onError: () => {} });
 		const client = createHost({ onError: () => {} });
-		const facet = defineFacet((h) => h.serve(Provider, () => ({ variant: "view", members: { n: constant(1) } })));
+		const facet = defineFacet(h => h.serve(Provider, () => ({ variant: "view", members: { n: constant(1) } })));
 		await server.load([{ name: "@app/provider", facet }], context);
 		await client.load([], context);
 		const [down, up] = memoryLinkPair();
@@ -1067,7 +1064,7 @@ describe('a load whose setup throws (decision "Per plugin at startup and reload"
 				{ name: "@test/broken", facet: broken },
 				{
 					name: "@test/app",
-					facet: defineFacet<TestPrincipal>((h) => h.serve(Info, () => ({ title: constant("t") }))),
+					facet: defineFacet<TestPrincipal>(h => h.serve(Info, () => ({ title: constant("t") }))),
 				},
 			],
 			context,
@@ -1108,7 +1105,7 @@ describe("acquiring: hold and get", () => {
 
 	it("invalid params at once; a local type not served here: hold waits failed, get rejects at its readyTimeout", async () => {
 		const host = createHost<TestPrincipal>({ address: Server(), ...noErrors, principal: { kind: "server" } });
-		await host.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }], context);
 		const params = { code: "invalid", reason: "params" };
 		expect(() => host.hold(Notes, { session: 1 } as never, context)).toThrow("params");
 		expect(await rejection(host.get(Notes, { session: 1 } as never, context))).toMatchObject(params);
@@ -1131,7 +1128,7 @@ describe("acquiring: hold and get", () => {
 		const refused = rejection(host.get(Page, { id: 1 }, context, { readyTimeout: 50 }));
 		expect([held.state.value, unserved.state.value]).toEqual([{ kind: "loading" }, { kind: "loading" }]);
 		await host.load(
-			[{ name: "@test/app", facet: defineFacet((h) => h.serve(Info, () => ({ title: constant("t") }))) }],
+			[{ name: "@test/app", facet: defineFacet(h => h.serve(Info, () => ({ title: constant("t") }))) }],
 			context,
 		);
 		await flushed();
@@ -1161,13 +1158,13 @@ describe("acquiring: hold and get", () => {
 		const factory = vi.fn(({ id }: { id: number }) => ({ id: constant(id) }));
 		const host = createHost(noErrors);
 		host.hold(Page, { id: 1 }, context).release();
-		await host.load([{ name: "@test/app", facet: defineFacet((h) => h.serve(Page, factory)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet(h => h.serve(Page, factory)) }], context);
 		await flushed();
 		expect(factory).not.toHaveBeenCalled();
 	});
 
 	it("through transient failures: hold is failed with retryAt, then loading; get waits, then rejects with the last cause", async () => {
-		const { host } = await loaded((h) => serveFlaky(h, { left: 5, broken: false }));
+		const { host } = await loaded(h => serveFlaky(h, { left: 5, broken: false }));
 		const held = host.hold(Svc, { id: 1 }, context);
 		const got = rejection(host.get(Svc, { id: 1 }, context, { readyTimeout: 1_500 }));
 		await flushed();
@@ -1187,7 +1184,7 @@ describe("acquiring: hold and get", () => {
 	});
 
 	it("a broken failure: hold is failed without retryAt; get releases its reference and rejects at once", async () => {
-		const { host } = await loaded((h) => serveFlaky(h, { left: 1, broken: true }));
+		const { host } = await loaded(h => serveFlaky(h, { left: 1, broken: true }));
 		const held = host.hold(Svc, { id: 1 }, context);
 		expect(await rejection(host.get(Svc, { id: 1 }, context))).toEqual(offline);
 		expect(held.state.value).toMatchObject({ kind: "failed", cause: { kind: "broken" }, retryAt: undefined });
@@ -1196,7 +1193,7 @@ describe("acquiring: hold and get", () => {
 	it("a cancelled context: no effect on a hold; a get releases its reference and rejects", async () => {
 		const gate = Promise.withResolvers<void>();
 		const closes: string[] = [];
-		const { host } = await loaded((h) => serveGated(h, gate.promise, closes));
+		const { host } = await loaded(h => serveGated(h, gate.promise, closes));
 		const { context: cancellable, cancel } = withCancel(context);
 		const held = host.hold(Svc, { id: 1 }, cancellable);
 		const got = host.get(Svc, { id: 2 }, cancellable);
@@ -1211,7 +1208,7 @@ describe("acquiring: hold and get", () => {
 
 	it("host.close: queued calls reject released, references go released, their watches end (race 10)", async () => {
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => serveGated(h, gate.promise, []));
+		const { host } = await loaded(h => serveGated(h, gate.promise, []));
 		const local = host.hold(Svc, { id: 1 }, context);
 		const remoteHost = createHost<TestPrincipal>(noErrors);
 		await remoteHost.load([], context);
@@ -1228,7 +1225,7 @@ describe("acquiring: hold and get", () => {
 forEachCodec(() => {
 	describe("connect after a drop", () => {
 		it("throws while the previous parent link is open or still closing, and takes the next once it closed (race 4)", async () => {
-			const { client, links } = await linked((h) => void serveNotes(h));
+			const { client, links } = await linked(h => void serveNotes(h));
 			const notes = await client.get(Notes, { session: "S1" }, context);
 			const next = (): void =>
 				client.connect(memoryLinkPair()[0], { principal: { kind: "server" }, codec: testCodec() }, context);
@@ -1250,7 +1247,7 @@ forEachCodec(() => {
 			const host = createHost<TestPrincipal>({
 				address: Session({ id: "S1" }),
 				principal: { kind: "worker", session: "S1" },
-				onError: (error) => errors.push(error),
+				onError: error => errors.push(error),
 			});
 			let parent: RawPeer | undefined;
 			if (options.parent === true) {
@@ -1259,7 +1256,7 @@ forEachCodec(() => {
 				parent = new RawPeer(b);
 			}
 			await host.load(
-				[{ name: "@test/w", facet: defineFacet<TestPrincipal>((h) => serveNotes(h, PlacedNotes)) }],
+				[{ name: "@test/w", facet: defineFacet<TestPrincipal>(h => serveNotes(h, PlacedNotes)) }],
 				context,
 			);
 			const [a, b] = memoryLinkPair();
@@ -1388,7 +1385,7 @@ describe("the host's store", () => {
 	it("reports storage_failed once and closes the host; the app still closes the store", async () => {
 		const { store, fail } = await faultyStore();
 		const errors: HostError[] = [];
-		const host = createHost({ store, onError: (error) => errors.push(error) });
+		const host = createHost({ store, onError: error => errors.push(error) });
 		await host.load([], context);
 		const write: StagedWrite = { order: "write", apply: async () => [] };
 		const fence = { admit: () => true, adopt: () => {} };
@@ -1406,7 +1403,7 @@ describe("the host's store", () => {
 
 /** A plugin's facet serving `Info` with the title `title` (a new facet value each call: a changed plugin). */
 function infoFacet(title: string) {
-	return defineFacet((h) => h.serve(Info, () => ({ title: constant(title) })));
+	return defineFacet(h => h.serve(Info, () => ({ title: constant(title) })));
 }
 
 describe("reload: the API (slice 7b §1)", () => {
@@ -1421,7 +1418,7 @@ describe("reload: the API (slice 7b §1)", () => {
 	it("reports plugins added, changed and removed; the same facet object is unchanged and untouched", async () => {
 		const core = infoFacet("core");
 		const host = createHost(noErrors);
-		const kept = defineFacet((h) => h.serve(Counter, () => ({ count: constant(1), bump: async () => null })));
+		const kept = defineFacet(h => h.serve(Counter, () => ({ count: constant(1), bump: async () => null })));
 		await host.load(
 			[
 				{ name: "@app/core", facet: kept },
@@ -1433,7 +1430,7 @@ describe("reload: the API (slice 7b §1)", () => {
 		const report = await host.reload(
 			[
 				{ name: "@app/core", facet: kept },
-				{ name: "@app/page", facet: defineFacet((h) => h.serve(Page, ({ id }) => ({ id: constant(id) }))) },
+				{ name: "@app/page", facet: defineFacet(h => h.serve(Page, ({ id }) => ({ id: constant(id) }))) },
 			],
 			context,
 		);
@@ -1518,7 +1515,7 @@ describe("reload: the API (slice 7b §1)", () => {
 		expect(await failedOf([{ name: "@app/info", facet: throwing }])).toEqual([
 			["@app/info", 'plugin "@app/info": setup threw'],
 		]);
-		const factoryThrows = defineFacet((h) =>
+		const factoryThrows = defineFacet(h =>
 			h.serve(Info, () => {
 				throw new Error("factory threw");
 			}),
@@ -1555,7 +1552,7 @@ describe("reload: the commit (slice 7b §3)", () => {
 		await host.reload(
 			[
 				{ name: "@app/info", facet: infoFacet("a") },
-				{ name: "@app/page", facet: defineFacet((h) => h.serve(Page, ({ id }) => ({ id: constant(id) }))) },
+				{ name: "@app/page", facet: defineFacet(h => h.serve(Page, ({ id }) => ({ id: constant(id) }))) },
 			],
 			context,
 		);
@@ -1566,7 +1563,7 @@ describe("reload: the commit (slice 7b §3)", () => {
 		expect(other.state.value).toMatchObject({ kind: "failed", cause: { kind: "waiting" } });
 		expect(otherStates).toEqual([]);
 		await host.reload(
-			[{ name: "@app/page", facet: defineFacet((h) => h.serve(Page, ({ id }) => ({ id: constant(id) }))) }],
+			[{ name: "@app/page", facet: defineFacet(h => h.serve(Page, ({ id }) => ({ id: constant(id) }))) }],
 			context,
 		);
 		expect(host.references(Info)).not.toBe(presence);
@@ -1577,7 +1574,7 @@ describe("reload: the commit (slice 7b §3)", () => {
 		const Names = defineRegistry<string, string>("app.names", { version: 1 });
 		const provider = (separator: string) =>
 			defineFacet((h, self) => {
-				h.serve(Names, { compose: (table) => table.map(({ value }) => value).join(separator) });
+				h.serve(Names, { compose: table => table.map(({ value }) => value).join(separator) });
 				self.contribute(Names, "own");
 			});
 		const contributor = (name: string) => defineFacet((_h, self) => self.contribute(Names, name));
@@ -1622,7 +1619,7 @@ const Title = remote("app.title", {
 });
 
 /** `Title` v2: an object; v1 consumers map back through `accepts`. */
-const TitleV2 = evolve(Title, (e) => e.state("v", "title", obj({ text: str() })));
+const TitleV2 = evolve(Title, e => e.state("v", "title", obj({ text: str() })));
 
 describe("reload: registries' older readers (slice 7b §3)", () => {
 	it("a reader of an older version follows the new provider's accepts[old].value; one it no longer serves waits", async () => {
@@ -1631,16 +1628,16 @@ describe("reload: registries' older readers (slice 7b §3)", () => {
 		const provider = (map: ((names: string[]) => string) | undefined) =>
 			defineFacet((h, self) => {
 				h.serve(NamesV2, {
-					compose: (table) => table.map(({ value }) => value),
+					compose: table => table.map(({ value }) => value),
 					...(map === undefined ? {} : { accepts: { 1: { value: map } } }),
 				});
 				self.contribute(NamesV2, "a");
 			});
 		const host = createHost(noErrors);
-		await host.load([{ name: "@app/names", facet: provider((names) => names.join(",")) }], context);
+		await host.load([{ name: "@app/names", facet: provider(names => names.join(",")) }], context);
 		const old = await host.registry(NamesV1, context);
 		expect(old.value).toBe("a");
-		await host.reload([{ name: "@app/names", facet: provider((names) => `${names.join("+")}!`) }], context);
+		await host.reload([{ name: "@app/names", facet: provider(names => `${names.join("+")}!`) }], context);
 		expect(old.value).toBe("a!");
 		await host.reload([{ name: "@app/names", facet: provider(undefined) }], context);
 		expect(() => old.value).toThrow("version 1 is not served here");
@@ -1656,12 +1653,12 @@ describe("reload across hosts, in the app's order (slice 7b §11)", () => {
 			h.serve(
 				TitleV2,
 				() => ({ variant: "v", members: { title: constant({ text }) } }),
-				accept ? { accepts: { 1: { state: { v: { title: (current) => current.text } } } } } : {},
+				accept ? { accepts: { 1: { state: { v: { title: current => current.text } } } } } : {},
 			);
 		const workerSet = (setup: (h: FacetHost<TestPrincipal>) => void) => [
 			{
 				name: "@test/worker",
-				facet: defineFacet<TestPrincipal>((h) => {
+				facet: defineFacet<TestPrincipal>(h => {
 					serveNotes(h, PlacedNotes);
 					setup(h);
 				}),
@@ -1699,11 +1696,11 @@ describe("reload: an abort while staging (fix round 1)", () => {
 	it("does not commit when the context is aborted by the synchronous setup", async () => {
 		const T = local("astra.cancel", { version: 1, params: {}, members: { n: int() } });
 		const host = createHost({ onError: () => {} });
-		const original = defineFacet((h) => h.serve(T, () => ({ n: constant(1) })));
+		const original = defineFacet(h => h.serve(T, () => ({ n: constant(1) })));
 		await host.load([{ name: "@astra/cancel", facet: original }], context);
 		const ref = await host.get(T, {}, context);
 		const abort = new AbortController();
-		const changed = defineFacet((h) => {
+		const changed = defineFacet(h => {
 			abort.abort();
 			h.serve(T, () => ({ n: constant(2) }));
 		});

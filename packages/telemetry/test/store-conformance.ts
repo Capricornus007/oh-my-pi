@@ -23,7 +23,7 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			vi.spyOn(Date, "now").mockReturnValue(20_000);
 			await using f = await factory();
 			const gate = Promise.withResolvers<void>();
-			const active = f.context.startSpan({ name: "root", attributes: { tags: ["original"] } }, async (root) => {
+			const active = f.context.startSpan({ name: "root", attributes: { tags: ["original"] } }, async root => {
 				root.addEvent("event", { tags: ["original"] });
 				await gate.promise;
 				await root.startSpan({ name: "child" }, () => {});
@@ -35,8 +35,8 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			await active;
 			await f.flush();
 			const trace = (await f.store.findTraces()).traces[0]!;
-			const root = trace.spans.find((span) => span.name === "root")!;
-			const child = trace.spans.find((span) => span.name === "child")!;
+			const root = trace.spans.find(span => span.name === "root")!;
+			const child = trace.spans.find(span => span.name === "child")!;
 			expect(root.id).toMatch(/^[0-9a-f-]{36}:[1-9][0-9]*$/);
 			expect(root.traceId).toBe(root.id);
 			expect(root.parentId).toBeUndefined();
@@ -48,31 +48,31 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			root.attributes.tags = ["changed"];
 			root.events[0]!.attributes.tags = ["changed"];
 			const fresh = await f.store.getTrace(trace.traceId);
-			expect(fresh?.spans.find((span) => span.id === root.id)?.attributes.tags).toEqual(["original"]);
-			expect(fresh?.spans.find((span) => span.id === root.id)?.events[0]?.attributes.tags).toEqual(["original"]);
+			expect(fresh?.spans.find(span => span.id === root.id)?.attributes.tags).toEqual(["original"]);
+			expect(fresh?.spans.find(span => span.id === root.id)?.events[0]?.attributes.tags).toEqual(["original"]);
 		});
 
 		it("filters by first-span name and start, any error, and all attributes on one span", async () => {
 			const now = vi.spyOn(Date, "now").mockReturnValue(10_000);
 			await using f = await factory();
-			await f.context.startSpan({ name: "old" }, async (root) => {
+			await f.context.startSpan({ name: "old" }, async root => {
 				now.mockReturnValue(30_000);
 				await root.startSpan({ name: "recent-child", attributes: { left: 1 } }, () => {});
 				await root.startSpan({ name: "split", attributes: { right: 2 } }, () => {});
 			});
 			now.mockReturnValue(20_000);
-			await f.context.startSpan({ name: "wanted" }, async (root) => {
+			await f.context.startSpan({ name: "wanted" }, async root => {
 				now.mockReturnValue(20_001);
 				await root.startSpan(
 					{ name: "failure", attributes: { left: 1, right: 2, valid: true, 'odd."key': "value" } },
-					(child) => child.setStatus({ status: "error" }),
+					child => child.setStatus({ status: "error" }),
 				);
 			});
 			now.mockReturnValue(40_000);
 			await f.context.startSpan({ name: "new", attributes: { valid: 1 } }, () => {});
 			await f.flush();
 			const names = async (query: Parameters<TelemetryStore["findTraces"]>[0]) =>
-				(await f.store.findTraces(query)).traces.map((trace) => trace.spans[0]?.name);
+				(await f.store.findTraces(query)).traces.map(trace => trace.spans[0]?.name);
 			expect(
 				await names({
 					name: "wanted",
@@ -96,7 +96,7 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			await using f = await factory();
 			for (let index = 0; index < 25; index++) {
 				now.mockReturnValue(20_000);
-				await f.context.startSpan({ name: "root", attributes: { index } }, async (root) => {
+				await f.context.startSpan({ name: "root", attributes: { index } }, async root => {
 					now.mockReturnValue(20_001);
 					await root.startSpan({ name: "child" }, () => {});
 				});
@@ -110,15 +110,15 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			expect(rest.cursor).toBeUndefined();
 			const all = (await f.store.findTraces({ limit: 100 })).traces;
 			expect([...first.traces, ...rest.traces]).toEqual(all);
-			expect(all.every((trace) => trace.spans.length === 2)).toBe(true);
+			expect(all.every(trace => trace.spans.length === 2)).toBe(true);
 			const ids: string[] = [];
 			let cursor: string | undefined;
 			do {
 				const page = await f.store.findTraces({ name: "root", limit: 3, cursor });
-				ids.push(...page.traces.map((trace) => trace.traceId));
+				ids.push(...page.traces.map(trace => trace.traceId));
 				cursor = page.cursor;
 			} while (cursor);
-			expect(ids).toEqual(all.map((trace) => trace.traceId));
+			expect(ids).toEqual(all.map(trace => trace.traceId));
 		});
 
 		it("inherits remote trace IDs and preserves remote parents and cross-trace links", async () => {
@@ -126,7 +126,7 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			await using sender = await factory();
 			await using receiver = await factory();
 			let carrier!: TelemetryCarrier;
-			await sender.context.startSpan({ name: "sender" }, (span) => {
+			await sender.context.startSpan({ name: "sender" }, span => {
 				carrier = sender.context.propagation.inject(span)!;
 			});
 			await sender.flush();
@@ -162,17 +162,17 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			const fallbacks = (await receiver.store.findTraces({ name: "fallback" })).traces;
 			expect(fallbacks).toHaveLength(Object.keys(carrier).length * 2);
 			expect(
-				fallbacks.every((trace) => trace.spans[0]?.parentId === undefined && trace.traceId === trace.spans[0]?.id),
+				fallbacks.every(trace => trace.spans[0]?.parentId === undefined && trace.traceId === trace.spans[0]?.id),
 			).toBe(true);
 		});
 
 		it("accepts external string identities without imposing an ID format", async () => {
 			await using f = await factory();
 			let carrier!: TelemetryCarrier;
-			await f.context.startSpan({ name: "source" }, (span) => {
+			await f.context.startSpan({ name: "source" }, span => {
 				carrier = f.context.propagation.inject(span)!;
 			});
-			const external = Object.fromEntries(Object.keys(carrier).map((key) => [key, `external-${key}`]));
+			const external = Object.fromEntries(Object.keys(carrier).map(key => [key, `external-${key}`]));
 			const parent = f.context.propagation.extract(external);
 			expect(f.context.propagation.inject(parent)).toEqual(external);
 			await parent.startSpan({ name: "continued" }, () => {});
@@ -203,11 +203,9 @@ export function telemetryStoreConformance(name: string, factory: () => Promise<S
 			const rows = await f.store.findMetrics(query);
 			expect(rows.reduce((count, row) => count + row.count, 0)).toBe(2);
 			expect(rows.reduce((sum, row) => sum + row.sum, 0)).toBe(5);
-			expect(Math.min(...rows.map((row) => row.min))).toBe(2);
-			expect(Math.max(...rows.map((row) => row.max))).toBe(3);
-			expect(rows.every((row) => row.kind === "counter" && row.unit === "By" && row.intervalMs === 20_000)).toBe(
-				true,
-			);
+			expect(Math.min(...rows.map(row => row.min))).toBe(2);
+			expect(Math.max(...rows.map(row => row.max))).toBe(3);
+			expect(rows.every(row => row.kind === "counter" && row.unit === "By" && row.intervalMs === 20_000)).toBe(true);
 			rows[0]!.attributes.method = "changed";
 			expect((await f.store.findMetrics(query))[0]?.attributes.method).toBe("read");
 			expect(await f.store.findMetrics({ name: "missing" })).toEqual([]);

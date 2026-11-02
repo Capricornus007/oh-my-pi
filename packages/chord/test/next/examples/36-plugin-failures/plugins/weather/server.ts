@@ -6,7 +6,7 @@ import { Weather } from "./contract.ts";
 
 const apiKey: string | undefined = undefined;
 
-export default defineFacet((host) => {
+export default defineFacet(host => {
 	if (apiKey === undefined) throw new Error("weather: no API key configured");
 	host.serve(Weather, () => ({ celsius: constant(21) }));
 });

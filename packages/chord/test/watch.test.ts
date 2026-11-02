@@ -17,7 +17,7 @@ import { NativeWatch, type NativeWatchCall, Watch, type WatchCall, type WatchEnd
 const context = BACKGROUND_CONTEXT;
 
 function flush(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 0));
+	return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
@@ -53,7 +53,7 @@ function recordedWatch<T>(value: T) {
 	const watch = new Watch<T>(
 		value,
 		() => recorded.detached++,
-		(error) => recorded.reported.push(error),
+		error => recorded.reported.push(error),
 	);
 	return { watch, recorded };
 }
@@ -73,7 +73,7 @@ function collectingWatch<T>(value: T) {
 /** The end of `closed`, or undefined while the watch is open. */
 function endOf(watch: { readonly closed: Promise<WatchEnd> }): { readonly end: WatchEnd | undefined } {
 	const settled: { end: WatchEnd | undefined } = { end: undefined };
-	void watch.closed.then((end) => {
+	void watch.closed.then(end => {
 		settled.end = end;
 	});
 	return settled;
@@ -220,13 +220,13 @@ describe("Watch with a slow listener", () => {
 				expect(replica).toEqual(value);
 				calls.push({ commits, ops: ops.length });
 				// A listener taking a second per call, as a slow client would.
-				await new Promise((resolve) => setTimeout(resolve, 1000));
+				await new Promise(resolve => setTimeout(resolve, 1000));
 			}),
 		);
 		// Ten seconds of a streamed reply at 60 tokens per second, a new entry every second.
 		for (let tick = 0; tick < 600; tick++) {
-			if (tick % 60 === 0) commit((draft) => void draft.entries.push({ text: "", status: "streaming" }));
-			commit((draft) => {
+			if (tick % 60 === 0) commit(draft => void draft.entries.push({ text: "", status: "streaming" }));
+			commit(draft => {
 				draft.entries.at(-1)!.text += "tok ";
 				draft.tokens++;
 			});
@@ -332,7 +332,7 @@ describe("Watch retirement", () => {
 		watch.advance(retirement({ n: 1 }), context);
 		watch.advance(frame({ m: 1 }, [["r", { m: 1 }]]), context);
 		const changes: WatchCall<JsonValue>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
 		await flush();
@@ -348,7 +348,7 @@ describe("Watch retirement", () => {
 		watch.advance(retirement({ k: [] }), context);
 		const newest = advanceDistinct(watch, MAX_PENDING_OPS + 1);
 		const changes: WatchCall<JsonValue>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
 		await flush();
@@ -385,7 +385,7 @@ describe("Watch failure calls", () => {
 	function recordingWatch<T>(value: T) {
 		const { watch, recorded } = recordedWatch(value);
 		const calls: WatchCall<T>[] = [];
-		watch.start(async (call) => {
+		watch.start(async call => {
 			calls.push(call);
 		});
 		return { watch, recorded, calls };
@@ -434,7 +434,7 @@ describe("Watch failure calls", () => {
 		watch.fail(first, context);
 		watch.fail(second, context);
 		const calls: WatchCall<JsonValue>[] = [];
-		watch.start(async (call) => {
+		watch.start(async call => {
 			calls.push(call);
 		});
 		await flush();
@@ -465,7 +465,7 @@ describe("Watch failure calls", () => {
 		const { watch } = recordedWatch<JsonValue>(0);
 		const gate = deferred();
 		const calls: WatchCall<JsonValue>[] = [];
-		watch.start(async (call) => {
+		watch.start(async call => {
 			calls.push(call);
 			if (calls.length === 1) await gate.promise;
 		});
@@ -477,7 +477,7 @@ describe("Watch failure calls", () => {
 		await flush();
 		watch.advance(frame(3, [["r", 3]]), context);
 		await flush();
-		expect(calls.map((call) => (call.kind === "value" ? call.value : call.error))).toEqual([1, "down", 3]);
+		expect(calls.map(call => (call.kind === "value" ? call.value : call.error))).toEqual([1, "down", 3]);
 		expect(watch.value).toBe(3);
 		await watch.stop();
 	});
@@ -631,7 +631,7 @@ describe("Watch call objects", () => {
 	it("hands a listener plain data only: `{ kind, value, ops, retired }`, cloneable and serializable", async () => {
 		const { watch } = recordedWatch<JsonValue>({ n: 0 });
 		const changes: WatchCall<JsonValue>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
 		watch.advance(frame({ n: 1 }, [["s", ["n"], 1]]), producerContext({}));
@@ -653,7 +653,7 @@ describe("Watch call objects", () => {
 	it("passes a frame delivered alone on as the source made it", async () => {
 		const { watch } = recordedWatch<JsonValue>(0);
 		const changes: WatchCall<JsonValue>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
 		const alone = frame(1, [["r", 1]]);
@@ -674,7 +674,7 @@ describe("Watch call objects", () => {
 					() => {},
 					() => {},
 				);
-				watch.start(async (change) => {
+				watch.start(async change => {
 					kept.push(change);
 				});
 				watch.advance(1, producerContext(payload));
@@ -684,7 +684,7 @@ describe("Watch call objects", () => {
 				await watch.stop();
 			} else {
 				const { watch } = recordedWatch<JsonValue>(0);
-				watch.start(async (change) => {
+				watch.start(async change => {
 					kept.push(change);
 				});
 				watch.advance(frame(1, [["r", 1]]), producerContext(payload));
@@ -873,9 +873,9 @@ describe("Watch references", () => {
 		};
 		const { watch, batches, newest } = overflow();
 		await collect();
-		expect(batches.map((batch) => batch.deref() === undefined)).toEqual([true, true, true, true]);
+		expect(batches.map(batch => batch.deref() === undefined)).toEqual([true, true, true, true]);
 		const changes: WatchCall<JsonValue>[] = [];
-		watch.start(async (change) => {
+		watch.start(async change => {
 			changes.push(change);
 		});
 		await flush();
@@ -934,7 +934,7 @@ describe("Watch references", () => {
 		expect(delivered.payload.deref()).toBeUndefined();
 		expect(delivered.watch.value).toBe(3);
 
-		const stopped = await pending(async (watch) => {
+		const stopped = await pending(async watch => {
 			await watch.stop();
 		});
 		await collect();
@@ -965,7 +965,7 @@ describe("NativeWatch", () => {
 		expect(delivered).toHaveLength(2);
 		expect(delivered[0].value).toBe(first);
 		expect(delivered[1].value).toBe(second);
-		expect(delivered.map((entry) => entry.frame)).toEqual(["first", "second"]);
+		expect(delivered.map(entry => entry.frame)).toEqual(["first", "second"]);
 		expect(watch.value).toBe(second);
 	});
 
@@ -1045,7 +1045,7 @@ describe("NativeWatch", () => {
 		const throwing = new NativeWatch<number>(
 			0,
 			() => {},
-			(thrown) => reported.push(thrown),
+			thrown => reported.push(thrown),
 		);
 		const failure = new Error("listener failed");
 		throwing.start(() => Promise.reject(failure));
@@ -1059,10 +1059,10 @@ describe("NativeWatch", () => {
 		const watch = new NativeWatch<number>(
 			0,
 			() => {},
-			(error) => reported.push(error),
+			error => reported.push(error),
 		);
 		const calls: NativeWatchCall<number>[] = [];
-		watch.start(async (call) => {
+		watch.start(async call => {
 			calls.push(call);
 		});
 		watch.advance(1, context);

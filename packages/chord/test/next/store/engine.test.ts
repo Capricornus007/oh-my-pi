@@ -86,22 +86,22 @@ describe("documents", () => {
 		const [id] = await commit(create("a", { n: 0 }));
 		await commit(delta(id!, 1, [["s", ["n"], 1]]));
 		await commit(delta(id!, 2, [["s", ["n"], 2]]));
-		const found = (await read<DocumentRecord | undefined>((e) => findDocument(e, at("a"))))!;
+		const found = (await read<DocumentRecord | undefined>(e => findDocument(e, at("a"))))!;
 		expect(found).toMatchObject({ id, revision: 3, version: 1, history: "none", createdAt: 1 });
-		expect(await read((e) => loadDocument(e, found))).toMatchObject({ value: { n: 2 }, deltasSinceBase: 2 });
+		expect(await read(e => loadDocument(e, found))).toMatchObject({ value: { n: 2 }, deltasSinceBase: 2 });
 		const next = base({ m: 9 }, 2);
 		await commit(changeDocument(id!, 3, { kind: "base", ...next }, JSON.stringify(next.value)));
-		const rebased = (await read<DocumentRecord | undefined>((e) => findDocument(e, at("a"))))!;
+		const rebased = (await read<DocumentRecord | undefined>(e => findDocument(e, at("a"))))!;
 		expect(rebased).toMatchObject({ revision: 4, version: 2, fingerprint: next.fingerprint });
-		expect(await read((e) => loadDocument(e, rebased))).toMatchObject({ value: { m: 9 }, deltasSinceBase: 0 });
-		expect(await read((e) => e.all(`SELECT seq FROM ${TABLES.revisions}`))).toEqual([{ seq: 4 }]);
+		expect(await read(e => loadDocument(e, rebased))).toMatchObject({ value: { m: 9 }, deltasSinceBase: 0 });
+		expect(await read(e => e.all(`SELECT seq FROM ${TABLES.revisions}`))).toEqual([{ seq: 4 }]);
 	});
 
 	it("list live keys in code point order, paging after a key", async () => {
 		const { commit, create, read } = await engine();
 		await commit(create("\u{1F600}", {}), create("\uFF5E", {}), create("b", {}), create("a", {}));
-		expect(await read((e) => listDocumentKeys(e, OWNER, undefined, 10))).toEqual(["a", "b", "\uFF5E", "\u{1F600}"]);
-		expect(await read((e) => listDocumentKeys(e, OWNER, "b", 1))).toEqual(["\uFF5E"]);
+		expect(await read(e => listDocumentKeys(e, OWNER, undefined, 10))).toEqual(["a", "b", "\uFF5E", "\u{1F600}"]);
+		expect(await read(e => listDocumentKeys(e, OWNER, "b", 1))).toEqual(["\uFF5E"]);
 	});
 
 	it("retire a none record with its row and revisions (R1); the address takes a new incarnation", async () => {
@@ -109,9 +109,9 @@ describe("documents", () => {
 		const [id] = await commit(create("a", { n: 0 }));
 		const [next] = await commit(retireDocument(id!, 1), create("a", { n: 1 }));
 		expect(next).toBe(3);
-		expect(await read((e) => e.all(`SELECT id FROM ${TABLES.documents}`))).toEqual([{ id: 3 }]);
-		expect(await read((e) => e.all(`SELECT document_id FROM ${TABLES.revisions}`))).toEqual([{ document_id: 3 }]);
-		expect(await read((e) => findDocument(e, at("a")))).toMatchObject({ id: 3 });
+		expect(await read(e => e.all(`SELECT id FROM ${TABLES.documents}`))).toEqual([{ id: 3 }]);
+		expect(await read(e => e.all(`SELECT document_id FROM ${TABLES.revisions}`))).toEqual([{ document_id: 3 }]);
+		expect(await read(e => findDocument(e, at("a")))).toMatchObject({ id: 3 });
 	});
 
 	it("refuse two live records at one address and a delta on another version: the step is refused", async () => {
@@ -131,21 +131,21 @@ describe("history rules (R1) and reads at a point", () => {
 	async function lifetime(history: DocumentHistory) {
 		const { store, commit, at, read } = await engine();
 		await commit(
-			staged(async (step) => {
+			staged(async step => {
 				const made = record(10, "a", history, step.seq);
 				await insertDocument(step, made, '{"n":0}');
 				return [];
 			}),
 		);
 		await commit(
-			staged(async (step) => {
+			staged(async step => {
 				const content = { kind: "base", version: 1, fingerprint: "", value: { n: 1 } } as const;
 				await writeContent(step, 10, history, 1, content, '{"n":1}');
 				return [];
 			}),
 		);
 		await commit(
-			staged(async (step) => {
+			staged(async step => {
 				await writeContent(
 					step,
 					10,
@@ -159,7 +159,7 @@ describe("history rules (R1) and reads at a point", () => {
 		);
 		// An adapter's retirement (Durable's): the record read in the step, retired by its history's rule.
 		await commit(
-			staged(async (step) => {
+			staged(async step => {
 				await retireRecord(step, (await readDocument(step, 10))!);
 				return [];
 			}),
@@ -169,12 +169,12 @@ describe("history rules (R1) and reads at a point", () => {
 
 	it("keep a retired latest record's row without revisions, and every revision of a rewindable one", async () => {
 		const latest = await lifetime("latest");
-		expect(await latest.read((e) => e.all(`SELECT id, retired_at FROM ${TABLES.documents}`))).toEqual([
+		expect(await latest.read(e => e.all(`SELECT id, retired_at FROM ${TABLES.documents}`))).toEqual([
 			{ id: 10, retired_at: 4 },
 		]);
-		expect(await latest.read((e) => e.all(`SELECT seq FROM ${TABLES.revisions}`))).toEqual([]);
+		expect(await latest.read(e => e.all(`SELECT seq FROM ${TABLES.revisions}`))).toEqual([]);
 		const rewindable = await lifetime("rewindable");
-		expect(await rewindable.read((e) => e.all(`SELECT seq, kind FROM ${TABLES.revisions} ORDER BY seq`))).toEqual([
+		expect(await rewindable.read(e => e.all(`SELECT seq, kind FROM ${TABLES.revisions} ORDER BY seq`))).toEqual([
 			{ seq: 1, kind: "base" },
 			{ seq: 2, kind: "base" },
 			{ seq: 3, kind: "delta" },
@@ -184,11 +184,11 @@ describe("history rules (R1) and reads at a point", () => {
 	it("find a record at a point by its half-open lifetime, and load a rewindable one at any point inside it", async () => {
 		const { read, at } = await lifetime("rewindable");
 		const found = await Promise.all(
-			[0, 1, 3, 4, "current" as const].map((point) =>
-				read<DocumentRecord | undefined>((e) => findDocument(e, at("a"), point)),
+			[0, 1, 3, 4, "current" as const].map(point =>
+				read<DocumentRecord | undefined>(e => findDocument(e, at("a"), point)),
 			),
 		);
-		expect(found.map((each) => each?.id)).toEqual([undefined, 10, 10, undefined, undefined]);
+		expect(found.map(each => each?.id)).toEqual([undefined, 10, 10, undefined, undefined]);
 		const record = found[1]!;
 		expect(record.retiredAt).toBe(4);
 		for (const [point, n] of [
@@ -196,18 +196,18 @@ describe("history rules (R1) and reads at a point", () => {
 			[2, 1],
 			[3, 2],
 		] as const) {
-			expect(await read((e) => loadDocument(e, record, point))).toMatchObject({ value: { n }, version: 1 });
+			expect(await read(e => loadDocument(e, record, point))).toMatchObject({ value: { n }, version: 1 });
 		}
-		expect(await read((e) => listDocuments(e, OWNER, 3, 0, 10))).toMatchObject([{ id: 10 }]);
-		expect(await read((e) => listDocuments(e, OWNER, "current", 0, 10))).toEqual([]);
+		expect(await read(e => listDocuments(e, OWNER, 3, 0, 10))).toMatchObject([{ id: 10 }]);
+		expect(await read(e => listDocuments(e, OWNER, "current", 0, 10))).toEqual([]);
 	});
 
 	it("find a retired latest record at a point, whose content is gone", async () => {
 		const { read, at } = await lifetime("latest");
-		const found = (await read<DocumentRecord | undefined>((e) => findDocument(e, at("a"), 2)))!;
+		const found = (await read<DocumentRecord | undefined>(e => findDocument(e, at("a"), 2)))!;
 		expect(found).toMatchObject({ id: 10, retiredAt: 4, history: "latest" });
 		// A read returns data (the store stops on a read's throw, slice 6b §1.4): the outcome as a value.
-		const outcome = read((e) =>
+		const outcome = read(e =>
 			loadDocument(e, found, 2).then(
 				() => "loaded",
 				(error: unknown) => String(error),
@@ -220,15 +220,13 @@ describe("history rules (R1) and reads at a point", () => {
 		const { commit, read, at, create } = await engine();
 		const [live] = await commit(create("a", {}));
 		await commit(
-			staged(async (step) => {
+			staged(async step => {
 				await insertDocument(step, { ...record(20, "a", "latest", step.seq), retiredAt: step.seq }, "{}");
 				return [];
 			}),
 		);
-		expect(await read((e) => findDocument(e, at("a")))).toMatchObject({ id: live });
-		expect(await read((e) => e.all(`SELECT document_id FROM ${TABLES.revisions} WHERE document_id = 20`))).toEqual(
-			[],
-		);
+		expect(await read(e => findDocument(e, at("a")))).toMatchObject({ id: live });
+		expect(await read(e => e.all(`SELECT document_id FROM ${TABLES.revisions} WHERE document_id = 20`))).toEqual([]);
 	});
 });
 
@@ -252,13 +250,13 @@ describe("counters at the safe-integer limit", () => {
 	it("count revisions up to the safe range after an import near it; a change past it is refused", async () => {
 		const { store: source, commit: seed, create } = await engine();
 		await seed(create("a", { n: 0 }));
-		const store = await reimported(source, (parts) =>
-			parts.map((part) =>
+		const store = await reimported(source, parts =>
+			parts.map(part =>
 				part.kind === "document.create" ? { ...part, record: { ...part.record, revision: LIMIT - 1 } } : part,
 			),
 		);
 		const { commit, delta, read, at } = await engine(store);
-		const found = (await read<DocumentRecord | undefined>((e) => findDocument(e, at("a"))))!;
+		const found = (await read<DocumentRecord | undefined>(e => findDocument(e, at("a"))))!;
 		await commit(delta(found.id, LIMIT - 1, [["s", ["n"], 1]]));
 		expect(String(await rejection(commit(delta(found.id, LIMIT, [["s", ["n"], 2]]))))).toContain("safe range");
 	});

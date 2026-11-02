@@ -26,7 +26,7 @@ const Flaky = local("app.flaky", {
 
 /** Serves `Flaky`, whose open throws while `failing.left` is above 0 (broken while `failing.broken`). */
 async function flaky(failing: { left: number; broken: boolean }) {
-	return loaded((h) =>
+	return loaded(h =>
 		h.serve(Flaky, ({ id }, self) => {
 			self.open(
 				async () => {

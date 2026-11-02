@@ -23,12 +23,12 @@ export function webIncoming(request: Request): Incoming {
 	return {
 		method: request.method,
 		url: request.url,
-		header: (name) => request.headers.get(name),
+		header: name => request.headers.get(name),
 		forwarded: () => {
 			for (const name of request.headers.keys()) if (isForwarding(name)) return true;
 			return false;
 		},
-		cancelled: (abort) => {
+		cancelled: abort => {
 			const { signal } = request;
 			if (signal.aborted) abort(signal.reason);
 			else signal.addEventListener("abort", () => abort(signal.reason), { once: true });

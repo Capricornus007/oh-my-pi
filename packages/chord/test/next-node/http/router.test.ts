@@ -22,7 +22,7 @@ const route =
 function compose(...entries: [string, HttpContribution][]): { router: Router; conflicts: RegistryConflict[] } {
 	const conflicts: RegistryConflict[] = [];
 	const table: RegistryTable<HttpContribution> = entries.map(([plugin, value]) => ({ plugin, version: 1, value }));
-	return { router: composeRouter(table, { report: (conflict) => conflicts.push(conflict) }), conflicts };
+	return { router: composeRouter(table, { report: conflict => conflicts.push(conflict) }), conflicts };
 }
 
 /** The matched route's pattern and params, or what `route` answered. */

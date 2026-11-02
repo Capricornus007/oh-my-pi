@@ -99,7 +99,7 @@ describe("consumeSseStream", () => {
 			},
 		});
 		const events: SseEvent[] = [];
-		await consumeSseStream(stream, { onEvent: (event) => events.push(event) });
+		await consumeSseStream(stream, { onEvent: event => events.push(event) });
 		expect(events).toEqual([{ id: "7", data: '{"one":\n1}' }]);
 	});
 
@@ -133,11 +133,11 @@ describe("StreamableHttpTransport", () => {
 		});
 		await client.close();
 
-		const listRequest = requests.find((entry) => entry.message?.method === "tools/list");
+		const listRequest = requests.find(entry => entry.message?.method === "tools/list");
 		expect(listRequest?.headers["mcp-session-id"]).toBe("session-1");
 		expect(listRequest?.headers["mcp-protocol-version"]).toBe(LATEST_PROTOCOL_VERSION);
-		expect(requests.some((entry) => entry.method === "GET")).toBe(true);
-		expect(requests.some((entry) => entry.method === "DELETE")).toBe(true);
+		expect(requests.some(entry => entry.method === "GET")).toBe(true);
+		expect(requests.some(entry => entry.method === "DELETE")).toBe(true);
 	});
 
 	it("classifies authentication failures", async () => {
@@ -157,7 +157,7 @@ describe("StreamableHttpTransport", () => {
 
 	it("fails only the request whose SSE stream breaks", async () => {
 		let releaseSlow = () => {};
-		const slowGate = new Promise<void>((resolve) => {
+		const slowGate = new Promise<void>(resolve => {
 			releaseSlow = resolve;
 		});
 		const { url } = await startServer(async (request, response, requests) => {
@@ -174,7 +174,7 @@ describe("StreamableHttpTransport", () => {
 		});
 		const client = new McpClient({ name: "http-test", version: "1.0.0" });
 		const errors: Error[] = [];
-		client.onError((error) => errors.push(error));
+		client.onError(error => errors.push(error));
 		await client.connect(new StreamableHttpTransport({ url, openGetStream: false }));
 
 		const slow = client.callTool("slow");
@@ -202,7 +202,7 @@ describe("StreamableHttpTransport", () => {
 		await client.listTools();
 		await client.close();
 		expect(order.indexOf("GET")).toBeGreaterThan(order.indexOf("notifications/initialized"));
-		expect(requests.every((entry) => entry.headers["last-event-id"] === undefined)).toBe(true);
+		expect(requests.every(entry => entry.headers["last-event-id"] === undefined)).toBe(true);
 	});
 
 	it("resumes a response stream the server closed before answering", async () => {
@@ -225,7 +225,7 @@ describe("StreamableHttpTransport", () => {
 		});
 		const client = new McpClient({ name: "http-test", version: "1.0.0" });
 		const errors: Error[] = [];
-		client.onError((error) => errors.push(error));
+		client.onError(error => errors.push(error));
 		await client.connect(new StreamableHttpTransport({ url, openGetStream: false }));
 		expect(await client.callTool("echo")).toEqual({ content: [{ type: "text", text: "resumed" }] });
 		expect(resumeHeaders).toEqual(["1"]);
@@ -266,7 +266,7 @@ describe("StreamableHttpTransport", () => {
 		});
 		const client = new McpClient({ name: "http-test", version: "1.0.0" });
 		let changes = 0;
-		const secondChange = new Promise<void>((resolve) => {
+		const secondChange = new Promise<void>(resolve => {
 			client.onNotification("notifications/tools/list_changed", () => {
 				if (++changes === 2) resolve();
 			});
@@ -357,14 +357,14 @@ describe("StreamableHttpTransport", () => {
 			return protocolHandler(request, response, requests, message);
 		});
 		let releaseRefresh = () => {};
-		const refreshGate = new Promise<void>((resolve) => {
+		const refreshGate = new Promise<void>(resolve => {
 			releaseRefresh = resolve;
 		});
 		let refresh: Promise<void> | undefined;
 		let refreshes = 0;
 		let waiting = 0;
 		let allWaiting = () => {};
-		const waitingGate = new Promise<void>((resolve) => {
+		const waitingGate = new Promise<void>(resolve => {
 			allWaiting = resolve;
 		});
 		const client = new McpClient({ name: "http-test", version: "1.0.0" });
@@ -417,8 +417,8 @@ describe("StreamableHttpTransport", () => {
 		const before = calls;
 		await client.close();
 		expect(calls).toBe(before);
-		const deletes = requests.filter((entry) => entry.method === "DELETE");
-		expect(deletes.map((entry) => entry.headers.authorization)).toEqual([`Bearer token-${before}`]);
+		const deletes = requests.filter(entry => entry.method === "DELETE");
+		expect(deletes.map(entry => entry.headers.authorization)).toEqual([`Bearer token-${before}`]);
 		expect(deletes[0]?.headers["mcp-session-id"]).toBe("session-1");
 	});
 
@@ -447,7 +447,7 @@ describe("StreamableHttpTransport", () => {
 					openGetStream: false,
 					authProvider: {
 						token: async () => token,
-						onUnauthorized: async (context) => {
+						onUnauthorized: async context => {
 							await (await context.fetch(url)).body?.cancel();
 							token = "token";
 						},

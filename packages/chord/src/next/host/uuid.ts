@@ -33,6 +33,6 @@ export function uuidv7(): string {
 	bytes[9] = Number((sequence >> 15n) & 0xffn);
 	bytes[10] = Number((sequence >> 7n) & 0xffn);
 	bytes[11] = Number((sequence & 0x7fn) << 1n) | (bytes[11]! & 0x01);
-	const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+	const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0"));
 	return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }

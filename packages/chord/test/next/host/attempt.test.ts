@@ -4,13 +4,7 @@ import { type Context, BACKGROUND_CONTEXT as context, withCancel } from "../../.
 import { arr, int, local, method, obj, opt, remote, str } from "../../../src/next/contracts/index.ts";
 import { broken, ChordError, isChordError } from "../../../src/next/data/index.ts";
 import { defineState, type SingletonHandle } from "../../../src/next/documents/index.ts";
-import {
-	createHost,
-	defineFacet,
-	type HostError,
-	type Self,
-	type StoreSelf,
-} from "../../../src/next/host/index.ts";
+import { createHost, defineFacet, type HostError, type Self, type StoreSelf } from "../../../src/next/host/index.ts";
 import { ChordObject } from "../../../src/next/host/object.ts";
 import { defineRegistry } from "../../../src/next/registries/index.ts";
 import { constant } from "../../../src/next/state/index.ts";
@@ -61,7 +55,7 @@ describe("failure kinds", () => {
 		],
 		[
 			"a throwing first derive",
-			(self) => ({
+			self => ({
 				label: self.derive([], () => {
 					throw new Error("derive threw");
 				}),
@@ -70,12 +64,12 @@ describe("failure kinds", () => {
 		],
 		[
 			"an initial() that fails its schema",
-			(self) => ({ label: self.derive([self.state(Bad)], () => "") }),
+			self => ({ label: self.derive([self.state(Bad)], () => "") }),
 			"app.broken(1): bad: initial() does not match the schema",
 		],
 		[
 			"an open that throws broken(error)",
-			(self) => {
+			self => {
 				self.open(
 					async () => {
 						throw broken(new Error("no remote configured"));
@@ -90,7 +84,7 @@ describe("failure kinds", () => {
 		"%s fails broken: reported, the get rejects at once with a ChordError, nothing is left",
 		async (_, factory, message) => {
 			const served = vi.fn((_: { id: number }, self: Self) => factory(self) as never);
-			const { host, errors } = await loaded((h) => h.serve(Broken, served));
+			const { host, errors } = await loaded(h => h.serve(Broken, served));
 			const error = await host.get(Broken, { id: 1 }, context).catch((error: unknown) => error);
 			expect(isChordError(error) && error.message).toBe(message);
 			await expect(host.get(Broken, { id: 1 }, context)).rejects.toThrow(message);
@@ -102,7 +96,7 @@ describe("failure kinds", () => {
 	);
 
 	it("an open that throws fails transient: reported, the get waits through retries", async () => {
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Broken, (_, self) => {
 				self.open(
 					async () => {
@@ -134,14 +128,14 @@ describe("failure kinds", () => {
 			let opener: Context | undefined;
 			const closes: string[] = [];
 			const { host, errors } = await loaded(
-				(h) =>
+				h =>
 					h.serve(Broken, (_, self) => {
 						self.open(
 							async () => "a",
 							(value, reason) => void closes.push(`${value} ${reason.kind}`),
 						);
 						self.open(
-							async (ctx) => {
+							async ctx => {
 								opener = ctx;
 								return new Promise<string>(() => {});
 							},
@@ -168,7 +162,7 @@ describe("failure kinds", () => {
 			const closing = Promise.withResolvers<void>();
 			let factories = 0;
 			const { host, errors } = await loaded(
-				(h) =>
+				h =>
 					h.serve(Page, (_, self) => {
 						factories++;
 						self.open(
@@ -202,12 +196,12 @@ describe("failure kinds", () => {
 			initial: () => ({ n: "x" }) as never,
 			keyed: true,
 		});
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Page, (_, self) => {
 				const keys = self.state(Keys);
 				return {
 					label: constant("live"),
-					slow: async (ctx) => {
+					slow: async ctx => {
 						await keys.change("a", () => {}, ctx);
 						return null;
 					},
@@ -221,7 +215,7 @@ describe("failure kinds", () => {
 
 	it("releases the references it acquired", async () => {
 		const pages = vi.fn((_: { id: number }) => ({ label: constant("p"), slow: async () => null }));
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Broken, (_, self) => {
 				const page = self.get(Page, { id: 7 });
 				const label = self.derive([page.label], (): string => {
@@ -243,15 +237,15 @@ describe("ending", () => {
 		const started = Promise.withResolvers<void>();
 		const proceed = Promise.withResolvers<void>();
 		const finished = Promise.withResolvers<{ aborted?: boolean; error?: unknown }>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Page, (_, self) => {
 				const list = self.state(List);
 				return {
 					label: constant(""),
-					slow: async (ctx) => {
+					slow: async ctx => {
 						started.resolve();
 						await proceed.promise;
-						const tx = self.tx(async (tx) => (await tx.draft(list)).items.push("x"), context);
+						const tx = self.tx(async tx => (await tx.draft(list)).items.push("x"), context);
 						finished.resolve({ aborted: ctx.abortSignal?.aborted, error: await rejection(tx) });
 						return null;
 					},
@@ -270,7 +264,7 @@ describe("ending", () => {
 
 	it("rejects a call whose caller's context is already aborted, before the handler runs", async () => {
 		const slow = vi.fn(async () => null);
-		const { host } = await loaded((h) => h.serve(Page, () => ({ label: constant(""), slow })));
+		const { host } = await loaded(h => h.serve(Page, () => ({ label: constant(""), slow })));
 		const page = await host.get(Page, { id: 1 }, context);
 		const { context: cancelled, cancel } = withCancel(context);
 		cancel(new Error("gone"));
@@ -282,7 +276,7 @@ describe("ending", () => {
 		const events: string[] = [];
 		const started = Promise.withResolvers<void>();
 		const proceed = Promise.withResolvers<void>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Page, (_, self) => {
 				self.open(
 					async () => "native",
@@ -314,7 +308,7 @@ describe("ending", () => {
 	it("drains a handler that releases its object's last reference before it returns its promise", async () => {
 		const events: string[] = [];
 		const proceed = Promise.withResolvers<void>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Page, (_, self) => {
 				self.open(
 					async () => null,
@@ -346,7 +340,7 @@ describe("ending", () => {
 	it("refuses transactions at once; documents stay readable until the closes are done", async () => {
 		let list: SingletonHandle<{ items: string[] }> | undefined;
 		const seen = Promise.withResolvers<unknown[]>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Page, (_, self) => {
 				const handle = self.state(List);
 				list = handle;
@@ -372,7 +366,7 @@ describe("ending", () => {
 		it("is bounded by closeTimeout: a handler still running then sees its natives close, which is reported", async () => {
 			const closed = vi.fn();
 			const { host, errors } = await loaded(
-				(h) =>
+				h =>
 					h.serve(Page, (_, self) => {
 						self.open(async () => null, closed);
 						return { label: constant(""), slow: () => new Promise<null>(() => {}) };
@@ -393,11 +387,11 @@ describe("ending", () => {
 			const Item = local("app.item", { version: 1, params: { id: int() }, members: { label: str() } });
 			const got = Promise.withResolvers<void>();
 			const { host } = await loaded(
-				(h) => {
+				h => {
 					h.serve(Item, () => ({ label: constant("item") }));
 					h.serve(Page, () => ({
 						label: constant(""),
-						slow: async (ctx) => {
+						slow: async ctx => {
 							await ctx.get(Item, { id: 7 });
 							got.resolve();
 							return new Promise<null>(() => {});
@@ -423,7 +417,7 @@ describe("ending", () => {
 describe("declarations", () => {
 	it("are valid only while the factory runs", async () => {
 		let later: Self | undefined;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Page, (_, self) => {
 				later = self;
 				return { label: constant(""), slow: async () => null };
@@ -450,8 +444,8 @@ describe("declarations", () => {
 		expectTypeOf<StoreSelf>().toHaveProperty("contribute");
 		const Names = defineRegistry<string, number>("app.names", { version: 1 });
 		const Store = local("app.store", { version: 1, params: {}, members: {} });
-		const { host } = await loaded((h) => {
-			h.serve(Names, { compose: (table) => table.length });
+		const { host } = await loaded(h => {
+			h.serve(Names, { compose: table => table.length });
 			h.serve(Page, (_, self) => {
 				(self as unknown as StoreSelf).contribute(Names, "page");
 				return { label: constant(""), slow: async () => null };
@@ -473,7 +467,7 @@ describe("declarations", () => {
 
 	it("refuse a document definition declared twice", async () => {
 		const Twice = local("app.twice", { version: 1, params: { n: int() }, members: {} });
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Twice, (_, self) => {
 				[self.state(List), self.state(List)];
 				return {};
@@ -492,9 +486,9 @@ describe("calls", () => {
 			params: {},
 			members: { echo: method(obj({ text: str() }), obj({ items: arr(str()) })), none: method() },
 		});
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Echo, () => ({
-				echo: async (args) => {
+				echo: async args => {
 					seen.push(args);
 					return result;
 				},
@@ -524,7 +518,7 @@ describe("calls", () => {
 			params: {},
 			members: { value: method(undefined, int()), fail: method() },
 		});
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			// Plugin code is bundled without type checks.
 			h.serve(Plain, () => ({
 				value: (() => 7) as never,
@@ -542,7 +536,7 @@ describe("calls", () => {
 		const telemetry = await metered();
 		// A fresh declaration: compiled checks are cached per contract.
 		const Fresh = local("app.store", { version: 1, params: {}, members: { add: method(obj({ text: str() })) } });
-		const { host } = await loaded((h) => h.serve(Fresh, () => ({ add: async () => null })));
+		const { host } = await loaded(h => h.serve(Fresh, () => ({ add: async () => null })));
 		const store = await host.get(Fresh, {}, context);
 		await store.add({ text: "a" }, telemetry.context);
 		await store.add({ text: "b" }, telemetry.context);
@@ -553,7 +547,7 @@ describe("calls", () => {
 describe("the call path's cost", () => {
 	it("makes at most 19 promises per local call (a guard: the drain and the cleanups share one reaction)", async () => {
 		const Touch = local("app.touch", { version: 1, params: {}, members: { touch: method() } });
-		const { host } = await loaded((h) => h.serve(Touch, () => ({ touch: async () => null })));
+		const { host } = await loaded(h => h.serve(Touch, () => ({ touch: async () => null })));
 		const ref = await host.get(Touch, {}, context);
 		await ref.touch(context);
 		let promises = 0;
@@ -589,9 +583,9 @@ describe("remote variants", () => {
 		const host = createHost<typeof owner>({
 			address: Server(),
 			principal: owner,
-			onError: (error) => errors.push(error),
+			onError: error => errors.push(error),
 		});
-		const facet = defineFacet<typeof owner>((h) => h.serve(Two, () => implementation as never));
+		const facet = defineFacet<typeof owner>(h => h.serve(Two, () => implementation as never));
 		await host.load([{ name: "@test/app", facet }], context);
 		return { host, errors };
 	}
@@ -643,7 +637,7 @@ describe("tables", () => {
 	it("a fresh table is created at activation at its version, with its indexes, in one commit", async () => {
 		const store = await memoryStore({ outbox: true });
 		const { host } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Store, (_, self) => {
 					self.table(Edits);
 					return { n: constant(1) };
@@ -663,7 +657,7 @@ describe("tables", () => {
 		]);
 		await host.close(context);
 		const again = await loaded(
-			(h) =>
+			h =>
 				h.serve(Store, (_, self) => {
 					self.table(Edits);
 					return { n: constant(1) };
@@ -681,7 +675,7 @@ describe("tables", () => {
 	it.each<[string, (self: StoreSelf) => void, string]>([
 		[
 			"declared twice",
-			(self) => {
+			self => {
 				self.table(Edits);
 				self.table(Edits);
 			},
@@ -689,18 +683,18 @@ describe("tables", () => {
 		],
 		[
 			"another version recorded",
-			(self) => self.table(defineTable("edits", { version: 2, columns: { id: str() }, key: ["id"] })),
+			self => self.table(defineTable("edits", { version: 2, columns: { id: str() }, key: ["id"] })),
 			"older than the history's base 2",
 		],
 		[
 			"another definition at the same version",
-			(self) => self.table(defineTable("edits", { version: 1, columns: { id: str(), at: int() }, key: ["id"] })),
+			self => self.table(defineTable("edits", { version: 1, columns: { id: str(), at: int() }, key: ["id"] })),
 			"recorded with another definition",
 		],
 	])("fails the activation broken: %s", async (_, declare, message) => {
 		const store = await memoryStore();
 		const first = await loaded(
-			(h) =>
+			h =>
 				h.serve(Store, (_, self) => {
 					self.table(Edits);
 					return { n: constant(1) };
@@ -712,7 +706,7 @@ describe("tables", () => {
 		await first.host.get(Store, {}, context);
 		await first.host.close(context);
 		const { host } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Store, (_, self) => {
 					declare(self);
 					return { n: constant(1) };
@@ -727,7 +721,7 @@ describe("tables", () => {
 	});
 
 	it("needs a local type with empty params (P3) and a host with a store", async () => {
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Page, (_, self) => {
 				// @ts-expect-error: only a local type with empty params has tables (P3)
 				const declare = () => self.table(Edits);
@@ -791,8 +785,8 @@ describe("eager migrations at activation (slice 6a §9)", () => {
 
 	/** Version 2 adding `note`, whose `rows` runs `each` per row first. */
 	function evolved(each: (id: string) => void) {
-		return evolveTable(EditsV1, (t) =>
-			t.add("note", opt(str())).rows((row) => {
+		return evolveTable(EditsV1, t =>
+			t.add("note", opt(str())).rows(row => {
 				each(row.id);
 				return { note: `#${row.at}` };
 			}),
@@ -809,7 +803,7 @@ describe("eager migrations at activation (slice 6a §9)", () => {
 		// Each row takes 10 ms of the fake clock: 2.5 s of migration against a 1 s deadline.
 		const Edits = evolved(() => vi.advanceTimersByTime(10));
 		const loading = loaded(
-			(h) =>
+			h =>
 				h.serve(Store, (_, self) => {
 					self.table(Edits);
 					// The factory takes 600 ms of the budget; the native after the migration never opens.
@@ -840,7 +834,7 @@ describe("eager migrations at activation (slice 6a §9)", () => {
 		const Edits = evolved(() => vi.advanceTimersByTime(10));
 		// Both types have empty params: the host activates both at load, the start barrier waiting for both.
 		const { host, errors } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Slow, (_, self) => {
 					self.open(hanging, () => {});
 					return { n: constant(1) };
@@ -863,12 +857,12 @@ describe("eager migrations at activation (slice 6a §9)", () => {
 		const store = await seeded(250);
 		let crash = true;
 		const patched: string[] = [];
-		const Edits = evolved((id) => {
+		const Edits = evolved(id => {
 			if (crash && id === "e150") throw new Error("crash");
 			patched.push(id);
 		});
 		const { host, errors } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Store, (_, self) => {
 					self.table(Edits);
 					return { n: constant(1) };
@@ -905,7 +899,7 @@ describe("parked attempts (dependency model §3)", () => {
 
 	it("run no timer while parked but parked_long's: no dependency deadline, no backoff, the factory run once", async () => {
 		const factories = vi.fn();
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(View, (_, self) => {
 				factories();
 				return { n: self.get(Missing, {}).n };
@@ -931,10 +925,10 @@ describe("parked attempts (dependency model §3)", () => {
 	it("pause the readyTimeout deadline while parked: the own steps get the budget left", async () => {
 		const Slow = local("app.slow", { version: 1, params: { id: int() }, members: { n: int() } });
 		const { host, errors } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Slow, (_, self) => {
 					self.open(
-						() => new Promise((resolve) => setTimeout(resolve, 5_000)),
+						() => new Promise(resolve => setTimeout(resolve, 5_000)),
 						() => {},
 					);
 					return { n: constant(1) };
@@ -963,7 +957,7 @@ describe("parked attempts (dependency model §3)", () => {
 		const Dependency = local("app.dependency", { version: 1, params: {}, members: { n: int() } });
 		const gate = Promise.withResolvers<void>();
 		let dependencySelf: Self | undefined;
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Dependency, (_, self) => {
 				dependencySelf = self;
 				return { n: constant(1) };

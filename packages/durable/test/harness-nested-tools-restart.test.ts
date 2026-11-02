@@ -62,20 +62,20 @@ async function sqlitePath(): Promise<string> {
 
 /** Open the SQLite Harness without starting scheduling. */
 function open(path: string, setup: ChatSetup) {
-	return openNodeSqliteStorage(path).then((storage) => openChat(storage, setup));
+	return openNodeSqliteStorage(path).then(storage => openChat(storage, setup));
 }
 
 async function nestedTasks(harness: Harness) {
-	const tasks = (await harness.commit((tx) => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
-	return tasks.filter((task) => (task.input as ToolTaskInput).kind === "nested");
+	const tasks = (await harness.commit(tx => tx.scanTasks({ kind: ToolTask.definition.name }, 100), context)).items;
+	return tasks.filter(task => (task.input as ToolTaskInput).kind === "nested");
 }
 
 function results(entries: Awaited<ReturnType<typeof allEntries>>): ToolResultMessage[] {
-	return entries.filter((entry) => ToolResultEntry.is(entry)).map((entry) => entry.model![0] as ToolResultMessage);
+	return entries.filter(entry => ToolResultEntry.is(entry)).map(entry => entry.model![0] as ToolResultMessage);
 }
 
 function codes(result: NestedToolExecutionResult | undefined): string[] {
-	return (result?.diagnostics ?? []).flatMap((diagnostic) => (diagnostic.code === undefined ? [] : [diagnostic.code]));
+	return (result?.diagnostics ?? []).flatMap(diagnostic => (diagnostic.code === undefined ? [] : [diagnostic.code]));
 }
 
 describe("nested tool calls across a restart", () => {
@@ -272,7 +272,7 @@ describe("nested tool calls across a restart", () => {
 		opened = await open(path, setup);
 		opened.harness.resume();
 		await eventually(async () => {
-			const inspected = (await opened.harness.inspect(context)).tasks.find((task) => task.record.id === worker);
+			const inspected = (await opened.harness.inspect(context)).tasks.find(task => task.record.id === worker);
 			return inspected?.state.kind === "blocked";
 		});
 		expect((await opened.harness.getTask(worker!, context))?.state.status).not.toBe("terminal");
@@ -488,13 +488,13 @@ describe("nested tool calls across a restart", () => {
 		opened = await open(path, setup);
 		let slotsAfterCaller: number | undefined;
 		opened.harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of publication.changes) {
 					if (change.type !== "task" || change.value.kind !== ToolTask.definition.name) continue;
 					if ((change.value.input as ToolTaskInput).kind !== "model" || change.value.state.status !== "terminal")
 						continue;
 					const live = publication.changes.find(
-						(each) => each.type === "document" && each.record.kind === "pi.live",
+						each => each.type === "document" && each.record.kind === "pi.live",
 					);
 					const value =
 						live?.type === "document" && live.kind === "change"
@@ -565,7 +565,7 @@ describe("nested tool calls across a restart", () => {
 			const runs: string[] = [];
 			addTool(
 				setup.registry,
-				tool("echo", async (args) => {
+				tool("echo", async args => {
 					runs.push(args.text ?? "");
 					return { output: [{ type: "text", text: `echo ${args.text}` }] };
 				}),
@@ -586,7 +586,7 @@ describe("nested tool calls across a restart", () => {
 							blocked.resolve();
 							await aborted(callContext.abortSignal!);
 						}
-						seen = [one, named].map((result) => result.structuredOutput as string);
+						seen = [one, named].map(result => result.structuredOutput as string);
 						return {};
 					},
 					{ replay: "safe" },
@@ -688,7 +688,7 @@ describe("nested tool calls across a restart", () => {
 			setup.registry,
 			tool("spawn", async (_args, api, callContext) => {
 				// A conversation the call owns, with background work in it, as a persistent subagent has.
-				background = await api.commit(async (tx) => {
+				background = await api.commit(async tx => {
 					const child = await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } });
 					return tx.createTask(Background, null, {
 						conversationId: child.id,

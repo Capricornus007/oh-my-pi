@@ -38,9 +38,9 @@ const AgentRegistry = defineDoc<{
 	initial: () => ({ agents: {} }),
 });
 
-const main = await session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
+const main = await session.commit(tx => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
 
-const setup = await session.commit(async (tx) => {
+const setup = await session.commit(async tx => {
 	// `background: true` means the task is side work: waiting for the main
 	// conversation to finish does not wait for it.
 	const supervisorId = await tx.createTask(Supervisor, null, {

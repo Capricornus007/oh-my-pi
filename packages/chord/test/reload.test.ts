@@ -17,12 +17,12 @@ import {
 	type StateOptions,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 const quiet = () => createHost({ self: { kind: "host" }, onError: () => {} });
 
 function latch() {
 	let open = () => {};
-	const promise = new Promise<void>((resolve) => {
+	const promise = new Promise<void>(resolve => {
 		open = resolve;
 	});
 	return { promise, open };
@@ -49,7 +49,7 @@ interface GreeterSpec {
 function greeterFacet(spec: GreeterSpec): Facet {
 	return {
 		name: "greeter",
-		setup: (api) =>
+		setup: api =>
 			api.serve(
 				Greeter,
 				(input, _principal, self) => {
@@ -63,7 +63,7 @@ function greeterFacet(spec: GreeterSpec): Facet {
 					return {
 						count,
 						greet: (name: string, ctx: Ctx) => {
-							count.change(ctx, (draft) => {
+							count.change(ctx, draft => {
 								const bump =
 									spec.bump ??
 									((d: Record<string, number>) => {
@@ -95,14 +95,14 @@ describe("reload", () => {
 		const ref = host.hold(Greeter, {});
 		assert.equal(await ref.greet("a"), "hello a");
 		const go = latch();
-		const pinned = host.root(async (ctx) => {
+		const pinned = host.root(async ctx => {
 			const first = await ref.greet("p", ctx);
 			await go.promise;
 			return [first, await ref.greet("p", ctx)];
 		});
 		await tick();
 		const shapes: string[] = [];
-		ref.onShape((shape) => shapes.push(shape.contract));
+		ref.onShape(shape => shapes.push(shape.contract));
 		const report = await host.reload([greeterFacet({ greeting: "hi" })]);
 		assert.deepEqual(report.gated, []);
 		assert.equal(report.prepared.length, 1);
@@ -122,13 +122,13 @@ describe("reload", () => {
 		const b = host.hold(Greeter, { id: "b" });
 		await Promise.all([a.ready, b.ready]);
 		let captured: Ctx | undefined;
-		await host.root((ctx) => {
+		await host.root(ctx => {
 			captured = ctx;
 		});
 
 		const writing = greeterFacet({
 			greeting: "hi",
-			extra: (self) => {
+			extra: self => {
 				const probe = self.state("probe", obj({}, { open: true }), {});
 				probe.replace(captured!, {});
 			},
@@ -151,7 +151,7 @@ describe("reload", () => {
 		await assert.rejects(
 			host.reload([failing]),
 			// A plain error from the new factory surfaces as `unavailable`; the message says the reload aborted.
-			(error) => isChordError(error, "unavailable") && /reload aborted.*b fails/.test(error.message),
+			error => isChordError(error, "unavailable") && /reload aborted.*b fails/.test(error.message),
 		);
 		assert.equal(host.codeVersion, codeVersion);
 		assert.deepEqual(log, ["open a", "close a"]);
@@ -169,7 +169,7 @@ describe("reload", () => {
 		});
 		await assert.rejects(
 			host.reload([changed]),
-			(error) =>
+			error =>
 				isChordError(error, "invalid") && error.reason === "state" && /without a version bump/.test(error.message),
 		);
 	});
@@ -181,10 +181,10 @@ describe("reload", () => {
 		await ref.greet("a");
 		await ref.greet("a");
 		const events: StateEvent<unknown>[] = [];
-		ref.count.events((event) => events.push(event));
+		ref.count.events(event => events.push(event));
 		const go = latch();
 		// Started before the reload, never touched the object: rejected after the commit.
-		const late = host.root(async (ctx) => {
+		const late = host.root(async ctx => {
 			await go.promise;
 			return ref.greet("late", ctx);
 		});
@@ -193,7 +193,7 @@ describe("reload", () => {
 			greeting: "hi",
 			schema: obj({ total: num() }, { open: true }),
 			initial: { total: 0 },
-			bump: (draft) => {
+			bump: draft => {
 				draft.total = (draft.total ?? 0) + 1;
 			},
 			state: {
@@ -211,7 +211,7 @@ describe("reload", () => {
 		assert.equal(await ref.greet("b"), "hi b");
 		assert.deepEqual(ref.count.value, { total: 3 });
 		go.open();
-		await assert.rejects(late, (error) => isChordError(error, "upgrade_conflict") && error.retryable);
+		await assert.rejects(late, error => isChordError(error, "upgrade_conflict") && error.retryable);
 	});
 
 	it("versions are per cell: a raised one migrates only that cell, a lowered one is refused", async () => {
@@ -224,7 +224,7 @@ describe("reload", () => {
 		const migrated: string[] = [];
 		const facet = (version: number): Facet => ({
 			name: "pair",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Pair, (_input, _principal, self) => {
 					const a = self.state("a", num(), 1);
 					const b = self.state("b", num(), 1, {
@@ -237,7 +237,7 @@ describe("reload", () => {
 					return {
 						a,
 						b,
-						bump: (ctx) => {
+						bump: ctx => {
 							a.replace(ctx, a.value + 1);
 						},
 					};
@@ -260,7 +260,7 @@ describe("reload", () => {
 		const ref = host.hold(Greeter, {});
 		await ref.ready;
 		const go = latch();
-		const grandfathered = host.root(async (ctx) => {
+		const grandfathered = host.root(async ctx => {
 			await ref.greet("g", ctx);
 			await go.promise;
 			return ref.greet("g", ctx);
@@ -287,11 +287,11 @@ describe("reload", () => {
 		const log: string[] = [];
 		const facet = (greeting: string, version: number): Facet => ({
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
-					self.task(async (ctx) => {
+					self.task(async ctx => {
 						log.push(`start ${greeting}`);
-						await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
+						await new Promise<void>(resolve => ctx.signal.addEventListener("abort", () => resolve()));
 						log.push(`stop ${greeting}`);
 					});
 					const count = self.state("count", num(), 0, { version });
@@ -302,12 +302,12 @@ describe("reload", () => {
 		const ref = host.hold(Greeter, {});
 		await ref.ready;
 		const go = latch();
-		const blocker = host.root(async (ctx) => {
+		const blocker = host.root(async ctx => {
 			await ref.greet("b", ctx);
 			await go.promise;
 		});
 		await tick();
-		await assert.rejects(host.reload([facet("hi", 2)], { gateDeadline: 30 }), (error) => {
+		await assert.rejects(host.reload([facet("hi", 2)], { gateDeadline: 30 }), error => {
 			assert.ok(isChordError(error, "aborted") && error.reason === "gate_deadline");
 			assert.match(error.message, /blocking roots: host#\w+:\d+/);
 			return true;
@@ -324,7 +324,7 @@ describe("reload", () => {
 		const log: string[] = [];
 		const facet = (rev: number): Facet => ({
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
 					const lock = self.resource("lock", {
 						version: rev,
@@ -362,7 +362,7 @@ describe("reload", () => {
 		await ref.ready;
 		const first = host.codeVersion;
 		const go = latch();
-		const pinned = host.root(async (ctx) => {
+		const pinned = host.root(async ctx => {
 			await ref.greet("p", ctx);
 			await go.promise;
 			return ref.greet("p", ctx);
@@ -372,10 +372,10 @@ describe("reload", () => {
 		assert.equal(host.previousCodeVersion, first);
 		await host.reload([greeterFacet({ greeting: "v3" })], { retireDeadline: 20 });
 		go.open();
-		await assert.rejects(pinned, (error) => isChordError(error, "superseded") && error.retryable);
+		await assert.rejects(pinned, error => isChordError(error, "superseded") && error.retryable);
 		await assert.rejects(
 			host.root(() => 1, { codeVersion: first }),
-			(error) => isChordError(error, "superseded"),
+			error => isChordError(error, "superseded"),
 		);
 		assert.equal(await ref.greet("n"), "v3 n");
 	});
@@ -386,7 +386,7 @@ describe("reload", () => {
 		const hold = latch();
 		const facet = (version: number): Facet => ({
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
 					const conn = self.resource("conn", {
 						version,
@@ -402,7 +402,7 @@ describe("reload", () => {
 								return `held on ${conn.value.version}, aborted ${ctx.signal.aborted}`;
 							}
 							if (name !== "wait") return name;
-							await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
+							await new Promise<void>(resolve => ctx.signal.addEventListener("abort", () => resolve()));
 							// Still open: the abort comes first, then the grace, then the close.
 							log.push(`aborted, conn ${conn.value.version}`);
 							return name;
@@ -413,11 +413,11 @@ describe("reload", () => {
 		host.install(facet(1));
 		const ref = host.hold(Greeter, {});
 		await ref.ready;
-		const old = host.root((ctx) => ref.greet("wait", ctx));
+		const old = host.root(ctx => ref.greet("wait", ctx));
 		await tick();
 		await host.reload([facet(2)]);
 		// A root of the code version that becomes the previous one: forced retirement of the older one leaves it alone.
-		const current = host.root((ctx) => ref.greet("hold", ctx));
+		const current = host.root(ctx => ref.greet("hold", ctx));
 		await tick();
 		await host.reload([facet(3)], { retireDeadline: 20 });
 		assert.equal(await old, "wait");
@@ -433,7 +433,7 @@ describe("reload", () => {
 		const log: string[] = [];
 		const facet = (label: string): Facet => ({
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
 					self.resource("conn", { version: 1, open: () => ({}), close: () => void log.push(`close by ${label}`) });
 					const count = self.state("count", CountV1, { n: 0 });
@@ -458,12 +458,12 @@ describe("reload", () => {
 			vi.useRealTimers();
 		});
 		const errors: unknown[] = [];
-		const host = createHost({ self: { kind: "host" }, onError: (error) => errors.push(error), taskStopDeadline: 30 });
+		const host = createHost({ self: { kind: "host" }, onError: error => errors.push(error), taskStopDeadline: 30 });
 		const log: string[] = [];
 		const stuck = latch();
 		const facet = (label: string): Facet => ({
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
 					self.task(async () => {
 						log.push(`start ${label}`);
@@ -485,7 +485,7 @@ describe("reload", () => {
 		await tick();
 		assert.deepEqual(log, ["start a", "start b"]);
 		assert.ok(
-			errors.some((error) => isChordError(error, "aborted") && /still running after 30 ms/.test(error.message)),
+			errors.some(error => isChordError(error, "aborted") && /still running after 30 ms/.test(error.message)),
 		);
 		stuck.open();
 	});
@@ -495,7 +495,7 @@ describe("reload", () => {
 		const signals = new Map<string, AbortSignal>();
 		const facet = (label: string, fail = false): Facet => ({
 			name: "greeter",
-			setup: (api) => {
+			setup: api => {
 				signals.set(label, api.signal);
 				api.serve(Greeter, (_input, _principal, self) => {
 					if (fail) throw new Error("broken");
@@ -504,7 +504,7 @@ describe("reload", () => {
 				});
 			},
 		});
-		const other: Facet = { name: "other", setup: (api) => void signals.set("other", api.signal) };
+		const other: Facet = { name: "other", setup: api => void signals.set("other", api.signal) };
 		host.install(facet("a"));
 		host.install(other);
 		await host.hold(Greeter, {}).ready;
@@ -542,27 +542,27 @@ describe("reload", () => {
 		const host = quiet();
 		host.install({
 			name: "doc",
-			setup: (api) => api.serve(DocV1, () => ({ variant: "main", read: () => ({ text: "v1" }) })),
+			setup: api => api.serve(DocV1, () => ({ variant: "main", read: () => ({ text: "v1" }) })),
 		});
 		const consumer = host.hold(DocV1, {});
 		assert.deepEqual(await consumer.read(), { text: "v1" });
 
 		const broken: Facet = {
 			name: "doc",
-			setup: (api) => api.serve(DocBroken, () => ({ variant: "main", read: () => ({ text: 1 }) })),
+			setup: api => api.serve(DocBroken, () => ({ variant: "main", read: () => ({ text: 1 }) })),
 		};
 		await assert.rejects(host.reload([broken]), /without a version bump/);
 
 		const fetch = () => ({ body: "v2" });
-		const v2: Facet = { name: "doc", setup: (api) => api.serve(DocV2, () => ({ variant: "main", fetch })) };
-		await assert.rejects(host.reload([v2]), (error) => isChordError(error, "contract_mismatch"));
+		const v2: Facet = { name: "doc", setup: api => api.serve(DocV2, () => ({ variant: "main", fetch })) };
+		await assert.rejects(host.reload([v2]), error => isChordError(error, "contract_mismatch"));
 
 		const adapted: Facet = {
 			name: "doc",
-			setup: (api) =>
+			setup: api =>
 				api.serve(DocV2, () => ({ variant: "main", fetch }), {
 					accepts: {
-						1: (current) => ({
+						1: current => ({
 							variant: "main",
 							read: () => ({ text: `${(current.fetch as typeof fetch)().body} via adapter` }),
 						}),
@@ -595,21 +595,21 @@ describe("reload", () => {
 		});
 		const facet = (factor: number): Facet => ({
 			name: "sum",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Sum, (_input, _principal, self) => {
 					const sum = self.state("sum", obj({ v: num() }, { open: true }), { v: 0 });
 					self.on(
 						"add",
 						events,
-						(source) => source,
+						source => source,
 						(value, ctx) =>
-							sum.change(ctx, (draft) => {
+							sum.change(ctx, draft => {
 								draft.v += value * factor;
 							}),
 					);
-					self.task(async (ctx) => {
+					self.task(async ctx => {
 						log.push(`start ${factor}`);
-						await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
+						await new Promise<void>(resolve => ctx.signal.addEventListener("abort", () => resolve()));
 						log.push(`stop ${factor}`);
 					});
 					return { sum };
@@ -635,7 +635,7 @@ describe("reload", () => {
 		const Router = local("t.router", { version: 1, input: obj({}, { open: true }) });
 		const facet = (value: string): Facet => ({
 			name: "router",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					Router,
 					(_input, _principal, self) => {
@@ -651,7 +651,7 @@ describe("reload", () => {
 		const seen: [string | undefined, number][] = [];
 		host.registry(Routes).subscribe((table, codeVersion) => seen.push([table.get("GET /"), codeVersion]));
 		const go = latch();
-		const pinned = host.root(async (ctx) => {
+		const pinned = host.root(async ctx => {
 			await go.promise;
 			return host.registry(Routes).get("GET /", ctx);
 		});
@@ -675,10 +675,10 @@ describe("reload", () => {
 			input: obj({}, { open: true }),
 			members: { now: method(undefined, num()) },
 		});
-		const clockFacet: Facet = { name: "clock", setup: (api) => api.serve(Clock, () => ({ now: () => 42 })) };
+		const clockFacet: Facet = { name: "clock", setup: api => api.serve(Clock, () => ({ now: () => 42 })) };
 		const consumer = (fail: boolean): Facet => ({
 			name: "greeter",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Greeter, (_input, _principal, self) => {
 					const clock = self.get(Clock, {});
 					const count = self.state("count", CountV1, { n: 0 });
@@ -703,12 +703,12 @@ describe("reload", () => {
 		const ref = host.hold(Greeter, {});
 		await ref.ready;
 		const go = latch();
-		const grandfathered = host.root(async (ctx) => {
+		const grandfathered = host.root(async ctx => {
 			await ref.greet("g", ctx);
 			await go.promise;
 		});
 		const later = latch();
-		const pinned = host.root(async (ctx) => {
+		const pinned = host.root(async ctx => {
 			await later.promise;
 			return ref.greet("old", ctx);
 		});
@@ -724,7 +724,7 @@ describe("reload", () => {
 		});
 		assert.throws(
 			() => host.hold(Greeter, { id: "late" }),
-			(error) => isChordError(error, "upgrade_conflict") && error.retryable,
+			error => isChordError(error, "upgrade_conflict") && error.retryable,
 		);
 		go.open();
 		await grandfathered;
@@ -733,6 +733,6 @@ describe("reload", () => {
 		// The previous code version is still retained (pinned root), but the gated object dropped its old implementation.
 		assert.notEqual(host.previousCodeVersion, undefined);
 		later.open();
-		await assert.rejects(pinned, (error) => isChordError(error, "upgrade_conflict"));
+		await assert.rejects(pinned, error => isChordError(error, "upgrade_conflict"));
 	});
 });

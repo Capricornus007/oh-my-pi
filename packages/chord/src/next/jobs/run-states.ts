@@ -190,7 +190,7 @@ export class RunStates implements DocumentSlot, PersistedSlot {
 		const created = { id: 0 };
 		const base = { version, fingerprint, value };
 		writes().push(
-			createDocument(persistence.at(id), base, JSON.stringify(value), (stored) => {
+			createDocument(persistence.at(id), base, JSON.stringify(value), stored => {
 				created.id = stored;
 			}),
 		);

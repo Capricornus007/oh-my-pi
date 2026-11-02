@@ -223,7 +223,7 @@ export class Coercer {
 
 	/** An enum is a union of its values: a member stays, else the first value the input converts to. */
 	private convertEnum(node: SchemaObject, values: readonly unknown[], base: string, value: unknown): unknown {
-		if (values.some((member) => member === value)) return value;
+		if (values.some(member => member === value)) return value;
 		for (const member of values) {
 			const candidate = convertLiteral(member, value);
 			if (candidate !== value && this.passes(node, base, candidate) === true) return candidate;
@@ -238,7 +238,7 @@ export class Coercer {
 	 * checked, so a branch is not discarded for a sibling property that is converted after it.
 	 */
 	private convertUnion(node: SchemaObject, branches: readonly unknown[], base: string, value: unknown): unknown {
-		if (branches.some((branch) => this.passes(branch, base, value) === true))
+		if (branches.some(branch => this.passes(branch, base, value) === true))
 			return this.convertMembers(node, base, value);
 		for (const branch of branches) {
 			const candidate = this.convertMembers(node, base, this.convert(branch, base, value));
@@ -272,7 +272,7 @@ export class Coercer {
 			});
 		}
 		if (Array.isArray(value)) {
-			return node.items === undefined ? value : mapItems(value, (item) => this.convert(node.items, base, item));
+			return node.items === undefined ? value : mapItems(value, item => this.convert(node.items, base, item));
 		}
 		// The wrapped single value is converted by the item schema with the same value: a re-entry point.
 		const item = node.items;
@@ -319,7 +319,7 @@ export class Coercer {
 		if (Array.isArray(schema.anyOf)) next = this.coerceUnion(next, schema.anyOf, b);
 		if (Array.isArray(schema.oneOf)) next = this.coerceUnion(next, schema.oneOf, b);
 		const types = typesOf(schema);
-		const matchesUnionMember = types.length > 1 && types.some((type) => matchesType(next, type));
+		const matchesUnionMember = types.length > 1 && types.some(type => matchesType(next, type));
 		if (types.length > 0 && !matchesUnionMember) {
 			for (const type of types) {
 				const candidate = coercePrimitive(next, type);

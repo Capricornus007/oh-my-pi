@@ -74,13 +74,13 @@ async function direct(setup: ChatSetup, name: string): Promise<ToolResultMessage
 	setup.faux.setResponses([call(name), DONE]);
 	const { harness, root } = await openChat(new MemoryStorage(), setup);
 	await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-	const entry = (await allEntries(root)).find((candidate) => ToolResultEntry.is(candidate))!;
+	const entry = (await allEntries(root)).find(candidate => ToolResultEntry.is(candidate))!;
 	await harness.close(context);
 	return entry.model![0] as ToolResultMessage;
 }
 
 function codes(result: { readonly diagnostics?: readonly { readonly code?: string }[] }): (string | undefined)[] {
-	return (result.diagnostics ?? []).map((diagnostic) => diagnostic.code);
+	return (result.diagnostics ?? []).map(diagnostic => diagnostic.code);
 }
 
 describe("structured output", () => {
@@ -153,7 +153,7 @@ describe("structured output", () => {
 		// The result each nested call's document got, as committed.
 		const stored: JsonValue[] = [];
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of publication.changes) {
 					if (
 						change.type !== "document" ||
@@ -214,7 +214,7 @@ describe("structured output", () => {
 			const stored = await direct(modelSetup, name);
 			expect(stored.isError).toBe(false);
 			expect(JSON.stringify(stored.content)).not.toContain(message);
-			expect(modelSetup.reports.map((error) => (error as Error).message).join("\n")).toContain(message);
+			expect(modelSetup.reports.map(error => (error as Error).message).join("\n")).toContain(message);
 		}
 	});
 

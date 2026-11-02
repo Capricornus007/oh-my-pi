@@ -54,7 +54,7 @@ export class Submissions {
 		this.#now = now;
 		this.#queueModes = queueModes;
 		this.#resume = resume;
-		session.followCommits((publication) => this.#observe(publication));
+		session.followCommits(publication => this.#observe(publication));
 		session.subscribeClose(() => {
 			this.#closed = true;
 			this.#waiters.rejectAll(closedError(this.#session));
@@ -63,9 +63,9 @@ export class Submissions {
 
 	/** Admit a submission in one commit; see `admitSubmission()`. */
 	async submit(conversationId: ConversationId, draft: SubmissionDraft, context: Context): Promise<Submission> {
-		const { id } = await this.#traced(conversationId, draft, context, (span) =>
+		const { id } = await this.#traced(conversationId, draft, context, span =>
 			this.#session.commitWith(
-				(tx) => admitSubmission(tx, conversationId, draft, this.#now(), this.#queueModes(), span),
+				tx => admitSubmission(tx, conversationId, draft, this.#now(), this.#queueModes(), span),
 				withTelemetry(span, context),
 			),
 		);
@@ -80,7 +80,7 @@ export class Submissions {
 		if (!this.#session.ownsTransaction(tx)) throw new Error("The transaction belongs to another Session");
 		// Enforced on every path: admission reads tables only on some (request IDs, an idle boundary, a steer's trace).
 		if (tx.hasTableWrite) throw new ReadAfterWrite("submit(tx, draft)");
-		const admission = await this.#traced(conversationId, draft, tx.context, (span) =>
+		const admission = await this.#traced(conversationId, draft, tx.context, span =>
 			admitSubmission(tx, conversationId, draft, this.#now(), this.#queueModes(), span),
 		);
 		return admission.id;
@@ -103,7 +103,7 @@ export class Submissions {
 				"submission.type": draft.type,
 				"conversation.id": conversationId,
 			},
-			async (span) => {
+			async span => {
 				if (startsRun) span.addLink({ context: context.telemetry });
 				try {
 					const admission = await admit(span);
@@ -120,12 +120,12 @@ export class Submissions {
 
 	/** Handle for an existing submission, or `undefined`. */
 	async get(id: SubmissionId, context: Context): Promise<Submission | undefined> {
-		const record = await this.#session.readOnLine((storage) => storage.submission(id, context));
+		const record = await this.#session.readOnLine(storage => storage.submission(id, context));
 		return record === undefined ? undefined : new SubmissionHandle(record.id, this);
 	}
 
 	async status(id: SubmissionId, context: Context): Promise<SubmissionRecord> {
-		const record = await this.#session.readOnLine((storage) => storage.submission(id, context));
+		const record = await this.#session.readOnLine(storage => storage.submission(id, context));
 		if (record === undefined) throw new Error(`Submission ${id} does not exist`);
 		return record;
 	}
@@ -133,7 +133,7 @@ export class Submissions {
 	async wait(id: SubmissionId, context: Context): Promise<SettledSubmissionRecord> {
 		this.#resume();
 		// Check and register on the line so no settling publication falls between them.
-		const found = await this.#session.readOnLine(async (storage) => {
+		const found = await this.#session.readOnLine(async storage => {
 			const record = await storage.submission(id, context);
 			if (record === undefined) throw new Error(`Submission ${id} does not exist`);
 			if (isSettled(record)) return { promise: Promise.resolve(record) };
@@ -146,7 +146,7 @@ export class Submissions {
 
 	/** Withdraw a queued submission and remove its inbox item; placed inputs and settled submissions are reported. */
 	abort(id: SubmissionId, context: Context, conversationId?: ConversationId): Promise<AbortResult | "not_found"> {
-		return this.#session.commitWith(async (tx) => {
+		return this.#session.commitWith(async tx => {
 			const record = await tx.submission(id);
 			if (record === undefined || (conversationId !== undefined && record.conversationId !== conversationId)) {
 				return "not_found";

@@ -29,11 +29,11 @@ describe("a worker process", () => {
 				execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
 				onOutput: (stream, chunk) => output.push(`${stream}: ${Buffer.from(chunk).toString().trim()}`),
 			},
-			{ control: (message) => control.push(message), linkLost: () => {}, linkClosed: () => {}, exited: () => {} },
+			{ control: message => control.push(message), linkLost: () => {}, linkClosed: () => {}, exited: () => {} },
 		);
 		await until(() => control.length > 0 && output.length >= 2);
 		const frames: number[][] = [];
-		child.link.onMessage((message) => frames.push([...message]));
+		child.link.onMessage(message => frames.push([...message]));
 		expect(frames).toEqual([[1, 2, 3]]);
 		expect(control).toEqual([{ kind: "started" }]);
 		expect(child.stderrTail).toBe("an error line\n");

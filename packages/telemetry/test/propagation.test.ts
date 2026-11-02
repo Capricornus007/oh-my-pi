@@ -15,7 +15,7 @@ describe("propagation and links", () => {
 	it("continues a parent in another Node process without shared recorder state", async () => {
 		const telemetry = new InMemoryTelemetryContext();
 		let carrier: TelemetryCarrier | undefined;
-		await telemetry.startSpan({ name: "caller" }, (span) => {
+		await telemetry.startSpan({ name: "caller" }, span => {
 			carrier = telemetry.inject(span);
 		});
 		const output = execFileSync(
@@ -35,17 +35,17 @@ describe("propagation and links", () => {
 		const provider = new InMemoryTelemetryContext();
 		let activation: TelemetrySpan | undefined;
 		let finishActivation: (() => void) | undefined;
-		const gate = new Promise<void>((resolve) => {
+		const gate = new Promise<void>(resolve => {
 			finishActivation = resolve;
 		});
 		let shared: Promise<void> | undefined;
 		await Promise.all(
-			["first", "later"].map((name) =>
-				caller.startSpan({ name }, async (trigger) => {
+			["first", "later"].map(name =>
+				caller.startSpan({ name }, async trigger => {
 					const parent = provider.extract(caller.inject(trigger));
-					await parent.startSpan({ name: `${name}.method` }, async (getter) => {
+					await parent.startSpan({ name: `${name}.method` }, async getter => {
 						if (!shared)
-							shared = provider.startSpan({ name: "activation", links: [{ context: getter }] }, async (span) => {
+							shared = provider.startSpan({ name: "activation", links: [{ context: getter }] }, async span => {
 								activation = span;
 								await gate;
 							});
@@ -57,10 +57,10 @@ describe("propagation and links", () => {
 			),
 		);
 		const spans = provider.getSpans();
-		const root = spans.find((span) => span.name === "activation");
+		const root = spans.find(span => span.name === "activation");
 		expect(root?.parentContext).toBeNull();
-		const first = spans.find((span) => span.name === "first.method");
-		const later = spans.find((span) => span.name === "later.method");
+		const first = spans.find(span => span.name === "first.method");
+		const later = spans.find(span => span.name === "later.method");
 		expect(first?.parentContext).toEqual(caller.getSpans()[0]?.context);
 		expect(later?.parentContext).toEqual(caller.getSpans()[1]?.context);
 		expect(root?.links[0]?.context).toEqual(first?.context);
@@ -70,7 +70,7 @@ describe("propagation and links", () => {
 	it("detaches carrier and link snapshots and retains settled target identities", async () => {
 		const telemetry = new InMemoryTelemetryContext();
 		let target: TelemetrySpan | undefined;
-		await telemetry.startSpan({ name: "target" }, (span) => {
+		await telemetry.startSpan({ name: "target" }, span => {
 			target = span;
 		});
 		if (!target) throw new Error("Expected target");
@@ -95,13 +95,13 @@ describe("propagation and links", () => {
 		const sender = new InMemoryTelemetryContext();
 		const receiver = new InMemoryTelemetryContext();
 		let carrier: TelemetryCarrier | undefined;
-		await sender.startSpan({ name: "trigger" }, (span) => {
+		await sender.startSpan({ name: "trigger" }, span => {
 			carrier = sender.inject(span);
 		});
 		const target = receiver.extract(JSON.parse(JSON.stringify(carrier)) as TelemetryCarrier);
 		await receiver.startSpan(
 			{ name: "background", links: [{ context: target, attributes: { reason: "restart" } }] },
-			(span) => {
+			span => {
 				span.addLink({ context: target });
 			},
 		);
@@ -121,7 +121,7 @@ describe("propagation and links", () => {
 		}
 		expect(NOOP_TELEMETRY_PROPAGATION.inject(NOOP_TELEMETRY_CONTEXT)).toBeUndefined();
 		expect(NOOP_TELEMETRY_PROPAGATION.extract({ unknown: "format" })).toBe(NOOP_TELEMETRY_CONTEXT);
-		await NOOP_TELEMETRY_CONTEXT.startSpan({ name: "noop" }, (span) => {
+		await NOOP_TELEMETRY_CONTEXT.startSpan({ name: "noop" }, span => {
 			span.addLink({ context: span });
 		});
 	});

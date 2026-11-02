@@ -39,7 +39,7 @@ export class Batch {
 
 	constructor(report: (error: BatchError) => void, metrics: TelemetryMetrics | undefined) {
 		this.#report = report;
-		this.reportListener = (error) => report({ kind: "listener_error", error });
+		this.reportListener = error => report({ kind: "listener_error", error });
 		this.#metrics = metrics;
 	}
 

@@ -112,7 +112,7 @@ function loopback(hostname: string): boolean {
  * assume `web`, which rejects http loopback redirect URIs. Loopback hosts and custom schemes are native (RFC 8252).
  */
 function applicationType(redirectUris: readonly string[]): "native" | "web" {
-	const native = redirectUris.some((uri) => {
+	const native = redirectUris.some(uri => {
 		if (!URL.canParse(uri)) return false;
 		const url = new URL(uri);
 		return (url.protocol !== "http:" && url.protocol !== "https:") || loopback(url.hostname);
@@ -316,7 +316,7 @@ function withScope(tokens: OAuthTokens, scope: string | undefined): OAuthTokens 
  */
 export function stepUpScope(granted: string | undefined, challenged: string | undefined): string | undefined {
 	if (!challenged) return undefined;
-	const scopes = [granted, challenged].flatMap((scope) => scope?.split(/\s+/).filter(Boolean) ?? []);
+	const scopes = [granted, challenged].flatMap(scope => scope?.split(/\s+/).filter(Boolean) ?? []);
 	return [...new Set(scopes)].join(" ");
 }
 
@@ -464,7 +464,7 @@ export function adaptOAuthProvider(provider: OAuthClientProvider): AuthProvider 
 				if (current !== undefined && current !== context.token) return;
 			}
 			inFlight ??= Promise.resolve(insufficientScope ? provider.tokens() : undefined)
-				.then((granted) =>
+				.then(granted =>
 					authorizeMcp(provider, {
 						serverUrl: context.serverUrl,
 						resourceMetadataUrl: challenge.resourceMetadataUrl,
@@ -473,7 +473,7 @@ export function adaptOAuthProvider(provider: OAuthClientProvider): AuthProvider 
 						skipRefresh: insufficientScope,
 					}),
 				)
-				.then((result) => {
+				.then(result => {
 					if (result === "REDIRECT") throw new McpOAuthAuthorizationRequiredError();
 				})
 				.finally(() => {

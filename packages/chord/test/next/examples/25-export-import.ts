@@ -44,20 +44,20 @@ const Site = local("example.site", {
 	},
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Site, (_, self) => {
 		const visits = self.table(Visits);
 		const title = self.state(Title);
 		return {
 			title,
 			visit: async (page, ctx) =>
-				self.tx(async (tx) => {
+				self.tx(async tx => {
 					const count = ((await tx.get(visits, { page }))?.count ?? 0) + 1;
 					tx.put(visits, { page, count });
 					return count;
 				}, ctx),
 			rename: async (text, ctx) => {
-				await title.change((draft) => {
+				await title.change(draft => {
 					draft.text = text;
 				}, ctx);
 				return null;
@@ -68,7 +68,7 @@ const facet = defineFacet((host) => {
 
 /** A host on `store` serving the site, run until `work` is done. */
 async function serve(store: Store, work: (site: Reference<typeof Site>) => Promise<void>) {
-	const host = createHost({ store, onError: (error) => console.error("background error:", error) });
+	const host = createHost({ store, onError: error => console.error("background error:", error) });
 	await host.load([{ name: "@example/site", facet }], context);
 	await work(await host.get(Site, {}, context));
 	await host.close(context);
@@ -77,7 +77,7 @@ async function serve(store: Store, work: (site: Reference<typeof Site>) => Promi
 const directory = await mkdtemp(join(tmpdir(), "chord-example-"));
 try {
 	const original = await openStore(sqliteBackend(await openNodeSqliteDatabase(join(directory, "a.db"))), context);
-	await serve(original, async (site) => {
+	await serve(original, async site => {
 		await site.rename("Chord", context);
 		await site.visit("/", context);
 		await site.visit("/", context);
@@ -93,7 +93,7 @@ try {
 	const parts = decodeJsonl(createReadStream(archive));
 	const copy = await importStore(sqliteBackend(await openNodeSqliteDatabase(join(directory, "b.db"))), parts, context);
 	console.log("imported at seq", copy.lastSeq);
-	await serve(copy, async (site) => {
+	await serve(copy, async site => {
 		console.log("title:", site.title.value.text, "- next visit of /:", await site.visit("/", context));
 	});
 	await copy.close(context);

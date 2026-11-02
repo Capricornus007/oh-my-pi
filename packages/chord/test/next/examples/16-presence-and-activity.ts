@@ -27,15 +27,15 @@ const Doc = remote("example.doc", {
 
 // 1. The server serves `Doc`; its factory derives the viewer count from `host.references(Doc)` (on the facet's host).
 const server = createHost<P>({ address: Server(), principal: { kind: "server" }, onError: console.error });
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(
 		Doc,
 		({ id }, _principal, self) => ({
 			variant: "v",
 			members: {
-				viewers: self.derive([host.references(Doc)], ([refs]) => refs.filter((ref) => ref.params.id === id).length),
-				think: async (ctx) => {
-					await new Promise((resolve) => setTimeout(resolve, 20));
+				viewers: self.derive([host.references(Doc)], ([refs]) => refs.filter(ref => ref.params.id === id).length),
+				think: async ctx => {
+					await new Promise(resolve => setTimeout(resolve, 20));
 					return ctx.principal?.kind === "user" ? 42 : 0;
 				},
 			},
@@ -47,7 +47,7 @@ await server.load([{ name: "@example/doc", facet }], context);
 
 // 2. The supervisor's view: every publication of the counts.
 const activity = await server.activity.watch(context);
-activity.start(async (call) => {
+activity.start(async call => {
 	if (call.kind === "value") console.log("  activity:", JSON.stringify(call.value));
 });
 
@@ -67,7 +67,7 @@ const [ada1, ada2, bob] = await Promise.all([tab("ada"), tab("ada"), tab("bob")]
 const doc = await ada1.host.get(Doc, { id: "d1" }, context);
 await ada2.host.get(Doc, { id: "d1" }, context);
 await bob.host.get(Doc, { id: "d1" }, context);
-await new Promise((resolve) => setTimeout(resolve, 5));
+await new Promise(resolve => setTimeout(resolve, 5));
 console.log("viewers seen by ada:", doc.viewers.value);
 const present = server
 	.references(Doc)
@@ -81,13 +81,13 @@ await doc.think(context);
 
 // 5. Bob's link drops: a departure, at once. Bob's own `Doc` object (identities include the principal) lingers.
 bob.link.close();
-await new Promise((resolve) => setTimeout(resolve, 5));
+await new Promise(resolve => setTimeout(resolve, 5));
 console.log("viewers after bob's link dropped:", doc.viewers.value);
 
 // 6. Ada closes both tabs: the object lingers (50 ms) with no references, then ends; then everything is zero.
 await ada1.host.close(context);
 await ada2.host.close(context);
-await new Promise((resolve) => setTimeout(resolve, 100));
+await new Promise(resolve => setTimeout(resolve, 100));
 console.log("references at the end:", server.references(Doc).value.length);
 await activity.stop();
 await server.close(context);

@@ -11,7 +11,7 @@ import { createPlugins } from "../../../../src/next-node/plugins/index.ts";
 import { createWorkers } from "../../../../src/next-node/workers/index.ts";
 import { Process, Session } from "./plugins/sessions/contract.ts";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const plugins = createPlugins(
 	{
@@ -30,11 +30,11 @@ const workers = createWorkers(
 		entry: fileURLToPath(new URL("./worker.ts", import.meta.url)),
 		execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
 		authorize: () => true,
-		principal: (address) => ({ kind: "worker", session: address.params.id }),
+		principal: address => ({ kind: "worker", session: address.params.id }),
 		start: () => ({}),
-		lock: (address) => `example-42:${process.pid}:${address.key}`,
+		lock: address => `example-42:${process.pid}:${address.key}`,
 		plugins,
-		onError: (error) => console.log(`   reported: ${error.kind}`),
+		onError: error => console.log(`   reported: ${error.kind}`),
 	},
 	context,
 );

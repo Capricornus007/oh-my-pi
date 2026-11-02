@@ -26,13 +26,13 @@ const EditsV1 = defineTable("edits", {
 	key: ["id"],
 	indexes: { by_file: ["file"] },
 });
-const EditsV2 = evolveTable(EditsV1, (t) =>
+const EditsV2 = evolveTable(EditsV1, t =>
 	t
 		.rename("file", "path")
 		.add("dir", str({ default: "" }))
-		.rows((row) => ({ dir: row.path.slice(0, row.path.lastIndexOf("/")) })),
+		.rows(row => ({ dir: row.path.slice(0, row.path.lastIndexOf("/")) })),
 );
-const EditsV3 = evolveTable(EditsV2, (t) => t.drop("dir").index("by_path", ["path", "at"]));
+const EditsV3 = evolveTable(EditsV2, t => t.drop("dir").index("by_path", ["path", "at"]));
 
 let store: ChordStore;
 afterEach(async () => {
@@ -150,7 +150,7 @@ describe("eager migrations", () => {
 
 	it("a dropped column's indexes are dropped first, in the same commit", async () => {
 		await filled(2);
-		const Dropped = evolveTable(EditsV1, (t) => t.drop("file"));
+		const Dropped = evolveTable(EditsV1, t => t.drop("file"));
 		const seq = store.lastSeq;
 		const edits = await prepared(Dropped);
 		const [commit] = await store.outbox!.read(seq, 10, context);
@@ -167,7 +167,7 @@ describe("eager migrations", () => {
 
 	it("an update step is one updateWhere over the rows below its version, stamping it, with ready", async () => {
 		await filled(5);
-		const Bumped = evolveTable(EditsV1, (t) => t.update({ where: (e) => lt(e.at, 3), set: { file: "old" } }));
+		const Bumped = evolveTable(EditsV1, t => t.update({ where: e => lt(e.at, 3), set: { file: "old" } }));
 		const seq = store.lastSeq;
 		const edits = await prepared(Bumped);
 		const commits = await store.outbox!.read(seq, 10, context);
@@ -176,7 +176,7 @@ describe("eager migrations", () => {
 			["updateWhere", "table"],
 		]);
 		expect(commits[1]!.writes[0]).toMatchObject({ kind: "updateWhere", count: 3, version: 2, set: { file: "old" } });
-		expect((await all(edits, Bumped)).map((row) => (row as { file: string }).file)).toEqual([
+		expect((await all(edits, Bumped)).map(row => (row as { file: string }).file)).toEqual([
 			"old",
 			"old",
 			"old",
@@ -191,10 +191,10 @@ describe("eager migrations", () => {
 			columns: { id: str(), meta: opt(json(obj({ a: int() }), { version: 1 })) },
 			key: ["id"],
 		});
-		const Notes2 = evolveTable(Notes1, (t) =>
+		const Notes2 = evolveTable(Notes1, t =>
 			t.json(
 				"meta",
-				json(obj({ a: int(), b: int() }), { version: 2, migrate: (old) => ({ ...(old as { a: number }), b: 0 }) }),
+				json(obj({ a: int(), b: int() }), { version: 2, migrate: old => ({ ...(old as { a: number }), b: 0 }) }),
 			),
 		);
 		store = await memoryStore({ outbox: true });
@@ -276,7 +276,7 @@ describe("patches", () => {
 			columns: { id: str(), data: json(nul(), { version: 1 }), note: opt(str()) },
 			key: ["id"],
 		});
-		const Cells2 = evolveTable(Cells1, (t) =>
+		const Cells2 = evolveTable(Cells1, t =>
 			t.add("more", opt(json(nul(), { version: 1 }))).rows(() => ({ more: null, note: undefined })),
 		);
 		store = await memoryStore();
@@ -293,8 +293,8 @@ describe("resumption", () => {
 	it("a data step that throws leaves the table migrating with its committed chunks; the next run continues", async () => {
 		await filled(250);
 		let fail = true;
-		const Failing = evolveTable(EditsV1, (t) =>
-			t.rows((row) => {
+		const Failing = evolveTable(EditsV1, t =>
+			t.rows(row => {
 				if (fail && row.id === id(150)) throw new Error("crash");
 				return { file: `${row.file}!` };
 			}),
@@ -305,9 +305,9 @@ describe("resumption", () => {
 		fail = false;
 		const edits = await prepared(Failing);
 		expect(await commitsAfter(seq)).toEqual([["update x100"], ["update x50", "table"]]);
-		const files = (await all(edits, Failing)).map((row) => (row as { file: string }).file);
+		const files = (await all(edits, Failing)).map(row => (row as { file: string }).file);
 		// Every row patched once: the first chunk's rows were skipped on the second run.
-		expect(files.every((file) => file.endsWith("!") && !file.endsWith("!!"))).toBe(true);
+		expect(files.every(file => file.endsWith("!") && !file.endsWith("!!"))).toBe(true);
 		expect(store.table(TABLE)).toMatchObject({ version: 2, state: "ready" });
 	});
 
@@ -331,7 +331,7 @@ describe("refusals", () => {
 		],
 		[
 			"a history edited in place",
-			async () => prepared(evolveTable(EditsV1, (t) => t.rename("file", "name"))),
+			async () => prepared(evolveTable(EditsV1, t => t.rename("file", "name"))),
 			"recorded with another definition",
 		],
 	])("%s (the store at version 2) throws before anything is written", async (_, prepare, message) => {

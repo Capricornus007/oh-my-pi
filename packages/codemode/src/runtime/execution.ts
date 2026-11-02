@@ -154,7 +154,7 @@ function checkGlobals(globals: readonly CodemodeDeclaredGlobal[]): void {
 	const namespaces = new Set<string>();
 	for (const global of globals) {
 		const parts = global.name.split(".");
-		if (parts.length > 2 || !parts.every((part) => IDENTIFIER.test(part)) || RESERVED_GLOBALS.has(parts[0])) {
+		if (parts.length > 2 || !parts.every(part => IDENTIFIER.test(part)) || RESERVED_GLOBALS.has(parts[0])) {
 			throw new Error(`Invalid global name "${global.name}"`);
 		}
 		if (names.has(global.name)) throw new Error(`Global "${global.name}" is already registered`);
@@ -204,7 +204,7 @@ class Execution {
 	finished = false;
 
 	constructor(options: ExecutionOptions) {
-		this.promise = new Promise<CodemodeResult>((resolve) => {
+		this.promise = new Promise<CodemodeResult>(resolve => {
 			this.resolveResult = resolve;
 		});
 		this.executors = options.executors;
@@ -228,22 +228,22 @@ class Execution {
 
 		const data: VmStartData = {
 			code: options.code,
-			tools: options.tools.map((tool) => ({
+			tools: options.tools.map(tool => ({
 				name: tool.name,
 				jsName: tool.jsName ?? toCodemodeIdentifier(tool.name),
 				description: tool.description ?? "",
 			})),
-			globals: options.globals.map((global) => ({ name: global.name, spread: global.spread === true })),
+			globals: options.globals.map(global => ({ name: global.name, spread: global.spread === true })),
 			memoryLimitBytes: options.memoryLimitBytes,
 			store: options.store,
 			...(options.deterministic ? { deterministic: options.deterministic } : {}),
 		};
 		const events: VmEvents = {
-			message: (message) => this.receive(message),
-			failure: (error) => this.finish(error),
+			message: message => this.receive(message),
+			failure: error => this.finish(error),
 		};
-		new Promise<VmChannel>((resolve) => resolve(options.launch(data, events))).then(
-			(channel) => {
+		new Promise<VmChannel>(resolve => resolve(options.launch(data, events))).then(
+			channel => {
 				if (this.finished) {
 					void channel.stop().catch(() => undefined);
 					return;
@@ -536,8 +536,8 @@ export class CodemodeSandboxBase {
 			throw new Error("seed must be a 32-bit unsigned integer");
 		}
 		const tools = options.tools ?? [];
-		if (new Set(tools.map((tool) => tool.name)).size !== tools.length) throw new Error("Tool names must be unique");
-		const scriptNames = tools.map((tool) => tool.jsName ?? toCodemodeIdentifier(tool.name));
+		if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error("Tool names must be unique");
+		const scriptNames = tools.map(tool => tool.jsName ?? toCodemodeIdentifier(tool.name));
 		if (new Set(scriptNames).size !== tools.length) throw new Error("Tool script names must be unique");
 		const globals = options.globals ?? [];
 		checkGlobals(globals);
@@ -568,6 +568,6 @@ export class CodemodeSandboxBase {
 	/** Aborts in-flight executions (they resolve with `kind: "aborted"`) and rejects new ones. */
 	async close(): Promise<void> {
 		this.closed = true;
-		await Promise.all([...this.running].map((execution) => execution.abort("Sandbox closed")));
+		await Promise.all([...this.running].map(execution => execution.abort("Sandbox closed")));
 	}
 }

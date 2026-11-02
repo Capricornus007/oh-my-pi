@@ -16,7 +16,7 @@ workerMain(
 	},
 	{
 		hostPackages: { "@earendil-works/chord/next": chordNext },
-		redact: (error) => ({ message: String(error) }),
+		redact: error => ({ message: String(error) }),
 		onError: console.error,
 	},
 );

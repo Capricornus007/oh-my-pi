@@ -141,14 +141,14 @@ export const EditsV1 = defineTable("fixture.switch.edits", {
 	key: ["id"],
 });
 
-export const EditsV2 = evolveTable(EditsV1, (t) =>
+export const EditsV2 = evolveTable(EditsV1, t =>
 	t
 		.rename("file", "path")
 		.add("dir", str({ default: "" }))
-		.rows((row) => ({ dir: row.path.slice(0, row.path.lastIndexOf("/")) })),
+		.rows(row => ({ dir: row.path.slice(0, row.path.lastIndexOf("/")) })),
 );
 
-export const EditsV3 = evolveTable(EditsV2, (t) => t.drop("dir").index("by_path", ["path", "at"]));
+export const EditsV3 = evolveTable(EditsV2, t => t.drop("dir").index("by_path", ["path", "at"]));
 
 /** A persisted job with a state document. */
 export const ImportState = defineState("fixture.switch.import.state", {

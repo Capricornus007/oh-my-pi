@@ -9,11 +9,11 @@ const generation = "v1";
 const Cache = local("example.cache", { version: 1, params: { generation: str() }, members: { generation: str() } });
 const Status = local("example.status", { version: 1, params: {}, members: { text: str() } });
 
-export default defineFacet((host) => {
+export default defineFacet(host => {
 	host.serve(Cache, (params, self) => {
 		self.open(
 			async () => {
-				await new Promise((resolve) => setTimeout(resolve, 200));
+				await new Promise(resolve => setTimeout(resolve, 200));
 				return {};
 			},
 			() => {},

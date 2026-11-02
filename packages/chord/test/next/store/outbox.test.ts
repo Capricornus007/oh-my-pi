@@ -108,7 +108,7 @@ describe("the outbox", () => {
 		const store = (await openStore(sqliteBackend(db), context, { outbox: true })) as ChordStore;
 		await created(store);
 		// The trim's DELETE committed; its transaction has not returned (the floor in memory is still 0).
-		db.transaction = async (fn) => {
+		db.transaction = async fn => {
 			const result = await transaction(fn);
 			entered.resolve();
 			await gate.promise;

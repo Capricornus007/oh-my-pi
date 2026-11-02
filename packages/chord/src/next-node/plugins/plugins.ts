@@ -148,13 +148,13 @@ class PluginsComponent implements Plugins {
 	constructor(options: PluginsOptions) {
 		this.#options = options;
 		this.#runtime = createPluginRuntime();
-		const batch = new Batch((error) => options.onError(error), undefined);
+		const batch = new Batch(error => options.onError(error), undefined);
 		this.#watcher = new PluginWatcher(
 			{
 				roots: options.roots,
 				base: options.base ?? [],
 				kinds: Object.keys(options.kinds),
-				failed: (error) => options.onError({ kind: "watch_failed", error }),
+				failed: error => options.onError({ kind: "watch_failed", error }),
 			},
 			batch,
 		);
@@ -173,13 +173,13 @@ class PluginsComponent implements Plugins {
 		const before = new Set(this.#discovery.plugins.map(({ name }) => name));
 		if (!this.#discovered || this.#watcher.needsDiscovery) await this.#discover(context);
 		const now = this.#discovery.plugins;
-		const removed = [...before].filter((name) => !now.some((plugin) => plugin.name === name));
+		const removed = [...before].filter(name => !now.some(plugin => plugin.name === name));
 		const wanted = now.filter(({ name }) => names.includes(name) || !before.has(name));
 		const snapshot = this.#watcher.snapshot([...wanted.map(({ name }) => name), ...removed]);
 		const facets = await Promise.all(
-			wanted.flatMap((plugin) => Object.keys(plugin.facets).map((kind) => this.#buildOne(plugin, kind, context))),
+			wanted.flatMap(plugin => Object.keys(plugin.facets).map(kind => this.#buildOne(plugin, kind, context))),
 		);
-		const plugins = Object.fromEntries(wanted.map((plugin) => [plugin.name, plugin]));
+		const plugins = Object.fromEntries(wanted.map(plugin => [plugin.name, plugin]));
 		const built: Built = { facets, plugins, removed };
 		this.#snapshots.set(built, snapshot);
 		return built;
@@ -250,7 +250,7 @@ class PluginsComponent implements Plugins {
 		const snapshot = this.#snapshots.get(built);
 		if (snapshot !== undefined) {
 			this.#watcher.applied(
-				[...snapshot.plugins.keys()].filter((name) => !failed.has(name)),
+				[...snapshot.plugins.keys()].filter(name => !failed.has(name)),
 				snapshot,
 			);
 		}
@@ -259,7 +259,7 @@ class PluginsComponent implements Plugins {
 
 	async installDependencies(name: string, context: Context): Promise<void> {
 		if (!this.#discovered) await this.#discover(context);
-		const plugin = this.#discovery.plugins.find((each) => each.name === name);
+		const plugin = this.#discovery.plugins.find(each => each.name === name);
 		if (plugin === undefined) throw new Error(`plugins.installDependencies: no plugin "${name}"`);
 		await installDependencies(plugin, context, this.#options.install);
 		this.#watcher.installed(name);
@@ -286,7 +286,7 @@ class PluginsComponent implements Plugins {
 		let set = this.#current.get(kind);
 		if (set !== undefined) return set;
 		if (!this.#discovered) await this.#discover(context);
-		const plugins = this.#discovery.plugins.filter((plugin) => plugin.facets[kind] !== undefined);
+		const plugins = this.#discovery.plugins.filter(plugin => plugin.facets[kind] !== undefined);
 		const scripts = await Promise.all(
 			plugins.map(async (plugin): Promise<PluginScript> => {
 				const built =
@@ -295,7 +295,7 @@ class PluginsComponent implements Plugins {
 			}),
 		);
 		// Built concurrently: a set made meanwhile (by a concurrent first use) wins.
-		set = this.#current.get(kind) ?? new Map(scripts.map((script) => [script.plugin.name, script]));
+		set = this.#current.get(kind) ?? new Map(scripts.map(script => [script.plugin.name, script]));
 		this.#current.set(kind, set);
 		return set;
 	}

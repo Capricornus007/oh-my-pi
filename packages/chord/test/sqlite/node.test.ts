@@ -40,7 +40,7 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		try {
 			expect(await runChanges(database)).toEqual(RUN_CHANGES);
-			const inTransaction = await database.transaction((handle) =>
+			const inTransaction = await database.transaction(handle =>
 				handle.runCounted("INSERT INTO changes_probe VALUES (?, ?, ?)", "t", "t/1", 1),
 			);
 			expect(inTransaction).toBe(1);
@@ -51,7 +51,7 @@ describe("Node SQLite driver", () => {
 
 	it("commits work done through the transaction handle and closes idempotently", async () => {
 		const database = await openNodeSqliteDatabase(":memory:");
-		await database.transaction(async (transaction) => {
+		await database.transaction(async transaction => {
 			await transaction.exec("CREATE TABLE async_probe (value INTEGER)");
 			await transaction.run("INSERT INTO async_probe (value) VALUES (?)", 1);
 		});
@@ -64,14 +64,14 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		await database.exec("CREATE TABLE transaction_queue (value INTEGER)");
 		let markFirstStarted!: () => void;
-		const firstStarted = new Promise<void>((resolve) => {
+		const firstStarted = new Promise<void>(resolve => {
 			markFirstStarted = resolve;
 		});
 		let releaseFirst!: () => void;
-		const firstGate = new Promise<void>((resolve) => {
+		const firstGate = new Promise<void>(resolve => {
 			releaseFirst = resolve;
 		});
-		const first = database.transaction(async (transaction) => {
+		const first = database.transaction(async transaction => {
 			await transaction.exec("INSERT INTO transaction_queue (value) VALUES (1)");
 			markFirstStarted();
 			await firstGate;
@@ -79,7 +79,7 @@ describe("Node SQLite driver", () => {
 		await firstStarted;
 
 		let secondStarted = false;
-		const second = database.transaction(async (transaction) => {
+		const second = database.transaction(async transaction => {
 			secondStarted = true;
 			await transaction.exec("INSERT INTO transaction_queue (value) VALUES (2)");
 		});
@@ -99,7 +99,7 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		await database.exec("CREATE TABLE call_order (value INTEGER)");
 		// Operations called during a transaction must neither see its uncommitted rows nor join its rollback.
-		const transaction = database.transaction(async (handle) => {
+		const transaction = database.transaction(async handle => {
 			await handle.run("INSERT INTO call_order (value) VALUES (?)", 1);
 			await Promise.resolve();
 			throw new Error("roll back");
@@ -119,14 +119,14 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		await database.exec("CREATE TABLE operation_queue (value INTEGER)");
 		let markTransactionStarted!: () => void;
-		const transactionStarted = new Promise<void>((resolve) => {
+		const transactionStarted = new Promise<void>(resolve => {
 			markTransactionStarted = resolve;
 		});
 		let releaseTransaction!: () => void;
-		const transactionGate = new Promise<void>((resolve) => {
+		const transactionGate = new Promise<void>(resolve => {
 			releaseTransaction = resolve;
 		});
-		const pending = database.transaction(async (transaction) => {
+		const pending = database.transaction(async transaction => {
 			await transaction.exec("INSERT INTO operation_queue (value) VALUES (1)");
 			markTransactionStarted();
 			await transactionGate;
@@ -156,7 +156,7 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		await database.exec("CREATE TABLE barrier_probe (value INTEGER)");
 		let outside!: Promise<void>;
-		const transaction = database.transaction(async (handle) => {
+		const transaction = database.transaction(async handle => {
 			// Misuse: this call must wait for the transaction instead of joining it.
 			outside = database.run("INSERT INTO barrier_probe (value) VALUES (?)", 2);
 			await handle.run("INSERT INTO barrier_probe (value) VALUES (?)", 1);
@@ -173,7 +173,7 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		await database.exec("CREATE TABLE stale_probe (value INTEGER)");
 		let handle!: SqliteExecutor;
-		await database.transaction(async (transaction) => {
+		await database.transaction(async transaction => {
 			handle = transaction;
 			await transaction.run("INSERT INTO stale_probe (value) VALUES (?)", 1);
 		});
@@ -188,7 +188,7 @@ describe("Node SQLite driver", () => {
 		const database = await openNodeSqliteDatabase(":memory:");
 		await database.exec("CREATE TABLE rollback_probe (value INTEGER)");
 		await expect(
-			database.transaction(async (transaction) => {
+			database.transaction(async transaction => {
 				await transaction.exec("INSERT INTO rollback_probe (value) VALUES (1)");
 				await transaction.exec("COMMIT");
 				throw new Error("rejected after an escaped commit");
@@ -221,7 +221,7 @@ describe("the outcome of a transaction (slice 6b D4)", () => {
 		const database = faulty();
 		const own = new Error("refused");
 		await database.exec("CREATE TABLE t (n INTEGER)");
-		const outcome = database.transaction(async (handle) => {
+		const outcome = database.transaction(async handle => {
 			await handle.run("INSERT INTO t VALUES (1)");
 			throw own;
 		});
@@ -229,7 +229,7 @@ describe("the outcome of a transaction (slice 6b D4)", () => {
 		expect(await database.all("SELECT n FROM t")).toEqual([]);
 	});
 
-	it.each(["BEGIN IMMEDIATE", "COMMIT"] as const)("rejects with another error when %s fails", async (statement) => {
+	it.each(["BEGIN IMMEDIATE", "COMMIT"] as const)("rejects with another error when %s fails", async statement => {
 		const database = faulty(statement);
 		const outcome = database.transaction(async () => 1);
 		await expect(outcome).rejects.toThrow(`${statement} failed`);

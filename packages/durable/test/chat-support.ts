@@ -85,7 +85,7 @@ export function textOf(message: Message | undefined): string | undefined {
 	if (message === undefined) return undefined;
 	if (message.role === "system") return undefined;
 	if (typeof message.content === "string") return message.content;
-	const text = message.content.find((content) => content.type === "text");
+	const text = message.content.find(content => content.type === "text");
 	return text?.type === "text" ? text.text : undefined;
 }
 
@@ -94,7 +94,7 @@ export async function waitFor(check: () => boolean | Promise<boolean>, timeoutMs
 	const deadline = Date.now() + timeoutMs;
 	while (!(await check())) {
 		if (Date.now() > deadline) throw new Error("Condition was not reached");
-		await new Promise((resolve) => setTimeout(resolve, 5));
+		await new Promise(resolve => setTimeout(resolve, 5));
 	}
 }
 
@@ -104,7 +104,7 @@ export async function waitFor(check: () => boolean | Promise<boolean>, timeoutMs
  */
 export function unanswered(): { readonly step: FauxResponseStep; readonly reached: Promise<void> } {
 	let reach!: () => void;
-	const reached = new Promise<void>((resolve) => {
+	const reached = new Promise<void>(resolve => {
 		reach = resolve;
 	});
 	const step: FauxResponseStep = (_context, options) =>
@@ -119,7 +119,7 @@ export function unanswered(): { readonly step: FauxResponseStep; readonly reache
 /** The installed tools with these names, as `configure()` takes them. */
 export function toolsNamed(setup: ChatSetup, ...names: string[]): ToolRegistration[] {
 	const installed = setup.registry.snapshot().tools();
-	return names.map((name) => {
+	return names.map(name => {
 		const found = installed.find(({ tool }) => tool.name === name);
 		if (found === undefined) throw new Error(`Tool ${name} is not installed`);
 		return found.tool;

@@ -257,11 +257,11 @@ export function createCodemodeExtension(options: CodemodeToolOptions): Extension
 		name: "codemode",
 		tools: [createCodemodeTool(options), ...(options.models === false ? [] : createModelTools())],
 		sections: [
-			section("codemode", (input) =>
+			section("codemode", input =>
 				codemodeSection(
 					// Deferred tools are found with `searchTools()`, as the coding agent leaves them out too.
 					input.agent.callable.filter(
-						(tool) => !tool.name.startsWith(CODEMODE_INTERNAL_PREFIX) && tool.deferred !== true,
+						tool => !tool.name.startsWith(CODEMODE_INTERNAL_PREFIX) && tool.deferred !== true,
 					),
 					options.namespaces ?? [],
 					options.inlineBudget ?? DEFAULT_CODEMODE_INLINE_BUDGET,
@@ -282,8 +282,8 @@ function outcomeOf(name: string, structured: boolean, result: NestedToolExecutio
 	if (!result.isError || (structured && value !== undefined)) return { ok: true, value };
 	const message = structured ? "" : (value as string);
 	const diagnostics = result.diagnostics
-		.filter((diagnostic) => diagnostic.severity === "error")
-		.map((diagnostic) => diagnostic.message)
+		.filter(diagnostic => diagnostic.severity === "error")
+		.map(diagnostic => diagnostic.message)
 		.join("\n");
 	return {
 		ok: false,
@@ -296,7 +296,7 @@ function outcomeOf(name: string, structured: boolean, result: NestedToolExecutio
 function textOf(value: JsonValue | undefined): string {
 	if (typeof value === "string") return value;
 	if (!Array.isArray(value)) return "";
-	return value.flatMap((item) => (isText(item) ? [item.text] : [])).join("\n");
+	return value.flatMap(item => (isText(item) ? [item.text] : [])).join("\n");
 }
 
 function isText(item: unknown): item is TextContent {
@@ -363,7 +363,7 @@ class CodemodeCall {
 		this.options = options;
 		this.api = api;
 		this.context = context;
-		this.gate = new Promise((resolve) => {
+		this.gate = new Promise(resolve => {
 			this.openGate = resolve;
 		});
 	}
@@ -372,25 +372,25 @@ class CodemodeCall {
 		const { code, options: sourceOptions } = parseCodemodeSource(source);
 		const { api, context } = this;
 		const agent = await api.agent(context);
-		const tools: DeclaredTool[] = agent.callable.map((tool) => ({
+		const tools: DeclaredTool[] = agent.callable.map(tool => ({
 			name: tool.name,
 			jsName: toCodemodeIdentifier(tool.name),
 			description: sampleOf(tool),
 			...(tool.structuredOutputSchema === undefined ? {} : { structured: true as const }),
 			...(tool.name.startsWith(CODEMODE_INTERNAL_PREFIX) ? { hidden: true as const } : {}),
 		}));
-		const callable = agent.callable.filter((tool) => !tool.name.startsWith(CODEMODE_INTERNAL_PREFIX));
+		const callable = agent.callable.filter(tool => !tool.name.startsWith(CODEMODE_INTERNAL_PREFIX));
 		const models = this.options.models === false ? [] : [...CATALOG_GLOBALS, ...Object.keys(MODEL_CALLS)];
 		const globals = [
-			...DISCOVERY_GLOBALS.map((name) => ({ name, spread: true })),
-			...models.map((name) => ({ name, spread: true })),
-			...(this.options.globals ?? []).map((global) => ({ name: global.name, spread: global.spread === true })),
+			...DISCOVERY_GLOBALS.map(name => ({ name, spread: true })),
+			...models.map(name => ({ name, spread: true })),
+			...(this.options.globals ?? []).map(global => ({ name: global.name, spread: global.spread === true })),
 		];
 		const namespaces: Start["namespaces"] = [];
 		for (const tool of callable) {
 			const namespace = namespaceOf(tool.name, this.options.namespaces ?? []);
 			if (namespace === undefined) continue;
-			let entry = namespaces.find((candidate) => candidate.name === namespace.name);
+			let entry = namespaces.find(candidate => candidate.name === namespace.name);
 			if (entry === undefined) {
 				entry = {
 					name: namespace.name,
@@ -467,13 +467,13 @@ class CodemodeCall {
 			this.run = this.options.sandbox.start(code, {
 				startedAt: this.start.startedAt,
 				seed: this.start.seed,
-				tools: this.start.tools.filter((tool) => tool.hidden !== true),
+				tools: this.start.tools.filter(tool => tool.hidden !== true),
 				globals: this.start.globals,
 				store: this.start.store,
 				signal: this.controller.signal,
 				...(remaining === undefined ? {} : { timeoutMs: remaining }),
-				onStarted: (fingerprint) => void this.checkFingerprint(fingerprint),
-				onCall: (call) => this.onCall(call),
+				onStarted: fingerprint => void this.checkFingerprint(fingerprint),
+				onCall: call => this.onCall(call),
 				onIdle: (seq, issued) => this.onIdle(seq, issued),
 			});
 			const result = await this.run.result;
@@ -484,7 +484,7 @@ class CodemodeCall {
 			// Harness. That decides nothing about the script: store nothing and end with this invocation, so a later attempt
 			// replays it.
 			if (!result.ok && result.error.kind === "aborted" && !this.controller.signal.aborted) {
-				await new Promise<void>((resolve) => {
+				await new Promise<void>(resolve => {
 					if (context.abortSignal === undefined || context.abortSignal.aborted) resolve();
 					else context.abortSignal.addEventListener("abort", () => resolve(), { once: true });
 				});
@@ -501,7 +501,7 @@ class CodemodeCall {
 					(during.seq === 0
 						? this.replayed.length > 0 || this.firstIssued !== undefined
 						: this.replayed[during.seq - 1]?.issuedAfter !== undefined) ||
-					this.replayed.slice(during.seq).some((entry) => entry.id > during.issued);
+					this.replayed.slice(during.seq).some(entry => entry.id > during.issued);
 				if (continued) {
 					return this.decide(
 						errorResult(
@@ -519,7 +519,7 @@ class CodemodeCall {
 	/** Store an outcome the call decided, and end the VM if it runs; returns the outcome. */
 	private async decide(decided: ToolExecutionResult): Promise<ToolExecutionResult> {
 		const result = { ...decided, details: this.details() as unknown as JsonValue };
-		await this.api.commit(async (tx) => {
+		await this.api.commit(async tx => {
 			const run = await tx.doc(CodemodeRunDoc, this.api.taskId);
 			run.result ??= copyJson(result as unknown as JsonValue, { omitUndefinedProperties: true }) as JsonObject;
 		}, this.context);
@@ -568,7 +568,7 @@ class CodemodeCall {
 			} as unknown as JsonValue,
 		};
 		const writes = result.ok ? result.storeWrites : undefined;
-		return this.api.commit(async (tx) => {
+		return this.api.commit(async tx => {
 			const run = await tx.doc(CodemodeRunDoc, this.api.taskId);
 			if (run.result !== undefined) return run.result as ToolExecutionResult;
 			run.result = copyJson(tool as unknown as JsonValue, { omitUndefinedProperties: true }) as JsonObject;
@@ -601,13 +601,13 @@ class CodemodeCall {
 	/** The run's output directory: the recorded one, else a new temp directory, recorded before any file is written. */
 	private async outputDir(env: ExecutionEnv): Promise<string> {
 		const recorded = await this.api.commit(
-			async (tx) => (await tx.doc(CodemodeRunDoc, this.api.taskId)).outputDir,
+			async tx => (await tx.doc(CodemodeRunDoc, this.api.taskId)).outputDir,
 			this.context,
 		);
 		if (recorded !== undefined) return recorded;
 		const created = await env.createTempDir("pi-codemode-", this.context);
 		if (!created.ok) throw new Error(created.error.message);
-		return this.api.commit(async (tx) => {
+		return this.api.commit(async tx => {
 			const run = await tx.doc(CodemodeRunDoc, this.api.taskId);
 			run.outputDir ??= created.value;
 			return run.outputDir!;
@@ -627,7 +627,7 @@ class CodemodeCall {
 			}
 		} else {
 			try {
-				await this.api.commit(async (tx) => {
+				await this.api.commit(async tx => {
 					const run = await tx.doc(CodemodeRunDoc, this.api.taskId);
 					if (run.start !== undefined) run.start.fingerprint = fingerprint;
 				}, this.context);
@@ -673,7 +673,7 @@ class CodemodeCall {
 		void this.gate
 			.then(() => this.callTool(call))
 			.then(
-				(outcome) => {
+				outcome => {
 					this.ready.set(call.id, outcome);
 					this.deliverReplayed();
 				},
@@ -771,9 +771,9 @@ class CodemodeCall {
 	/** Launch the waiting calls whose issued count is committed. */
 	private launchCovered(): void {
 		if (!this.released || this.stopped) return;
-		const covered = this.waiting.filter((call) => call.id <= this.durableIssued);
+		const covered = this.waiting.filter(call => call.id <= this.durableIssued);
 		if (covered.length === 0) return;
-		this.waiting = this.waiting.filter((call) => call.id > this.durableIssued);
+		this.waiting = this.waiting.filter(call => call.id > this.durableIssued);
 		for (const call of covered) this.launch(call);
 	}
 
@@ -795,8 +795,8 @@ class CodemodeCall {
 		if (this.stopped) return;
 		const running: Promise<{ outcome: CodemodeOutcome; global?: JournalEntry["global"] }> =
 			call.target === "tool"
-				? this.callTool(call).then((outcome) => ({ outcome }))
-				: this.callGlobal(call).then((outcome) => ({
+				? this.callTool(call).then(outcome => ({ outcome }))
+				: this.callGlobal(call).then(outcome => ({
 						outcome,
 						global: {
 							name: call.name,
@@ -805,7 +805,7 @@ class CodemodeCall {
 						},
 					}));
 		running.then(
-			(done) => {
+			done => {
 				// A result after the outcome is decided has nowhere to go, and the call's API has ended.
 				if (this.stopped) return;
 				this.queue.push({ id: call.id, at: this.api.now(), ...done });
@@ -840,7 +840,7 @@ class CodemodeCall {
 			if (model) this.releaseModelSlot();
 		}
 		if (call.name === GENERATE_IMAGES_TOOL) this.generatedImages += countImages(result.structuredOutput);
-		const structured = this.start.tools.find((tool) => tool.name === call.name)?.structured === true;
+		const structured = this.start.tools.find(tool => tool.name === call.name)?.structured === true;
 		const outcome = outcomeOf(call.name, structured, result);
 		this.finishRow(call.id, outcome, result);
 		return outcome;
@@ -863,8 +863,8 @@ class CodemodeCall {
 		if (row === undefined) return;
 		row.status = result.isError ? "error" : "ok";
 		if (result.durationMs !== undefined) row.durationMs = result.durationMs;
-		const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
-		const error = !outcome.ok ? outcome.message : errors.map((diagnostic) => diagnostic.message).join("\n");
+		const errors = result.diagnostics.filter(diagnostic => diagnostic.severity === "error");
+		const error = !outcome.ok ? outcome.message : errors.map(diagnostic => diagnostic.message).join("\n");
 		if (result.isError && error !== "") row.error = cut(error, ERROR_PREVIEW_CHARS);
 	}
 
@@ -872,7 +872,7 @@ class CodemodeCall {
 	private details(): CodemodeToolDetails {
 		const calls = [...this.rows.values()]
 			.sort((a, b) => a.id - b.id)
-			.map((row) => (row.status === "running" ? { ...row, status: "cancelled" as const } : row));
+			.map(row => (row.status === "running" ? { ...row, status: "cancelled" as const } : row));
 		return { calls };
 	}
 
@@ -880,7 +880,7 @@ class CodemodeCall {
 		const discovery = (DISCOVERY_GLOBALS as readonly string[]).includes(call.name);
 		const catalog = (CATALOG_GLOBALS as readonly string[]).includes(call.name);
 		const global =
-			discovery || catalog ? undefined : this.options.globals?.find((candidate) => candidate.name === call.name);
+			discovery || catalog ? undefined : this.options.globals?.find(candidate => candidate.name === call.name);
 		if (!discovery && !catalog && global === undefined) return { ok: false, message: `Unknown global ${call.name}` };
 		try {
 			// `undefined` stays undefined: the journal omits the value, and a replay resolves with undefined again.
@@ -898,7 +898,7 @@ class CodemodeCall {
 
 	private async modelSlot(): Promise<void> {
 		if (this.modelCalls >= MAX_CONCURRENT_MODEL_CALLS) {
-			await new Promise<void>((resolve) => this.modelWaiters.push(resolve));
+			await new Promise<void>(resolve => this.modelWaiters.push(resolve));
 		}
 		this.modelCalls++;
 	}
@@ -912,25 +912,25 @@ class CodemodeCall {
 	private discover(call: CodemodeHostCall): JsonValue | undefined {
 		const args = Array.isArray(call.args) ? call.args : [];
 		const { namespaces } = this.start;
-		const tools = this.start.tools.filter((tool) => tool.hidden !== true);
-		const namespaceOfTool = (name: string) => namespaces.find((namespace) => namespace.tools.includes(name));
+		const tools = this.start.tools.filter(tool => tool.hidden !== true);
+		const namespaceOfTool = (name: string) => namespaces.find(namespace => namespace.tools.includes(name));
 		const matchesNamespace = (namespace: Start["namespaces"][number], query: string) =>
 			namespace.name === query || toCodemodeIdentifier(namespace.name) === toCodemodeIdentifier(query);
 		if (call.name === "describeTool") {
 			const [name] = args;
 			if (typeof name !== "string") throw new Error("describeTool() expects a tool name");
-			return tools.find((tool) => tool.name === name || tool.jsName === name)?.description;
+			return tools.find(tool => tool.name === name || tool.jsName === name)?.description;
 		}
 		if (call.name === "describeNamespace") {
 			const [name] = args;
 			if (typeof name !== "string") throw new Error("describeNamespace() expects a namespace name");
-			const namespace = namespaces.find((candidate) => matchesNamespace(candidate, name));
+			const namespace = namespaces.find(candidate => matchesNamespace(candidate, name));
 			if (namespace === undefined) return undefined;
 			return {
 				name: namespace.name,
 				...(namespace.description === undefined ? {} : { description: namespace.description }),
 				...(namespace.instructions === undefined ? {} : { instructions: namespace.instructions }),
-				tools: namespace.tools.map((tool) => toCodemodeIdentifier(tool)),
+				tools: namespace.tools.map(tool => toCodemodeIdentifier(tool)),
 			};
 		}
 		const [query, options] = args as [unknown, { limit?: unknown; namespace?: unknown } | undefined];
@@ -943,7 +943,7 @@ class CodemodeCall {
 		if (namespace !== undefined && namespace !== null && typeof namespace !== "string") {
 			throw new Error("searchTools() namespace must be a string");
 		}
-		const documents = tools.flatMap((tool) => {
+		const documents = tools.flatMap(tool => {
 			const own = namespaceOfTool(tool.name);
 			if (typeof namespace === "string" && (own === undefined || !matchesNamespace(own, namespace))) return [];
 			const namespaceText =
@@ -951,8 +951,8 @@ class CodemodeCall {
 			// `description` is the tool's sample: its description and declaration, with the parameters' names and descriptions.
 			return [{ name: tool.name, text: tool.description, namespaceText }];
 		});
-		return rankDocuments(query, documents, limit).map((name) => {
-			const tool = tools.find((candidate) => candidate.name === name)!;
+		return rankDocuments(query, documents, limit).map(name => {
+			const tool = tools.find(candidate => candidate.name === name)!;
 			return { name: tool.jsName, description: tool.description };
 		});
 	}
@@ -969,7 +969,7 @@ class CodemodeCall {
 		const acks = [...this.acks];
 		this.acks.clear();
 		try {
-			await this.api.commit(async (tx) => {
+			await this.api.commit(async tx => {
 				const journal = await tx.doc(CodemodeJournalDoc, this.api.taskId);
 				for (const [seq, issued] of acks) {
 					if (seq === 0) journal.firstIssued ??= issued;
@@ -1015,7 +1015,7 @@ function asToolCall(call: CodemodeHostCall): CodemodeHostCall {
 /** Image blocks in a `models.generateImages()` result. */
 function countImages(value: unknown): number {
 	const output = typeof value === "object" && value !== null ? (value as { output?: unknown }).output : undefined;
-	return Array.isArray(output) ? output.filter((item) => (item as { type?: unknown })?.type === "image").length : 0;
+	return Array.isArray(output) ? output.filter(item => (item as { type?: unknown })?.type === "image").length : 0;
 }
 
 function describe(call: CodemodeHostCall): string {
@@ -1035,7 +1035,7 @@ function sameJson(a: unknown, b: unknown): boolean {
 	return (
 		keys.length === Object.keys(b).length &&
 		keys.every(
-			(key) =>
+			key =>
 				Object.hasOwn(b, key) && sameJson((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
 		)
 	);

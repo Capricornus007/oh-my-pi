@@ -57,7 +57,7 @@ describe("IPC links over a fake port", () => {
 		port.receive({ start: "the app's own" });
 		port.receive(new Uint8Array([2]));
 		const received: number[] = [];
-		link.onMessage((message) => received.push(message[0]!));
+		link.onMessage(message => received.push(message[0]!));
 		port.receive(new Uint8Array([3]));
 		expect(received).toEqual([1, 2, 3]);
 	});
@@ -89,7 +89,7 @@ describe("IPC links over a fake port", () => {
 		let closed = 0;
 		const received: Uint8Array[] = [];
 		link.onClose(() => closed++);
-		link.onMessage((message) => received.push(message));
+		link.onMessage(message => received.push(message));
 		link.send(new Uint8Array([1]));
 		fail(port);
 		link.send(new Uint8Array([2]));
@@ -121,9 +121,9 @@ describe("IPC links to a forked child", () => {
 			execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
 		});
 		const link = ipcLink(child);
-		const echoed = new Promise<Uint8Array>((resolve) => link.onMessage(resolve));
+		const echoed = new Promise<Uint8Array>(resolve => link.onMessage(resolve));
 		let closes = 0;
-		const closed = new Promise<void>((resolve) =>
+		const closed = new Promise<void>(resolve =>
 			link.onClose(() => {
 				closes++;
 				resolve();

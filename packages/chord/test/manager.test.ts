@@ -33,9 +33,11 @@ describe("processLock", () => {
 		try {
 			const name = `deep-${process.pid}`;
 			const release = await processLock(name);
-			await assert.rejects(processLock(name), (error) => isChordError(error) && error.reason === "locked");
+			await assert.rejects(processLock(name), error => isChordError(error) && error.reason === "locked");
 			await release();
-			await (await processLock(name))();
+			await (
+				await processLock(name)
+			)();
 		} finally {
 			if (previous === undefined) delete process.env.TMPDIR;
 			else process.env.TMPDIR = previous;
@@ -95,7 +97,7 @@ describe("host manager (real child processes)", () => {
 		const second = createHostManager({ driver: driver({}, lock) });
 		const a = await first.start();
 		// Both managers race for the same lock; only the kernel decides, so the second child cannot start.
-		await assert.rejects(second.start(), (error) => isChordError(error, "unavailable") && error.reason === "locked");
+		await assert.rejects(second.start(), error => isChordError(error, "unavailable") && error.reason === "locked");
 		const b = await first.replace();
 		assert.notEqual(a.pid, b.pid);
 		await first.stop();
@@ -111,7 +113,7 @@ describe("host manager (real child processes)", () => {
 		const grandchild = Number(readFileSync(file, "utf8"));
 		assert.ok(alive(grandchild));
 		await manager.stop();
-		for (let i = 0; i < 50 && alive(grandchild); i++) await new Promise((resolve) => setTimeout(resolve, 20));
+		for (let i = 0; i < 50 && alive(grandchild); i++) await new Promise(resolve => setTimeout(resolve, 20));
 		assert.ok(!alive(grandchild));
 		rmSync(file, { force: true });
 	});
@@ -125,7 +127,7 @@ describe("host manager (real child processes)", () => {
 				exited: new Promise(() => {}),
 				send: () => {},
 				killTree: () => {},
-				onControl: (listener) => listeners.add(listener),
+				onControl: listener => listeners.add(listener),
 			}),
 		};
 		const emit = (message: ControlMessage) => {
@@ -133,11 +135,11 @@ describe("host manager (real child processes)", () => {
 		};
 		const manager = createHostManager({ driver: fake });
 		const started = manager.start();
-		for (let i = 0; i < 20 && listeners.size === 0; i++) await new Promise((resolve) => setImmediate(resolve));
+		for (let i = 0; i < 20 && listeners.size === 0; i++) await new Promise(resolve => setImmediate(resolve));
 		emit({ type: "ready" });
 		await started;
 		emit({ type: "status", activeCalls: 1 });
-		await new Promise((resolve) => setTimeout(resolve, 120));
+		await new Promise(resolve => setTimeout(resolve, 120));
 		assert.equal(manager.liveness.idleFor, 0);
 		emit({ type: "status", activeCalls: 0 });
 		assert.ok(manager.liveness.idleFor < 60, `idleFor ${manager.liveness.idleFor}`);
@@ -155,7 +157,7 @@ describe("host manager (real child processes)", () => {
 		assert.ok(alive(grandchild));
 		await manager.stop();
 		assert.equal((await instance.exited).signal, "SIGKILL");
-		for (let i = 0; i < 50 && alive(grandchild); i++) await new Promise((resolve) => setTimeout(resolve, 20));
+		for (let i = 0; i < 50 && alive(grandchild); i++) await new Promise(resolve => setTimeout(resolve, 20));
 		assert.ok(!alive(grandchild));
 		rmSync(file, { force: true });
 	});
@@ -170,13 +172,13 @@ describe("host manager (real child processes)", () => {
 		const exits: unknown[] = [];
 		const manager = createHostManager({
 			driver: driver(),
-			keepAlive: (liveness) => !liveness.booting && liveness.idleFor < 150,
+			keepAlive: liveness => !liveness.booting && liveness.idleFor < 150,
 			checkInterval: 50,
-			onExit: (exit) => exits.push(exit),
+			onExit: exit => exits.push(exit),
 		});
 		await manager.start();
 		for (let i = 0; i < 100 && manager.status !== "stopped"; i++)
-			await new Promise((resolve) => setTimeout(resolve, 20));
+			await new Promise(resolve => setTimeout(resolve, 20));
 		assert.equal(manager.status, "stopped");
 		assert.equal(exits.length, 1);
 	});

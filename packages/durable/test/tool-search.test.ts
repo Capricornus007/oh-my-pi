@@ -44,20 +44,20 @@ function setup(): ChatSetup {
 }
 
 async function offered(root: Conversation): Promise<string[]> {
-	return (await root.agent(context)).tools.map((each) => each.name);
+	return (await root.agent(context)).tools.map(each => each.name);
 }
 
 /** The model messages of the `pi.system` entries, oldest first. */
 function systemMessages(entries: readonly EntryRecord[]) {
 	return entries
-		.filter((entry) => entry.kind === "pi.system")
-		.map((entry) => entry.model![0] as { toolsAdded?: { name: string }[]; toolsRemoved?: { name: string }[] });
+		.filter(entry => entry.kind === "pi.system")
+		.map(entry => entry.model![0] as { toolsAdded?: { name: string }[]; toolsRemoved?: { name: string }[] });
 }
 
 function toolResultTexts(entries: readonly EntryRecord[]): string[] {
 	return entries
-		.filter((entry) => entry.kind === "pi.tool-result")
-		.map((entry) => (entry.model![0] as { content: { text?: string }[] }).content.map((item) => item.text).join(""));
+		.filter(entry => entry.kind === "pi.tool-result")
+		.map(entry => (entry.model![0] as { content: { text?: string }[] }).content.map(item => item.text).join(""));
 }
 
 describe("deferred tools and tool_search", () => {
@@ -70,12 +70,12 @@ describe("deferred tools and tool_search", () => {
 		]);
 		const { harness, root } = await openChat(new MemoryStorage(), chat);
 		expect(await offered(root)).toEqual(["alpha", "omega", "tool_search"]);
-		expect((await root.agent(context)).deferred.map((each) => each.name)).toEqual([
+		expect((await root.agent(context)).deferred.map(each => each.name)).toEqual([
 			"github_get_issue",
 			"github_list_repos",
 		]);
 		// Deferred tools stay callable by other tools, such as code mode scripts.
-		expect((await root.agent(context)).callable.map((each) => each.name)).toContain("github_get_issue");
+		expect((await root.agent(context)).callable.map(each => each.name)).toContain("github_get_issue");
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		const entries = await allEntries(root);
 		const [search, issue] = toolResultTexts(entries);
@@ -86,10 +86,10 @@ describe("deferred tools and tool_search", () => {
 		expect((await harness.snapshot(AgentDoc, root.id, context))?.modelTools).toEqual({ add: ["github_get_issue"] });
 		expect(await offered(root)).toEqual(["alpha", "omega", "tool_search", "github_get_issue"]);
 		// A later search sees only the tools not loaded yet.
-		expect((await root.agent(context)).deferred.map((each) => each.name)).toEqual(["github_list_repos"]);
+		expect((await root.agent(context)).deferred.map(each => each.name)).toEqual(["github_list_repos"]);
 		// The load appended the declaration: no tool was removed and declared again, so the cached prefix holds.
 		const [baseline, load] = systemMessages(entries);
-		expect(baseline!.toolsAdded!.map((each) => each.name)).toEqual(["alpha", "omega", "tool_search"]);
+		expect(baseline!.toolsAdded!.map(each => each.name)).toEqual(["alpha", "omega", "tool_search"]);
 		expect(load).toEqual(
 			expect.objectContaining({ toolsAdded: [expect.objectContaining({ name: "github_get_issue" })] }),
 		);
@@ -108,11 +108,11 @@ describe("deferred tools and tool_search", () => {
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(await offered(root)).toEqual(["alpha", "omega", "tool_search", "github_list_repos", "github_get_issue"]);
 		const loads = systemMessages(await allEntries(root)).slice(1);
-		expect(loads.map((message) => message.toolsAdded?.map((each) => each.name))).toEqual([
+		expect(loads.map(message => message.toolsAdded?.map(each => each.name))).toEqual([
 			["github_list_repos"],
 			["github_get_issue"],
 		]);
-		expect(loads.every((message) => message.toolsRemoved === undefined)).toBe(true);
+		expect(loads.every(message => message.toolsRemoved === undefined)).toBe(true);
 		await harness.close(context);
 	});
 
@@ -133,7 +133,7 @@ describe("deferred tools and tool_search", () => {
 		});
 		expect(await offered(root)).toEqual(["alpha", "omega", "tool_search", "grow", "github_get_issue"]);
 		// A name in both remove and add is not offered.
-		const [getIssue] = (await root.agent(context)).callable.filter((each) => each.name === "github_get_issue");
+		const [getIssue] = (await root.agent(context)).callable.filter(each => each.name === "github_get_issue");
 		await root.configure({ modelTools: { remove: [getIssue!], add: [getIssue!] } }, context);
 		expect(await offered(root)).not.toContain("github_get_issue");
 		// Loading it again drops it from remove.
@@ -157,8 +157,8 @@ describe("deferred tools and tool_search", () => {
 		chat.registry.install(defineExtension({ name: "tool:github_get_issue", tools: [issue] }));
 		expect(await offered(root)).toContain("github_get_issue");
 		// With an explicit array, a load appends to it as before.
-		const alpha = (await root.agent(context)).tools.find((each) => each.name === "alpha")!;
-		const search = (await root.agent(context)).tools.find((each) => each.name === "tool_search")!;
+		const alpha = (await root.agent(context)).tools.find(each => each.name === "alpha")!;
+		const search = (await root.agent(context)).tools.find(each => each.name === "tool_search")!;
 		await root.configure({ modelTools: [alpha, search] }, context);
 		chat.faux.setResponses([call("tool_search", { query: "repositories", limit: 1 }), DONE]);
 		await (await root.submit({ type: "input", content: "more" }, context)).wait(context);
@@ -184,7 +184,7 @@ describe("deferred tools and tool_search", () => {
 		chat.faux.setResponses([DONE]);
 		await (await root.submit({ type: "input", content: "fresh" }, context)).wait(context);
 		const baseline = systemMessages(await allEntries(root)).at(-1)!;
-		expect(baseline.toolsAdded!.map((each) => each.name)).toEqual([
+		expect(baseline.toolsAdded!.map(each => each.name)).toEqual([
 			"alpha",
 			"omega",
 			"tool_search",

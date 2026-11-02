@@ -35,7 +35,7 @@ function truth(node: WhereNode, row: EvaluatedRow): Truth {
 		// SQL: `x IN ()` is false, for a `NULL` x too.
 		if (values.length === 0) return false;
 		const value = row[column] as Scalar | undefined;
-		return value === undefined ? null : values.some((each) => compareScalar(value, each) === 0);
+		return value === undefined ? null : values.some(each => compareScalar(value, each) === 0);
 	}
 	if ("prefix" in node) {
 		const value = row[node.prefix[0]] as string | undefined;

@@ -53,7 +53,7 @@ function workerLauncher(options: CodemodeSandboxOptions): VmLauncher {
 				message: errorMessage(error),
 			});
 		});
-		worker.on("exit", (code) => {
+		worker.on("exit", code => {
 			events.failure({ kind: "sandbox", message: `Worker exited with code ${code} before the script settled` });
 		});
 		const stop = async (): Promise<void> => {
@@ -65,12 +65,12 @@ function workerLauncher(options: CodemodeSandboxOptions): VmLauncher {
 			worker.unref();
 		};
 		try {
-			options.onWorkerStarted?.(new Promise<void>((resolve) => worker.once("exit", () => resolve())));
+			options.onWorkerStarted?.(new Promise<void>(resolve => worker.once("exit", () => resolve())));
 		} catch (error) {
 			void stop();
 			throw error;
 		}
-		return { post: (message) => worker.postMessage(message), stop };
+		return { post: message => worker.postMessage(message), stop };
 	};
 }
 

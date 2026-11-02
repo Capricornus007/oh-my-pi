@@ -26,7 +26,7 @@ function assistantMessage(text: string, calls: readonly string[] = [], stopReaso
 		role: "assistant",
 		content: [
 			{ type: "text", text },
-			...calls.map((id) => ({ type: "toolCall" as const, id, name: "read", arguments: {} })),
+			...calls.map(id => ({ type: "toolCall" as const, id, name: "read", arguments: {} })),
 		],
 		api: "example",
 		provider: "example",
@@ -63,7 +63,7 @@ function show(message: Message): string {
 			return `system: ${JSON.stringify(message.sections)}`;
 		case "assistant":
 			return `assistant: ${message.content
-				.map((part) => (part.type === "text" ? part.text : part.type === "toolCall" ? `call(${part.id})` : ""))
+				.map(part => (part.type === "text" ? part.text : part.type === "toolCall" ? `call(${part.id})` : ""))
 				.join(" ")}`;
 		case "toolResult":
 			return `result(${message.toolCallId})${message.isError ? " error" : ""}`;
@@ -72,7 +72,7 @@ function show(message: Message): string {
 
 const transcript = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 const say = (kind: string, ...model: Message[]) =>
-	transcript.commit((tx) => tx.appendEntry(transcript.id, { kind, model }), context);
+	transcript.commit(tx => tx.appendEntry(transcript.id, { kind, model }), context);
 
 const question = await say("message", { role: "user", content: "read a and b", timestamp: 1 });
 await say("message", assistantMessage("I crashed", [], "aborted")); // stored, never sent
@@ -82,7 +82,7 @@ await say("pi.system", { role: "system", content: "", sections: { cwd: "<cwd>/re
 await say("message", toolResultMessage("a"));
 await say("message", assistantMessage("a and b look fine"));
 await transcript.commit(
-	(tx) =>
+	tx =>
 		tx.appendEntry(transcript.id, {
 			kind: "edit",
 			data: "user fixed a typo",
@@ -96,12 +96,12 @@ await transcript.commit(
 		}),
 	context,
 );
-await transcript.commit((tx) => tx.appendEntry(transcript.id, { kind: "note", data: "display only" }), context);
+await transcript.commit(tx => tx.appendEntry(transcript.id, { kind: "note", data: "display only" }), context);
 
 let view = await transcript.context(context);
 console.log(
 	"raw active entries:",
-	view.entries.map((entry) => entry.kind),
+	view.entries.map(entry => entry.kind),
 );
 console.log("request messages:", view.messages.map(show));
 
@@ -112,7 +112,7 @@ console.log("fork messages:", (await cut.context(context)).messages.map(show));
 // A headed summary replaces everything before the entry it points at.
 // "self" points the head at the summary entry itself.
 await transcript.commit(
-	(tx) =>
+	tx =>
 		tx.appendEntry(transcript.id, {
 			kind: "summary",
 			head: "self",
@@ -128,7 +128,7 @@ console.log("after summary:", view.head?.kind, view.messages.map(show));
 const history = await transcript.entries({}, 3, undefined, context);
 console.log(
 	"newest stored entries:",
-	history.items.map((entry) => entry.kind),
+	history.items.map(entry => entry.kind),
 	"more:",
 	history.next !== undefined,
 );

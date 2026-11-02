@@ -57,7 +57,7 @@ const RESULT = prose(1, 1024 * 1024);
 
 const Doc = defineState("doc", { schema: obj({ entries: arr(Entry) }), version: 1, initial: () => ({ entries }) });
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(Store, (_, self) => ({ doc: self.state(Doc) }));
 	host.serve(View, (_, _principal, self) => ({
 		variant: "owner",
@@ -68,14 +68,14 @@ const facet = defineFacet<P>((host) => {
 /** A link end counting the bytes its host receives. */
 function counted(link: Link, bytes: { received: number }): Link {
 	return {
-		send: (message) => link.send(message),
-		onMessage: (listener) =>
-			link.onMessage((message) => {
+		send: message => link.send(message),
+		onMessage: listener =>
+			link.onMessage(message => {
 				bytes.received += message.byteLength;
 				listener(message);
 			}),
 		close: () => link.close(),
-		onClose: (listener) => link.onClose(listener),
+		onClose: listener => link.onClose(listener),
 	};
 }
 

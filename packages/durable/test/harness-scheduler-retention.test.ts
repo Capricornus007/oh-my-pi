@@ -56,7 +56,7 @@ const Spawner = defineTask<{ name: string; into: number }, { phase: "hold" }, nu
 		hold: async (task, runtime, ctx) => {
 			const opened = await Promise.race([gate(task.input.name).promise.then(() => true), aborted(runtime.signal)]);
 			if (opened !== true) return;
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				await tx.createTask(
 					Hold,
 					{ name: `inside.${task.input.name}` },
@@ -86,7 +86,7 @@ const Rejected = defineTask<{ into: number }, { phase: "hold" }, null>({
 			const opened = await Promise.race([gate("rejected").promise.then(() => true), aborted(runtime.signal)]);
 			if (opened !== true) return;
 			try {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					await tx.createTask(
 						Hold,
 						{ name: "staged" },
@@ -142,7 +142,7 @@ async function status(harness: Harness, id: TaskId) {
 
 /** Under live `parent`: tool task T owning conversation C, a task in C; all of them end. Returns C. */
 async function subagentCycle(harness: Harness, root: Conversation, parent: TaskId, n: number) {
-	const { tool, inner, child } = await root.commit(async (tx) => {
+	const { tool, inner, child } = await root.commit(async tx => {
 		const tool = await tx.createTask(Hold, { name: `tool${n}` }, { ownership: { kind: "task", taskId: parent } });
 		const child = await tx.createConversation({ ownership: { kind: "task", taskId: tool } });
 		const inner = await tx.createTask(
@@ -163,7 +163,7 @@ describe("scheduler retention", () => {
 	it("forgets ended subagent chains once their work ends", async () => {
 		const { harness, root } = await open();
 		const parent = await root.commit(
-			(tx) => tx.createTask(Hold, { name: "parent" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "parent" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await subagentCycle(harness, root, parent, 0);
@@ -178,7 +178,7 @@ describe("scheduler retention", () => {
 	it("holds a live owner for work later created in a forgotten conversation, loading its chain again", async () => {
 		const { harness, root } = await open();
 		// Live P -> ended B -> ended A -> conversation C, empty: forgotten.
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const a = await tx.createTask(Hold, { name: "a" }, { ownership: { kind: "task", taskId: b } });
@@ -191,7 +191,7 @@ describe("scheduler retention", () => {
 		const before = sizes(harness);
 		const c = (await harness.conversation(tree.c, context))!;
 		const d = await c.commit(
-			(tx) => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		gate("p").resolve();
@@ -207,7 +207,7 @@ describe("scheduler retention", () => {
 	it("holds an owner for work its own terminal commit creates below a forgotten chain", async () => {
 		const { harness, root } = await open();
 		// Live P (a spawner) -> ended B -> ended A -> conversation C, empty: forgotten. P's terminal commit creates D in C.
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Spawner, { name: "p", into: 0 }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const a = await tx.createTask(Hold, { name: "a" }, { ownership: { kind: "task", taskId: b } });
@@ -215,7 +215,7 @@ describe("scheduler retention", () => {
 			return { p, b, c: c.id };
 		}, context);
 		// Point the spawner at C, now that its ID is known.
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			const record = (await tx.task(tree.p))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({
 				...record,
@@ -236,7 +236,7 @@ describe("scheduler retention", () => {
 	it("withdraws an input queued in a forgotten conversation below an abort-marked owner", async () => {
 		const { harness, root } = await open();
 		// Live P -> ended B -> conversation C with no task; C gets a queued input while P is cancelling.
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
@@ -248,7 +248,7 @@ describe("scheduler retention", () => {
 		await harness.waitForTask(tree.b, context);
 		const c = (await harness.conversation(tree.c, context))!;
 		// Busy, so the input queues instead of starting a run.
-		await c.commit(async (tx) => {
+		await c.commit(async tx => {
 			(await tx.doc(LiveDoc, tree.c)).run = { taskId: tree.keep, inputs: [], turns: 0 };
 		}, context);
 		const queued = (await c.submit({ type: "input", content: "later" }, context)).id;
@@ -264,7 +264,7 @@ describe("scheduler retention", () => {
 
 	it("aborts work created in a forgotten conversation below an abort-marked owner before it runs", async () => {
 		const { harness, root } = await open();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
@@ -274,14 +274,14 @@ describe("scheduler retention", () => {
 		gate("b").resolve();
 		await harness.waitForTask(tree.b, context);
 		// P cancels; its live child keeps it holding.
-		await harness.commit(async (tx) => {
+		await harness.commit(async tx => {
 			const record = (await tx.task(tree.p))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({ ...record, abortRequested: true });
 		}, context);
 		await eventually(async () => (await harness.getTask(tree.keep, context))!.abortRequested);
 		const c = (await harness.conversation(tree.c, context))!;
 		const late = await c.commit(
-			(tx) => tx.createTask(Hold, { name: "late" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "late" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		expect((await harness.waitForTask(late, context)).state.outcome.status).toBe("aborted");
@@ -293,7 +293,7 @@ describe("scheduler retention", () => {
 		const path = await sqlitePath();
 		const storage = await openNodeSqliteStorage(path);
 		const { harness, root } = await open(storage);
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "conversation" } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
 			return { b, c: c.id };
@@ -318,7 +318,7 @@ describe("scheduler retention", () => {
 		const c = (await second.conversation(tree.c, context))!;
 		holding = true;
 		const committing = c.commit(
-			(tx) => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "d" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		// Its admission loads the chain, for the memberships it writes: the commit waits for the read.
@@ -335,7 +335,7 @@ describe("scheduler retention", () => {
 	it("keeps a chain when one commit ends its last task and creates new work below it", async () => {
 		const { harness, root } = await open();
 		// Live P -> ended B -> conversation C with background task `old`, which keeps the chain known without holding B.
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
@@ -349,7 +349,7 @@ describe("scheduler retention", () => {
 		gate("b").resolve();
 		await harness.waitForTask(tree.b, context);
 		// One commit: the old task ends, which leaves nothing live below B, and a replacement starts in C.
-		const replacement = await harness.commit(async (tx) => {
+		const replacement = await harness.commit(async tx => {
 			const old = (await tx.task(tree.old))!;
 			const id = await tx.createTask(
 				Hold,
@@ -375,13 +375,13 @@ describe("scheduler retention", () => {
 		const { harness, root } = await open();
 		// Live P owns ended B, which owns conversation C: forgotten. P's terminal commit stages work in C, which loads C's
 		// chain, and a child of P, which the Transaction rejects, as P is ending.
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Rejected, { into: 0 }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
 			return { p, b, c: c.id };
 		}, context);
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			const record = (await tx.task(tree.p))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({ ...record, input: { into: tree.c } });
 		}, context);
@@ -400,7 +400,7 @@ describe("scheduler retention", () => {
 		const path = await sqlitePath();
 		let opened = await open(await openNodeSqliteStorage(path));
 		// A live task D in conversation C, owned by ended B: after reopen D's chain is not loaded.
-		const tree = await opened.root.commit(async (tx) => {
+		const tree = await opened.root.commit(async tx => {
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "conversation" } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
 			const d = await tx.createTask(
@@ -429,7 +429,7 @@ describe("scheduler retention", () => {
 	it("withdraws an input queued two ended levels below an owner whose intent appears later", async () => {
 		const { harness, root } = await open();
 		// Live P -> ended B -> ended A -> conversation C with no task, and a live child keeping P holding.
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const p = await tx.createTask(Hold, { name: "p" }, { ownership: { kind: "conversation" } });
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "task", taskId: p } });
 			const a = await tx.createTask(Hold, { name: "a" }, { ownership: { kind: "task", taskId: b } });
@@ -441,14 +441,14 @@ describe("scheduler retention", () => {
 		gate("b").resolve();
 		await harness.waitForTask(tree.b, context);
 		const c = (await harness.conversation(tree.c, context))!;
-		await c.commit(async (tx) => {
+		await c.commit(async tx => {
 			(await tx.doc(LiveDoc, tree.c)).run = { taskId: tree.keep, inputs: [], turns: 0 };
 		}, context);
 		// Queued while nothing cancels: no withdrawal scan.
 		const queued = (await c.submit({ type: "input", content: "later" }, context)).id;
 		await eventually(() => sizes(harness).dropQueue === 0);
 		// P fails while its child runs: it holds the failed outcome, which is cancellation intent.
-		await harness.commit(async (tx) => {
+		await harness.commit(async tx => {
 			const record = (await tx.task(tree.p))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({
 				...record,
@@ -466,7 +466,7 @@ describe("scheduler retention", () => {
 		const { harness, root } = await open();
 		const depth = 20_000;
 		const baseline = sizes(harness);
-		const { links, leaf } = await root.commit(async (tx) => {
+		const { links, leaf } = await root.commit(async tx => {
 			const links: TaskId[] = [];
 			let owner = await tx.createTask(Hold, { name: "link0" }, { ownership: { kind: "conversation" } });
 			links.push(owner);
@@ -490,7 +490,7 @@ describe("scheduler retention", () => {
 		const path = await sqlitePath();
 		let opened = await open(await openNodeSqliteStorage(path));
 		const parent = await opened.root.commit(
-			(tx) => tx.createTask(Hold, { name: "parent" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "parent" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		for (let n = 0; n < 20; n++) await subagentCycle(opened.harness, opened.root, parent, n);
@@ -515,16 +515,16 @@ describe("scheduler retention", () => {
 		};
 		const { harness, root } = await open(storage);
 		const busy = await root.commit(
-			(tx) => tx.createTask(Hold, { name: "busy" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "busy" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			(await tx.doc(LiveDoc, root.id)).run = { taskId: busy, inputs: [], turns: 0 };
 		}, context);
 		const before = scans;
 		await root.submit({ type: "input", content: "queued" }, context);
 		// Let any reconcile it would cause run.
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(scans).toBe(before);
 		gate("busy").resolve();
 		await harness.close(context);
@@ -536,7 +536,7 @@ describe("scheduler retention", () => {
 		const opened = await openTasks(await openNodeSqliteStorage(await sqlitePath()), [Hold, Waiter]);
 		const root = await opened.harness.root(context);
 		opened.harness.resume();
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const b = await tx.createTask(Hold, { name: "b" }, { ownership: { kind: "conversation" } });
 			const c = await tx.createConversation({ ownership: { kind: "task", taskId: b } });
 			return { b, c: c.id };
@@ -545,7 +545,7 @@ describe("scheduler retention", () => {
 		await opened.harness.waitForTask(tree.b, context);
 		const c = (await opened.harness.conversation(tree.c, context))!;
 		const waiter = await c.commit(
-			(tx) => tx.createTask(Waiter, { on: [tree.b] }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Waiter, { on: [tree.b] }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const outcome = (await opened.harness.waitForTask(waiter, context)).state.outcome;

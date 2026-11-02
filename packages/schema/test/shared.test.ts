@@ -11,7 +11,7 @@ const gc = runInNewContext("gc") as () => void;
 
 async function collectGarbage(): Promise<void> {
 	for (let round = 0; round < 6; round++) {
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		gc();
 	}
 }

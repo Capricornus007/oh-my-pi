@@ -92,8 +92,8 @@ describe("compression at the origin", () => {
 		const large = json(COMPRESS_ABOVE * 2);
 		expect(originPart(large, undefined, context)).toBe(large);
 		const useless: Compression = {
-			deflate: (bytes) => bytes,
-			inflate: (bytes) => ({ kind: "bytes", bytes }),
+			deflate: bytes => bytes,
+			inflate: bytes => ({ kind: "bytes", bytes }),
 		};
 		expect(originPart(large, useless, context)).toEqual(UTF8.encode(large));
 	});

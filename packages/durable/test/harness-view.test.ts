@@ -86,15 +86,15 @@ function answer(text: string): AssistantMessage {
 
 /** Let watch callbacks, which run after the commit, catch up. */
 async function drained(): Promise<void> {
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	await new Promise(resolve => setTimeout(resolve, 0));
 }
 
 function touches(harness: Harness, conversation: Conversation): { count: number } {
 	const counter = { count: 0 };
 	harness.observeCommits({
-		advance: (publication) => {
+		advance: publication => {
 			const touched = publication.changes.some(
-				(change) =>
+				change =>
 					(change.type === "entry" && change.value.conversationId === conversation.id) ||
 					(change.type === "document" &&
 						change.kind === "change" &&
@@ -137,7 +137,7 @@ describe("conversation view", () => {
 		const { initial, frames, stop } = await record(root);
 		const touching = touches(harness, root);
 		const submission = await root.submit({ type: "input", content: "hi" }, context);
-		await waitFor(() => frames.some((frame) => (frame.value.docs["pi.live"] as { generation?: unknown }).generation));
+		await waitFor(() => frames.some(frame => (frame.value.docs["pi.live"] as { generation?: unknown }).generation));
 		release.resolve();
 		await submission.wait(context);
 		await harness.waitForIdle(context);
@@ -148,7 +148,7 @@ describe("conversation view", () => {
 		expect(last).toEqual(await committed(harness, root, initial.conversation, last.entries.length));
 		expect(frames[0]!.ops).toContainEqual(["p", ["entries"], 0, 0, [expect.objectContaining({ kind: "pi.user" })]]);
 		// Document operations keep their exact shape under the mount path.
-		expect(frames.flatMap((frame) => frame.ops)).toContainEqual([
+		expect(frames.flatMap(frame => frame.ops)).toContainEqual([
 			"s",
 			["docs", "pi.live", "generation"],
 			{ attempt: 1 },
@@ -162,9 +162,9 @@ describe("conversation view", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const other = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 		const { initial, frames, stop } = await record(root);
-		await other.commit((tx) => tx.appendEntry(other.id, { kind: "note" }), context);
+		await other.commit(tx => tx.appendEntry(other.id, { kind: "note" }), context);
 		await root.configure({ thinkingLevel: "high" }, context);
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		await drained();
 		expect(frames).toHaveLength(2);
 		expect(frames[0]!.ops).toEqual([["s", ["docs", "pi.agent", "thinkingLevel"], "high"]]);
@@ -177,16 +177,16 @@ describe("conversation view", () => {
 
 	it("keeps head markers in place: a summary and a reset are appended entries", async () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
-		const note = (kind: string) => root.commit((tx) => tx.appendEntry(root.id, { kind }), context);
+		const note = (kind: string) => root.commit(tx => tx.appendEntry(root.id, { kind }), context);
 		await note("a");
 		const b = await note("b");
 		await note("c");
 		const { initial, frames, stop } = await record(root);
-		const summary = await root.commit((tx) => tx.appendEntry(root.id, { kind: "summary", head: b.id }), context);
+		const summary = await root.commit(tx => tx.appendEntry(root.id, { kind: "summary", head: b.id }), context);
 		await note("d");
 		await root.reset(undefined, context);
 		await drained();
-		const kinds = frames.map((frame) => frame.value.entries.map((entry) => entry.kind));
+		const kinds = frames.map(frame => frame.value.entries.map(entry => entry.kind));
 		expect(kinds).toEqual([
 			["a", "b", "c", "summary"],
 			["a", "b", "c", "summary", "d"],
@@ -203,14 +203,14 @@ describe("conversation view", () => {
 
 	it("shows a fork's inherited entries in ID order, its head markers in place", async () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
-		const a = await root.commit((tx) => tx.appendEntry(root.id, { kind: "a" }), context);
-		const b = await root.commit((tx) => tx.appendEntry(root.id, { kind: "b" }), context);
+		const a = await root.commit(tx => tx.appendEntry(root.id, { kind: "a" }), context);
+		const b = await root.commit(tx => tx.appendEntry(root.id, { kind: "b" }), context);
 		const fork = await root.fork(b.id, { ownership: { kind: "ownerless" } }, context);
 		const { initial, frames, stop } = await record(fork);
-		await fork.commit((tx) => tx.appendEntry(fork.id, { kind: "summary", head: b.id }), context);
+		await fork.commit(tx => tx.appendEntry(fork.id, { kind: "summary", head: b.id }), context);
 		await drained();
-		expect(initial.entries.map((entry) => entry.id)).toEqual([a.id, b.id]);
-		expect(frames[0]!.value.entries.map((entry) => entry.kind)).toEqual(["a", "b", "summary"]);
+		expect(initial.entries.map(entry => entry.id)).toEqual([a.id, b.id]);
+		expect(frames[0]!.value.entries.map(entry => entry.kind)).toEqual(["a", "b", "summary"]);
 		expect(frames[0]!.value).toEqual(await committed(harness, fork, initial.conversation, 3));
 		await stop();
 		await harness.close(context);
@@ -218,15 +218,15 @@ describe("conversation view", () => {
 
 	it("shows a fork's inherited entries and follows only the fork's own commits", async () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
-		const first = await root.commit((tx) => tx.appendEntry(root.id, { kind: "first" }), context);
+		const first = await root.commit(tx => tx.appendEntry(root.id, { kind: "first" }), context);
 		const fork = await root.fork(first.id, { ownership: { kind: "ownerless" } }, context);
 		const { initial, frames, stop } = await record(fork);
-		expect(initial.entries.map((entry) => entry.kind)).toEqual(["first"]);
+		expect(initial.entries.map(entry => entry.kind)).toEqual(["first"]);
 		expect(initial.conversation.parent).toEqual({ conversationId: root.id, at: first.id });
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "parent" }), context);
-		await fork.commit((tx) => tx.appendEntry(fork.id, { kind: "child" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "parent" }), context);
+		await fork.commit(tx => tx.appendEntry(fork.id, { kind: "child" }), context);
 		await drained();
-		expect(frames.map((frame) => frame.value.entries.map((entry) => entry.kind))).toEqual([["first", "child"]]);
+		expect(frames.map(frame => frame.value.entries.map(entry => entry.kind))).toEqual([["first", "child"]]);
 		await stop();
 		await harness.close(context);
 	});
@@ -234,12 +234,12 @@ describe("conversation view", () => {
 	it("unmounts a retired document and mounts its recreation whole", async () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
 		const { frames, stop } = await record(root);
-		await root.commit((tx) => tx.retireDoc(LiveDoc, root.id), context);
-		await root.commit(async (tx) => {
+		await root.commit(tx => tx.retireDoc(LiveDoc, root.id), context);
+		await root.commit(async tx => {
 			(await tx.doc(LiveDoc, root.id)).tools = [];
 		}, context);
 		await drained();
-		expect(frames.map((frame) => frame.ops)).toEqual([
+		expect(frames.map(frame => frame.ops)).toEqual([
 			[["d", ["docs", "pi.live"]]],
 			[["s", ["docs", "pi.live"], { tools: [] }]],
 		]);
@@ -253,7 +253,7 @@ describe("conversation view", () => {
 		const watch = await root.watch(context);
 		const initial = watch.value;
 		for (let index = 0; index < 101; index++) {
-			await root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+			await root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		}
 		const frames: Frame[] = [];
 		watch.start(
@@ -275,15 +275,15 @@ describe("conversation view", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
 		const kept = await record(root);
 		const { frames, stop } = await record(root);
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "one" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "one" }), context);
 		await drained();
-		expect(kept.frames.at(-1)!.value.entries.map((entry) => entry.kind)).toEqual(["one"]);
+		expect(kept.frames.at(-1)!.value.entries.map(entry => entry.kind)).toEqual(["one"]);
 		await stop();
 		expect(frames).toHaveLength(1);
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "two" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "two" }), context);
 		await drained();
 		const last = kept.frames.at(-1)!.value;
-		expect(last.entries.map((entry) => entry.kind)).toEqual(["one", "two"]);
+		expect(last.entries.map(entry => entry.kind)).toEqual(["one", "two"]);
 		await kept.stop();
 		// No observer is left, so the mount was dropped: a new observer builds a new revision from committed state.
 		const rebuilt = await fresh(root);
@@ -339,8 +339,8 @@ describe("conversation view", () => {
 		failing.start(async () => {
 			throw new Error("listener failed");
 		});
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "one" }), context);
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "two" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "one" }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "two" }), context);
 		await drained();
 		expect(await failing.closed).toMatchObject({ kind: "listener_error" });
 		expect(frames).toHaveLength(2);
@@ -360,18 +360,18 @@ describe("conversation view", () => {
 			initial: () => ({ n: 0 }),
 		});
 		const { initial, frames, stop } = await record(root);
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			await tx.appendEntry(root.id, { kind: "a" });
 			(await tx.doc(LiveDoc, root.id)).tools = [];
 			await tx.appendEntry(root.id, { kind: "b" });
 		}, context);
 		// A document that is not mounted publishes nothing.
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			(await tx.doc(Other, root.id)).n = 1;
 		}, context);
 		await drained();
 		expect(frames).toHaveLength(1);
-		expect(frames[0]!.value.entries.map((entry) => entry.kind)).toEqual(["a", "b"]);
+		expect(frames[0]!.value.entries.map(entry => entry.kind)).toEqual(["a", "b"]);
 		expect(replay(initial, frames)).toEqual(await committed(harness, root, initial.conversation, 2));
 		await stop();
 		await harness.close(context);
@@ -382,12 +382,12 @@ describe("conversation view", () => {
 async function notes(conversation: Conversation, count: number, kind = "note"): Promise<EntryRecord[]> {
 	const entries: EntryRecord[] = [];
 	for (let index = 0; index < count; index++) {
-		entries.push(await conversation.commit((tx) => tx.appendEntry(conversation.id, { kind, data: index }), context));
+		entries.push(await conversation.commit(tx => tx.appendEntry(conversation.id, { kind, data: index }), context));
 	}
 	return entries;
 }
 
-const ids = (entries: readonly EntryRecord[]) => entries.map((entry) => entry.id);
+const ids = (entries: readonly EntryRecord[]) => entries.map(entry => entry.id);
 
 const gc = (() => {
 	setFlagsFromString("--expose-gc");
@@ -416,7 +416,7 @@ describe("conversation view window", () => {
 		expect(ids(initial.entries)).toEqual(ids(written.slice(1)));
 		const appended = await notes(root, 3);
 		await drained();
-		expect(frames.map((frame) => frame.value.entries.length)).toEqual([4, 5, 3]);
+		expect(frames.map(frame => frame.value.entries.length)).toEqual([4, 5, 3]);
 		const [e5, e6, e7] = appended as [EntryRecord, EntryRecord, EntryRecord];
 		expect(frames[0]!.ops).toEqual([["p", ["entries"], 3, 0, [e5]]]);
 		expect(frames[2]!.ops).toEqual([
@@ -438,7 +438,7 @@ describe("conversation view window", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
 		await notes(root, 2);
 		const { initial, frames, stop } = await record(root, { min: 2, max: 3 });
-		const burst = await root.commit(async (tx) => {
+		const burst = await root.commit(async tx => {
 			const entries: EntryRecord[] = [];
 			for (let index = 0; index < 5; index++) entries.push(await tx.appendEntry(root.id, { kind: "burst" }));
 			return entries;
@@ -528,7 +528,7 @@ describe("conversation view window", () => {
 		const changes: ConversationView[] = [];
 		const observation = await harness.observeConversation(
 			root.id,
-			{ advance: (call) => call.kind === "value" && changes.push(call.value), end: () => {} },
+			{ advance: call => call.kind === "value" && changes.push(call.value), end: () => {} },
 			context,
 			{ min: 2, max: 3 },
 		);
@@ -551,7 +551,7 @@ describe("conversation view window", () => {
 		// Past 10,000 pending operations, the next call is one root replacement: here an append per commit, and a splice
 		// and a `before` every other commit.
 		for (let index = 0; index < 6000; index++) {
-			await root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+			await root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		}
 		const frames: Frame[] = [];
 		watch.start(

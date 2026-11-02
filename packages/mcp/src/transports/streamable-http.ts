@@ -352,13 +352,13 @@ export class StreamableHttpTransport extends TransportEvents implements McpTrans
 	): Promise<void> {
 		await consumeSseStream(stream, {
 			maxEventBytes: this.options.maxMessageBytes ?? DEFAULT_MAX_MESSAGE_BYTES,
-			onId: (id) => {
+			onId: id => {
 				cursor.lastEventId = id;
 			},
-			onRetry: (delayMs) => {
+			onRetry: delayMs => {
 				cursor.retryMs = delayMs;
 			},
-			onEvent: (event) => {
+			onEvent: event => {
 				cursor.received = true;
 				// Events without data prime resumption; other event types are not JSON-RPC.
 				if (!event.data.trim() || (event.event !== undefined && event.event !== "message")) return;
@@ -388,7 +388,7 @@ export class StreamableHttpTransport extends TransportEvents implements McpTrans
 		};
 		let stream: ReadableStream<Uint8Array> | undefined = body;
 		let failure: unknown;
-		for (let attempt = 0; ; ) {
+		for (let attempt = 0; ;) {
 			if (stream) {
 				try {
 					await this.consumeSse(stream, cursor, onMessage);
@@ -429,7 +429,7 @@ export class StreamableHttpTransport extends TransportEvents implements McpTrans
 	/** Keep the server-to-client stream open, reconnecting with backoff when it drops. */
 	private async runGetStream(): Promise<void> {
 		const cursor: StreamCursor = { lastEventId: undefined, retryMs: undefined, received: false };
-		for (let attempt = 0; !this.closed; ) {
+		for (let attempt = 0; !this.closed;) {
 			try {
 				const stream = await this.openSseStream(cursor.lastEventId);
 				// The server does not offer a GET stream.
@@ -505,7 +505,7 @@ export class StreamableHttpTransport extends TransportEvents implements McpTrans
 	private sleep(ms: number): Promise<boolean> {
 		const signal = this.controller.signal;
 		if (signal.aborted) return Promise.resolve(false);
-		return new Promise((resolve) => {
+		return new Promise(resolve => {
 			const onAbort = () => {
 				clearTimeout(timer);
 				resolve(false);

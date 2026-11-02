@@ -45,7 +45,7 @@ type Keyword = keyof typeof KEYWORD_GROUPS;
 
 const KEYWORDS = new Map(
 	Object.entries(KEYWORD_GROUPS).flatMap(([keyword, names]) =>
-		names.split(" ").map((name) => [name, keyword as Keyword]),
+		names.split(" ").map(name => [name, keyword as Keyword]),
 	),
 );
 
@@ -109,7 +109,7 @@ function walkKeyword(keyword: Keyword, value: unknown, path: string, objects: Ob
 			}
 			return { schema: value, normal: value, bytes: false };
 		case "required": {
-			if (!Array.isArray(value) || !value.every((name) => typeof name === "string")) {
+			if (!Array.isArray(value) || !value.every(name => typeof name === "string")) {
 				throw new Error(`${path}: expected an array of strings`);
 			}
 			const names = [...value].sort();
@@ -131,9 +131,9 @@ function walkList(value: unknown, path: string, objects: Objects, ancestors: Set
 	if (!Array.isArray(value)) throw new Error(`${path}: expected an array of schemas`);
 	const items = Array.from(value, (item, index) => walk(item, `${path}[${index}]`, objects, ancestors));
 	return {
-		schema: items.map((item) => item.schema),
-		normal: items.map((item) => item.normal),
-		bytes: items.some((item) => item.bytes),
+		schema: items.map(item => item.schema),
+		normal: items.map(item => item.normal),
+		bytes: items.some(item => item.bytes),
 	};
 }
 
@@ -148,7 +148,7 @@ function sortedCopy(value: JsonValue): JsonValue {
 	if (value === null || typeof value !== "object") return value;
 	if (Array.isArray(value)) return value.map(sortedCopy);
 	const keys = Object.keys(value).sort();
-	return Object.fromEntries(keys.map((key) => [key, sortedCopy(value[key]!)]));
+	return Object.fromEntries(keys.map(key => [key, sortedCopy(value[key]!)]));
 }
 
 /** Data entries sorted by key; symbol keys, accessors and non-enumerable keys (not data) are refused. */

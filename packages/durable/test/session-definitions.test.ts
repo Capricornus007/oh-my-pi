@@ -54,7 +54,7 @@ const SessionFamily = defineDocFamily<State, number>({
 	version: 1,
 	family: true,
 	scope: "session",
-	initial: (seed) => ({ value: seed }),
+	initial: seed => ({ value: seed }),
 });
 const ConversationFamily = defineDocFamily<State, number>({
 	checkpointWhen: () => false,
@@ -64,7 +64,7 @@ const ConversationFamily = defineDocFamily<State, number>({
 	scope: "conversation",
 	history: "rewindable",
 	fork: "initial",
-	initial: (seed) => ({ value: seed }),
+	initial: seed => ({ value: seed }),
 });
 const TaskFamily = defineDocFamily<State, number>({
 	checkpointWhen: () => false,
@@ -72,7 +72,7 @@ const TaskFamily = defineDocFamily<State, number>({
 	version: 1,
 	family: true,
 	scope: "task",
-	initial: (seed) => ({ value: seed }),
+	initial: seed => ({ value: seed }),
 });
 
 describe("document definitions", () => {

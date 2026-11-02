@@ -26,7 +26,7 @@ function createCase(
 }
 
 function findSpan(spans: readonly RecordedTelemetrySpan[], name: string): RecordedTelemetrySpan {
-	const span = spans.find((candidate) => candidate.name === name);
+	const span = spans.find(candidate => candidate.name === name);
 	ok(span, `Expected recorded span ${name}`);
 	return span;
 }
@@ -45,68 +45,54 @@ export function createTelemetryAdapterConformance(
 	factory: TelemetryAdapterFixtureFactory,
 ): readonly TelemetryAdapterConformanceCase[] {
 	return [
-		createCase(
-			factory,
-			"capabilities",
-			"carries adapter capabilities through contexts and spans",
-			async (fixture) => {
-				const metrics = fixture.metrics ?? fixture.context.metrics;
-				const propagation = fixture.propagation ?? fixture.context.propagation;
-				const assertCapabilities = (context: TelemetryContext): void => {
-					strictEqual(context.metrics, metrics);
-					strictEqual(context.propagation, propagation);
-				};
-				assertCapabilities(fixture.context);
-				let settled: TelemetrySpan | undefined;
-				await fixture.context.startSpan({ name: "capabilities" }, async (span) => {
-					settled = span;
-					assertCapabilities(span);
-					await span.startSpan({ name: "capabilities.child" }, assertCapabilities);
-					if (propagation) {
-						const parent = propagation.extract(propagation.inject(span));
-						assertCapabilities(parent);
-						await parent.startSpan({ name: "capabilities.extracted" }, assertCapabilities);
-					}
-				});
-				ok(settled);
-				await settled.startSpan({ name: "capabilities.inert" }, assertCapabilities);
-			},
-		),
-		createCase(
-			factory,
-			"metrics",
-			"records ordered measurements and optional histogram exemplars",
-			async (fixture) => {
-				if (!fixture.metrics) return;
-				ok(fixture.getMetrics, "Metrics fixtures require a normalized measurement reader");
-				fixture.metrics
-					.counter("bytes", { description: "Encoded bytes", unit: "By" })
-					.add(12, { direction: "out" });
-				const active = fixture.metrics.upDownCounter("active");
-				active.add(1);
-				active.add(-1);
-				const histogram = fixture.metrics.histogram("duration", { unit: "ms", boundaries: [1, 10] });
-				await fixture.context.startSpan({ name: "measured" }, (span) =>
-					histogram.record(5, { method: "read" }, span),
-				);
-				const measurements = await fixture.getMetrics();
-				deepStrictEqual(
-					measurements.map((measurement) => [measurement.kind, measurement.name, measurement.value]),
-					[
-						["counter", "bytes", 12],
-						["upDownCounter", "active", 1],
-						["upDownCounter", "active", -1],
-						["histogram", "duration", 5],
-					],
-				);
-				deepStrictEqual(measurements[0]?.attributes, { direction: "out" });
-				strictEqual(measurements[0]?.description, "Encoded bytes");
-				strictEqual(measurements[0]?.unit, "By");
-				deepStrictEqual(measurements[3]?.boundaries, [1, 10]);
-				deepStrictEqual(measurements[3]?.context, findSpan(await fixture.getSpans(), "measured").context);
-			},
-		),
-		createCase(factory, "metrics", "copies instrument metadata and measurement attributes", async (fixture) => {
+		createCase(factory, "capabilities", "carries adapter capabilities through contexts and spans", async fixture => {
+			const metrics = fixture.metrics ?? fixture.context.metrics;
+			const propagation = fixture.propagation ?? fixture.context.propagation;
+			const assertCapabilities = (context: TelemetryContext): void => {
+				strictEqual(context.metrics, metrics);
+				strictEqual(context.propagation, propagation);
+			};
+			assertCapabilities(fixture.context);
+			let settled: TelemetrySpan | undefined;
+			await fixture.context.startSpan({ name: "capabilities" }, async span => {
+				settled = span;
+				assertCapabilities(span);
+				await span.startSpan({ name: "capabilities.child" }, assertCapabilities);
+				if (propagation) {
+					const parent = propagation.extract(propagation.inject(span));
+					assertCapabilities(parent);
+					await parent.startSpan({ name: "capabilities.extracted" }, assertCapabilities);
+				}
+			});
+			ok(settled);
+			await settled.startSpan({ name: "capabilities.inert" }, assertCapabilities);
+		}),
+		createCase(factory, "metrics", "records ordered measurements and optional histogram exemplars", async fixture => {
+			if (!fixture.metrics) return;
+			ok(fixture.getMetrics, "Metrics fixtures require a normalized measurement reader");
+			fixture.metrics.counter("bytes", { description: "Encoded bytes", unit: "By" }).add(12, { direction: "out" });
+			const active = fixture.metrics.upDownCounter("active");
+			active.add(1);
+			active.add(-1);
+			const histogram = fixture.metrics.histogram("duration", { unit: "ms", boundaries: [1, 10] });
+			await fixture.context.startSpan({ name: "measured" }, span => histogram.record(5, { method: "read" }, span));
+			const measurements = await fixture.getMetrics();
+			deepStrictEqual(
+				measurements.map(measurement => [measurement.kind, measurement.name, measurement.value]),
+				[
+					["counter", "bytes", 12],
+					["upDownCounter", "active", 1],
+					["upDownCounter", "active", -1],
+					["histogram", "duration", 5],
+				],
+			);
+			deepStrictEqual(measurements[0]?.attributes, { direction: "out" });
+			strictEqual(measurements[0]?.description, "Encoded bytes");
+			strictEqual(measurements[0]?.unit, "By");
+			deepStrictEqual(measurements[3]?.boundaries, [1, 10]);
+			deepStrictEqual(measurements[3]?.context, findSpan(await fixture.getSpans(), "measured").context);
+		}),
+		createCase(factory, "metrics", "copies instrument metadata and measurement attributes", async fixture => {
 			if (!fixture.metrics) return;
 			ok(fixture.getMetrics, "Metrics fixtures require a normalized measurement reader");
 			const boundaries = [1, 10];
@@ -124,15 +110,15 @@ export function createTelemetryAdapterConformance(
 			strictEqual(measurements[0]?.description, "Original");
 			strictEqual(measurements[0]?.context, null);
 		}),
-		createCase(factory, "links", "records initial and late links without changing parents", async (fixture) => {
+		createCase(factory, "links", "records initial and late links without changing parents", async fixture => {
 			let target: TelemetrySpan | undefined;
-			await fixture.context.startSpan({ name: "target" }, (span) => {
+			await fixture.context.startSpan({ name: "target" }, span => {
 				target = span;
 			});
 			if (!target) throw new Error("Expected target span");
 			const targetSpan = target;
 			const attributes = { reason: ["initial"] };
-			await fixture.context.startSpan({ name: "linked", links: [{ context: target, attributes }] }, (span) => {
+			await fixture.context.startSpan({ name: "linked", links: [{ context: target, attributes }] }, span => {
 				attributes.reason.push("mutated");
 				span.addLink({ context: targetSpan, attributes: { reason: "late" } });
 				span.addLink({ context: NOOP_TELEMETRY_CONTEXT });
@@ -146,9 +132,9 @@ export function createTelemetryAdapterConformance(
 				{ context: findSpan(spans, "target").context, attributes: { reason: "late" } },
 			]);
 		}),
-		createCase(factory, "links", "ignores links added after source settlement", async (fixture) => {
+		createCase(factory, "links", "ignores links added after source settlement", async fixture => {
 			let source: TelemetrySpan | undefined;
-			await fixture.context.startSpan({ name: "link-source" }, (span) => {
+			await fixture.context.startSpan({ name: "link-source" }, span => {
 				source = span;
 			});
 			if (!source) throw new Error("Expected source span");
@@ -160,10 +146,10 @@ export function createTelemetryAdapterConformance(
 			factory,
 			"propagation",
 			"roundtrips parent identity through JSON without retaining the carrier",
-			async (fixture) => {
+			async fixture => {
 				if (!fixture.propagation) return;
 				const propagation = fixture.propagation;
-				await fixture.context.startSpan({ name: "sender" }, async (span) => {
+				await fixture.context.startSpan({ name: "sender" }, async span => {
 					const carrier = propagation.inject(span);
 					ok(carrier);
 					const wire = JSON.parse(JSON.stringify(carrier)) as TelemetryCarrier;
@@ -176,7 +162,7 @@ export function createTelemetryAdapterConformance(
 				deepStrictEqual(findSpan(spans, "receiver").parentContext, findSpan(spans, "sender").context);
 			},
 		),
-		createCase(factory, "propagation", "absent and unknown carriers produce recorded roots", async (fixture) => {
+		createCase(factory, "propagation", "absent and unknown carriers produce recorded roots", async fixture => {
 			if (!fixture.propagation) return;
 			strictEqual(fixture.propagation.inject(NOOP_TELEMETRY_CONTEXT), undefined);
 			const carriers: readonly (TelemetryCarrier | undefined)[] = [undefined, {}, { unknown: "format" }];
@@ -187,20 +173,20 @@ export function createTelemetryAdapterConformance(
 			for (const span of await fixture.getSpans()) strictEqual(span.parentContext, null);
 		}),
 
-		createCase(factory, "propagation", "propagates across fresh adapters and multiple hops", async (fixture) => {
+		createCase(factory, "propagation", "propagates across fresh adapters and multiple hops", async fixture => {
 			if (!fixture.propagation) return;
 			await using receiver = await factory();
 			await using worker = await factory();
 			if (!receiver.propagation || !worker.propagation) throw new Error("Expected propagation on each fixture");
 			let senderCarrier: TelemetryCarrier | undefined;
-			await fixture.context.startSpan({ name: "sender" }, (span) => {
+			await fixture.context.startSpan({ name: "sender" }, span => {
 				senderCarrier = fixture.propagation?.inject(span);
 			});
 			ok(senderCarrier);
 			let receiverCarrier: TelemetryCarrier | undefined;
 			await receiver.propagation
 				.extract(JSON.parse(JSON.stringify(senderCarrier)) as TelemetryCarrier)
-				.startSpan({ name: "receiver" }, (span) => {
+				.startSpan({ name: "receiver" }, span => {
 					receiverCarrier = receiver.propagation?.inject(span);
 				});
 			ok(receiverCarrier);
@@ -210,33 +196,28 @@ export function createTelemetryAdapterConformance(
 			deepStrictEqual(findSpan(await receiver.getSpans(), "receiver").parentContext, senderCarrier);
 			deepStrictEqual(findSpan(await worker.getSpans(), "worker").parentContext, receiverCarrier);
 		}),
-		createCase(
-			factory,
-			"callback lifecycle",
-			"admits once synchronously and preserves the result",
-			async (fixture) => {
-				let admitted = false;
-				let calls = 0;
-				const expected = { value: 42 };
-				const result = fixture.context.startSpan({ name: "success" }, () => {
-					admitted = true;
-					calls++;
-					return expected;
-				});
+		createCase(factory, "callback lifecycle", "admits once synchronously and preserves the result", async fixture => {
+			let admitted = false;
+			let calls = 0;
+			const expected = { value: 42 };
+			const result = fixture.context.startSpan({ name: "success" }, () => {
+				admitted = true;
+				calls++;
+				return expected;
+			});
 
-				strictEqual(admitted, true);
-				strictEqual(calls, 1);
-				strictEqual(await result, expected);
-				deepStrictEqual(findSpan(await fixture.getSpans(), "success").status, { status: "ok" });
-				strictEqual(findSpan(await fixture.getSpans(), "success").settled, true);
-			},
-		),
+			strictEqual(admitted, true);
+			strictEqual(calls, 1);
+			strictEqual(await result, expected);
+			deepStrictEqual(findSpan(await fixture.getSpans(), "success").status, { status: "ok" });
+			strictEqual(findSpan(await fixture.getSpans(), "success").settled, true);
+		}),
 
 		createCase(
 			factory,
 			"callback lifecycle",
 			"preserves synchronous and asynchronous rejection values",
-			async (fixture) => {
+			async fixture => {
 				const syncError = new Error("sync");
 				await rejectsWithSameValue(
 					fixture.context.startSpan({ name: "sync-error" }, () => {
@@ -265,15 +246,15 @@ export function createTelemetryAdapterConformance(
 			},
 		),
 
-		createCase(factory, "status", "uses last explicit status without automatic overwrite", async (fixture) => {
-			await fixture.context.startSpan({ name: "last-status" }, (span) => {
+		createCase(factory, "status", "uses last explicit status without automatic overwrite", async fixture => {
+			await fixture.context.startSpan({ name: "last-status" }, span => {
 				span.setStatus({ status: "error", error: { name: "Expected", message: "first" } });
 				span.setStatus({ status: "ok" });
 			});
 
 			const thrown = new Error("after explicit status");
 			await rejectsWithSameValue(
-				fixture.context.startSpan({ name: "explicit-before-throw" }, (span) => {
+				fixture.context.startSpan({ name: "explicit-before-throw" }, span => {
 					span.setStatus({ status: "ok" });
 					throw thrown;
 				}),
@@ -282,14 +263,14 @@ export function createTelemetryAdapterConformance(
 
 			const rejected = new Error("after async explicit status");
 			await rejectsWithSameValue(
-				fixture.context.startSpan({ name: "explicit-before-rejection" }, (span) => {
+				fixture.context.startSpan({ name: "explicit-before-rejection" }, span => {
 					span.setStatus({ status: "error", error: { name: "Expected", message: "async failure" } });
 					return Promise.reject(rejected);
 				}),
 				rejected,
 			);
 
-			await fixture.context.startSpan({ name: "expected-failure" }, (span) => {
+			await fixture.context.startSpan({ name: "expected-failure" }, span => {
 				span.setStatus({ status: "error", error: { name: "Expected", message: "returned failure" } });
 				return { ok: false };
 			});
@@ -307,13 +288,13 @@ export function createTelemetryAdapterConformance(
 			});
 		}),
 
-		createCase(factory, "recording", "merges attributes and records ordered events", async (fixture) => {
+		createCase(factory, "recording", "merges attributes and records ordered events", async fixture => {
 			await fixture.context.startSpan(
 				{
 					name: "recording",
 					attributes: { start: "value", overwrite: "start", ignored: undefined },
 				},
-				(span) => {
+				span => {
 					span.setAttributes({ count: 1, overwrite: "middle" });
 					span.setAttributes({ count: undefined, overwrite: "end" });
 					span.addEvent("first", { index: 1, ignored: undefined });
@@ -329,9 +310,9 @@ export function createTelemetryAdapterConformance(
 			]);
 		}),
 
-		createCase(factory, "recording", "makes calls after settlement inert", async (fixture) => {
+		createCase(factory, "recording", "makes calls after settlement inert", async fixture => {
 			let settledSpan: TelemetrySpan | undefined;
-			await fixture.context.startSpan({ name: "settled", attributes: { value: "initial" } }, (span) => {
+			await fixture.context.startSpan({ name: "settled", attributes: { value: "initial" } }, span => {
 				settledSpan = span;
 			});
 			const capturedSpan = settledSpan;
@@ -355,13 +336,13 @@ export function createTelemetryAdapterConformance(
 			deepStrictEqual(spans[0]?.status, { status: "ok" });
 		}),
 
-		createCase(factory, "parentage", "records nested and concurrent child relationships", async (fixture) => {
+		createCase(factory, "parentage", "records nested and concurrent child relationships", async fixture => {
 			let releaseFirst: (() => void) | undefined;
-			const firstGate = new Promise<void>((resolve) => {
+			const firstGate = new Promise<void>(resolve => {
 				releaseFirst = resolve;
 			});
 
-			await fixture.context.startSpan({ name: "parent" }, async (parent) => {
+			await fixture.context.startSpan({ name: "parent" }, async parent => {
 				const first = parent.startSpan({ name: "first-child" }, async () => {
 					await firstGate;
 				});

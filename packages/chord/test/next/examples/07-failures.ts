@@ -21,7 +21,7 @@ const Mirror = local("example.mirror", { version: 1, params: { id: int() }, memb
 const Stuck = local("example.stuck", { version: 1, params: { id: int() }, members: { status: str() } });
 
 let attempts = 0;
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Remote, (_, self) => {
 		const attempt = ++attempts;
 		self.open(

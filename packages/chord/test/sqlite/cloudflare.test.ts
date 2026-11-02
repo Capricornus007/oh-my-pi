@@ -22,7 +22,7 @@ describe("Durable Object SQLite driver", () => {
 	it("reports the rows a statement changed, without index writes", async () => {
 		const database = new DurableObjectSqliteDatabase(durableObjectStorage());
 		expect(await runChanges(database)).toEqual(RUN_CHANGES);
-		const inTransaction = await database.transaction((handle) =>
+		const inTransaction = await database.transaction(handle =>
 			handle.runCounted("INSERT INTO changes_probe VALUES (?, ?, ?)", "t", "t/1", 1),
 		);
 		expect(inTransaction).toBe(1);
@@ -31,7 +31,7 @@ describe("Durable Object SQLite driver", () => {
 	it("reads only the cursor's first row for get", async () => {
 		const operations: string[] = [];
 		const database = new DurableObjectSqliteDatabase(
-			durableObjectStorage(new DatabaseSync(":memory:"), (operation) => operations.push(operation)),
+			durableObjectStorage(new DatabaseSync(":memory:"), operation => operations.push(operation)),
 		);
 		await database.exec("CREATE TABLE items (id INTEGER PRIMARY KEY)");
 		await database.run("INSERT INTO items (id) VALUES (1), (2)");
@@ -53,7 +53,7 @@ describe("Durable Object SQLite driver", () => {
 		await database.exec("CREATE TABLE items (id INTEGER PRIMARY KEY)");
 		const order: string[] = [];
 		const { promise: gate, resolve } = Promise.withResolvers<void>();
-		const transaction = database.transaction(async (handle) => {
+		const transaction = database.transaction(async handle => {
 			await handle.run("INSERT INTO items (id) VALUES (?)", 1);
 			await gate;
 			order.push("transaction");
@@ -78,7 +78,7 @@ describe("Durable Object SQLite driver", () => {
 		await database.exec("CREATE TABLE items (id INTEGER PRIMARY KEY)");
 		let handle: Parameters<Parameters<DurableObjectSqliteDatabase["transaction"]>[0]>[0] | undefined;
 		await expect(
-			database.transaction(async (transaction) => {
+			database.transaction(async transaction => {
 				handle = transaction;
 				await transaction.run("INSERT INTO items (id) VALUES (?)", 1);
 				throw new Error("abort");
@@ -94,7 +94,7 @@ describe("Durable Object SQLite driver", () => {
 		const other = new DurableObjectSqliteDatabase(storage);
 		await database.exec("CREATE TABLE items (id INTEGER PRIMARY KEY)");
 		const { promise: gate, resolve } = Promise.withResolvers<void>();
-		const transaction = database.transaction(async (handle) => {
+		const transaction = database.transaction(async handle => {
 			await handle.run("INSERT INTO items (id) VALUES (?)", 1);
 			await gate;
 			throw new Error("abort");
@@ -115,7 +115,7 @@ describe("Durable Object SQLite driver", () => {
 		await database.exec("CREATE TABLE items (id INTEGER PRIMARY KEY)");
 		const { promise: opened, resolve: markOpened } = Promise.withResolvers<void>();
 		const { promise: gate, resolve } = Promise.withResolvers<void>();
-		const transaction = database.transaction(async (handle) => {
+		const transaction = database.transaction(async handle => {
 			await handle.run("INSERT INTO items (id) VALUES (?)", 1);
 			markOpened();
 			await gate;
@@ -138,7 +138,7 @@ describe("the outcome of a transaction (slice 6b D4)", () => {
 		return {
 			storage: {
 				...storage,
-				transaction: async (closure) => {
+				transaction: async closure => {
 					const result = await transaction(closure);
 					if (!failing) return result;
 					failing = false;
@@ -181,12 +181,12 @@ describe("the outcome of a transaction (slice 6b D4)", () => {
 			BACKGROUND_CONTEXT,
 		)) as ChordStore;
 		await store.read(
-			(executor) => executor.exec('CREATE TABLE "checked" (n INTEGER CHECK (n < 10))'),
+			executor => executor.exec('CREATE TABLE "checked" (n INTEGER CHECK (n < 10))'),
 			BACKGROUND_CONTEXT,
 		);
 		const refused: StagedWrite = {
 			order: "write",
-			apply: async (step) => {
+			apply: async step => {
 				await step.run('INSERT INTO "checked" VALUES (11)');
 				return [];
 			},

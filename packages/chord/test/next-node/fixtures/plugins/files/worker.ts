@@ -5,6 +5,6 @@ import { constant, defineFacet } from "@earendil-works/chord/next";
 import { pluginFile } from "@earendil-works/chord/next/plugins";
 import { Files } from "@test/contracts/contract";
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Files, () => ({ text: constant(readFileSync(pluginFile("assets/data.txt"), "utf8").trim()) })),
 );

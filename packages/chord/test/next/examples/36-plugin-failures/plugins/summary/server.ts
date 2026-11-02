@@ -6,7 +6,7 @@ import { Price } from "@example/prices/contract";
 
 const Summary = local("example.summary", { version: 1, params: {}, members: { text: str() } });
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Summary, (_params, self) => {
 		const price = self.get(Price, {});
 		return { text: self.derive([price.cents], ([cents]) => `price v${Price.version}: ${cents} cents`) };

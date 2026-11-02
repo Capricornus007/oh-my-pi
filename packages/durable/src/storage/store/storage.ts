@@ -131,7 +131,7 @@ export class StoreStorage implements Storage {
 			for (const namespace of SCOPE_NAMESPACES) chord.claims.documents(owner, namespace, claimant);
 			await declared.prepare(context);
 			const highest = await chord.read(
-				(executor) =>
+				executor =>
 					executor.get<{ readonly id: number | null }>(
 						`SELECT max("id") AS id FROM "${tables.recordIds.sql.table}"`,
 					),
@@ -187,7 +187,7 @@ export class StoreStorage implements Storage {
 	}
 
 	conversation(id: ConversationId, context: Context): Promise<ConversationRecord | undefined> {
-		return this.#read((executor) => this.#conversation(executor, id, context), context);
+		return this.#read(executor => this.#conversation(executor, id, context), context);
 	}
 
 	scanConversations(
@@ -216,7 +216,7 @@ export class StoreStorage implements Storage {
 	): Promise<StoredEntry | undefined> {
 		if (maybeContext === undefined) {
 			const context = idOrContext as Context;
-			return this.#read((executor) => this.#entry(executor, idOrConversationId as EntryId, context), context);
+			return this.#read(executor => this.#entry(executor, idOrConversationId as EntryId, context), context);
 		}
 		const context = maybeContext;
 		const id = typeof idOrContext === "number" ? idFromNumber<EntryId>(idOrContext) : undefined;
@@ -224,7 +224,7 @@ export class StoreStorage implements Storage {
 			if (id === undefined) throw new StorageRequestError("Storage.entry() requires an entry ID");
 			const conversationId = idOrConversationId as ConversationId;
 			return this.#store
-				.read((executor) => this.#visibleEntry(executor, conversationId, id, context), context)
+				.read(executor => this.#visibleEntry(executor, conversationId, id, context), context)
 				.then(told);
 		});
 	}
@@ -236,7 +236,7 @@ export class StoreStorage implements Storage {
 	): Promise<(EntryRecord & { readonly head: EntryId }) | undefined> {
 		return this.#reading(() =>
 			this.#store
-				.read((executor) => this.#latestHeadMarker(executor, conversationId, atOrBeforeEntryId, context), context)
+				.read(executor => this.#latestHeadMarker(executor, conversationId, atOrBeforeEntryId, context), context)
 				.then(told),
 		);
 	}
@@ -259,7 +259,7 @@ export class StoreStorage implements Storage {
 
 	task(id: TaskId, context: Context): Promise<StoredTask | undefined> {
 		const tasks = this.#queries.tasks;
-		return this.#read(async (executor) => {
+		return this.#read(async executor => {
 			const row = await tasks.byId(executor, id);
 			return row === undefined ? undefined : tasks.record<StoredTask>(row, context);
 		}, context);
@@ -286,7 +286,7 @@ export class StoreStorage implements Storage {
 
 	submission(id: SubmissionId, context: Context): Promise<SubmissionRecord | undefined> {
 		const submissions = this.#queries.submissions;
-		return this.#read(async (executor) => {
+		return this.#read(async executor => {
 			const row = await submissions.byId(executor, id);
 			return row === undefined ? undefined : submissions.record<SubmissionRecord>(row, context);
 		}, context);
@@ -317,14 +317,14 @@ export class StoreStorage implements Storage {
 			["conversation_id", "eq", conversationId],
 			["request_id", "eq", encodeIndexed(requestId)],
 		];
-		return this.#read(async (executor) => {
+		return this.#read(async executor => {
 			const row = await submissions.first(executor, conditions, "ascending");
 			return row === undefined ? undefined : submissions.record<SubmissionRecord>(row, context);
 		}, context);
 	}
 
 	findDocument(address: DocumentAddress, at: DocumentPoint, context: Context): Promise<DocumentRecord | undefined> {
-		return this.#read(async (executor) => {
+		return this.#read(async executor => {
 			const entry = await findDocumentEntry(executor, addressOf(address, this.#owner), at);
 			return entry === undefined ? undefined : recordOfEntry(entry);
 		}, context);
@@ -333,7 +333,7 @@ export class StoreStorage implements Storage {
 	document(id: DocumentId, at: DocumentPoint, context: Context): Promise<StoredDocument | undefined> {
 		// The record and its revisions must come from one committed state (S4).
 		return this.#reading(() =>
-			this.#store.readTransaction((executor) => readAt(executor, id, at, this.#owner), context).then(documentOf),
+			this.#store.readTransaction(executor => readAt(executor, id, at, this.#owner), context).then(documentOf),
 		);
 	}
 
@@ -351,8 +351,8 @@ export class StoreStorage implements Storage {
 				...(query.kind === undefined ? {} : { kind: encodeIndexed(query.kind) }),
 			};
 			return this.#store
-				.read((executor) => listDocumentEntries(executor, scope, query.at, after, limit + 1), context)
-				.then((found) => page(found.map(recordOfEntry), limit, "ascending"));
+				.read(executor => listDocumentEntries(executor, scope, query.at, after, limit + 1), context)
+				.then(found => page(found.map(recordOfEntry), limit, "ascending"));
 		});
 	}
 
@@ -365,7 +365,7 @@ export class StoreStorage implements Storage {
 			this.#closed = true;
 			this.#closing = (async () => {
 				if (this.#underway > 0) {
-					await new Promise<void>((resolve) => {
+					await new Promise<void>(resolve => {
 						this.#drained = resolve;
 					});
 				}
@@ -419,7 +419,7 @@ export class StoreStorage implements Storage {
 
 	#entry(executor: SqliteExecutor, id: EntryId, context: Context): Promise<StoredEntry | undefined> {
 		const entries = this.#queries.entries;
-		return entries.byId(executor, id).then((row) => {
+		return entries.byId(executor, id).then(row => {
 			if (row === undefined) return undefined;
 			return { entry: entries.record<EntryRecord>(row, context), commitSeq: seqFromNumber(row.commit_seq!) };
 		});
@@ -545,8 +545,8 @@ export class StoreStorage implements Storage {
 		context: Context,
 	): Promise<Page<T, Cursor>> {
 		return this.#store
-			.read((executor) => queries.select(executor, conditions, start.order, limit + 1), context)
-			.then((rows) => {
+			.read(executor => queries.select(executor, conditions, start.order, limit + 1), context)
+			.then(rows => {
 				const values: T[] = [];
 				queries.records(rows, values, context);
 				return page(values, limit, start.order);

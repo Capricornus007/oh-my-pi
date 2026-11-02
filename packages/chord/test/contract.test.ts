@@ -33,7 +33,7 @@ describe("contracts", () => {
 		assert.equal(canonicalIdentity(chatV1.input, a), '{"session":"s"}');
 		assert.throws(
 			() => normalize(chatV1.input, { session: 1 }, "input"),
-			(error) => isChordError(error, "invalid") && error.reason === "input",
+			error => isChordError(error, "invalid") && error.reason === "input",
 		);
 	});
 
@@ -92,7 +92,7 @@ describe("contracts", () => {
 		assert.match(coverage(required.description, chatV1.description) ?? "", /arguments/);
 		assert.throws(
 			() => bind(required, undefined, chatV1),
-			(error) => isChordError(error, "contract_mismatch"),
+			error => isChordError(error, "contract_mismatch"),
 		);
 
 		const retyped = remote("t.chat", {
@@ -120,7 +120,7 @@ describe("contracts", () => {
 		const v2 = remote("t.chat", { ...chatV1.def, version: 2, variants: { viewer: { state: { body: View } } } });
 		assert.throws(
 			() => bind(v2, undefined, chatV1),
-			(error) => isChordError(error, "contract_mismatch"),
+			error => isChordError(error, "contract_mismatch"),
 		);
 		const adapter = (current: Record<string, unknown>) => ({ variant: "viewer", view: current.body });
 		assert.equal(bind(v2, { 1: adapter }, chatV1), adapter);

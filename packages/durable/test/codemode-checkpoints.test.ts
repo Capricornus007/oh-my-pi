@@ -15,7 +15,7 @@ describe("built-in document checkpoint policies", () => {
 		const { session, storage } = openTestSession();
 		try {
 			const conversationId = await createConversation(session);
-			let cutoff = await session.commit(async (tx) => {
+			let cutoff = await session.commit(async tx => {
 				(await tx.doc(CodemodeStoreDoc, conversationId)).values.counter = 0;
 				return (await tx.appendEntry(conversationId, { kind: "test.counter" })).id;
 			}, context);
@@ -26,14 +26,14 @@ describe("built-in document checkpoint policies", () => {
 			);
 			if (record === undefined) throw new Error("Expected codemode store");
 			for (let counter = 1; counter <= 64; counter++) {
-				const entry = await session.commit(async (tx) => {
+				const entry = await session.commit(async tx => {
 					(await tx.doc(CodemodeStoreDoc, conversationId)).values.counter = counter;
 					return (await tx.appendEntry(conversationId, { kind: "test.counter" })).id;
 				}, context);
 				if (counter === 32) cutoff = entry;
 			}
 			expect((await storage.document(record.id, "current", context))?.deltasSinceBase).toBe(64);
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(CodemodeStoreDoc, conversationId)).values.counter = 65;
 			}, context);
 			expect((await storage.document(record.id, "current", context))?.deltasSinceBase).toBe(0);
@@ -46,11 +46,11 @@ describe("built-in document checkpoint policies", () => {
 				values: { counter: 32 },
 			});
 			const fork = await session.commit(
-				(tx) => tx.forkConversation(conversationId, cutoff, { ownership: { kind: "ownerless" } }),
+				tx => tx.forkConversation(conversationId, cutoff, { ownership: { kind: "ownerless" } }),
 				context,
 			);
 			expect(await session.snapshot(CodemodeStoreDoc, fork.id, context)).toEqual({ values: { counter: 32 } });
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(CodemodeStoreDoc, conversationId)).values.counter = 66;
 			}, context);
 			expect((await storage.document(record.id, "current", context))?.deltasSinceBase).toBe(1);

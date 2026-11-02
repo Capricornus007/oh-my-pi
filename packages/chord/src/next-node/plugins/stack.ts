@@ -15,7 +15,7 @@ type Registered = { readonly map: SourceMap; readonly dir: string; live: number 
 const scripts = new Map<string, Registered>();
 
 /** Counts down an evaluation that was collected; its script's entry goes with the last one. */
-const collected = new FinalizationRegistry<string>((filename) => {
+const collected = new FinalizationRegistry<string>(filename => {
 	const script = scripts.get(filename);
 	if (script !== undefined && --script.live === 0) scripts.delete(filename);
 });

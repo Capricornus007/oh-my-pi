@@ -48,7 +48,7 @@ describe("the catalog", () => {
 		const { version, record: columns, key, fingerprint } = Edits;
 		const failing: StagedWrite = {
 			order: "write",
-			apply: (step) =>
+			apply: step =>
 				step
 					.run("INSERT INTO no_such_table VALUES (1)")
 					.then(() => [{ kind: "dropIndex", table: TABLE, name: "x" }]),

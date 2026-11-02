@@ -95,7 +95,7 @@ class PhotonThread {
 			this.#exit();
 		};
 		this.#worker.on("error", fail);
-		this.#worker.on("exit", (code) => fail(new Error(`The Photon image worker exited with code ${code}`)));
+		this.#worker.on("exit", code => fail(new Error(`The Photon image worker exited with code ${code}`)));
 	}
 
 	prepare(bytes: Uint8Array, mimeType: string, limits: ImageLimits): Promise<PreparedImage | undefined> {

@@ -57,7 +57,7 @@ const Probe = defineTask<{ name: string }, { phase: "look" }, null>({
 			await Promise.race([gate(`look.${task.input.name}`).promise, aborted(runtime.signal)]);
 			owned.set(
 				task.input.name,
-				(await runtime.ownedTasks(ctx)).map((record) => record.id),
+				(await runtime.ownedTasks(ctx)).map(record => record.id),
 			);
 			await Promise.race([gate(task.input.name).promise, aborted(runtime.signal)]);
 			await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
@@ -91,7 +91,7 @@ describe("scheduler indexes", () => {
 		// cancelling owner, and the request only once middle carries it.
 		const path = await sqlitePath();
 		const session = createSession(await openNodeSqliteStorage(path));
-		const ids = await session.commit(async (tx) => {
+		const ids = await session.commit(async tx => {
 			const conversation = await tx.createConversation({ ownership: { kind: "ownerless" } });
 			const top = await tx.createTask(
 				Hold,
@@ -102,7 +102,7 @@ describe("scheduler indexes", () => {
 			const leaf = await tx.createTask(Hold, { name: "leaf" }, { ownership: { kind: "task", taskId: middle } });
 			return { top, middle, leaf };
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const top = (await tx.task(ids.top))!;
 			const middle = (await tx.task(ids.middle))!;
 			const set = (tx as unknown as { setTask(value: unknown): void }).setTask.bind(tx);
@@ -149,7 +149,7 @@ describe("scheduler indexes", () => {
 		const harness = opened.harness;
 		const root = await harness.root(context);
 		harness.resume();
-		const { top, middle, leaf } = await root.commit(async (tx) => {
+		const { top, middle, leaf } = await root.commit(async tx => {
 			const top = await tx.createTask(Hold, { name: "top" }, { ownership: { kind: "conversation" } });
 			const middle = await tx.createTask(Hold, { name: "middle" }, { ownership: { kind: "task", taskId: top } });
 			const leaf = await tx.createTask(Hold, { name: "leaf" }, { ownership: { kind: "task", taskId: middle } });
@@ -173,7 +173,7 @@ describe("scheduler indexes", () => {
 		let root = await opened.harness.root(context);
 		opened.harness.resume();
 		// root conversation -> owner (ends) -> conversation C -> inner (created after owner ended), as a subagent call's.
-		const { owner, child } = await root.commit(async (tx) => {
+		const { owner, child } = await root.commit(async tx => {
 			const owner = await tx.createTask(Hold, { name: "owner" }, { ownership: { kind: "conversation" } });
 			const child = await tx.createConversation({ ownership: { kind: "task", taskId: owner } });
 			return { owner, child: child.id };
@@ -182,7 +182,7 @@ describe("scheduler indexes", () => {
 		await opened.harness.waitForTask(owner, context);
 		const conversation = (await opened.harness.conversation(child, context))!;
 		const inner = await conversation.commit(
-			(tx) => tx.createTask(Hold, { name: "inner" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Hold, { name: "inner" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await opened.harness.close(context);
@@ -216,7 +216,7 @@ describe("TaskRuntime.ownedTasks", () => {
 		const root = await opened.harness.root(context);
 		opened.harness.resume();
 		// The probe owns: two held tasks, one that ends, a grandchild below the first, and a conversation with a task.
-		const ids = await root.commit(async (tx) => {
+		const ids = await root.commit(async tx => {
 			const probe = await tx.createTask(Probe, { name: "probe" }, { ownership: { kind: "conversation" } });
 			const first = await tx.createTask(Hold, { name: "first" }, { ownership: { kind: "task", taskId: probe } });
 			const ends = await tx.createTask(Hold, { name: "ends" }, { ownership: { kind: "task", taskId: probe } });
@@ -256,7 +256,7 @@ describe("TaskRuntime.ownedTasks", () => {
 		const root = await opened.harness.root(context);
 		opened.harness.resume();
 		const probe = await root.commit(
-			(tx) => tx.createTask(Probe, { name: "probe" }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Probe, { name: "probe" }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await eventually(() => runtimes.has("probe"));

@@ -17,7 +17,7 @@ import { context, fleet, Notes, Session, type TestPrincipal, until } from "./sup
 
 /** A step's hosts as `[host, what]`. */
 function listed(hosts: readonly RolloutHost[]) {
-	return hosts.map((entry) => [
+	return hosts.map(entry => [
 		entry.host,
 		"report" in entry ? entry.report.plugins : "stopped" in entry ? "stopped" : (entry.error as Error).message,
 	]);
@@ -92,7 +92,7 @@ describe("failures stay until retry or a rollout (R2)", () => {
 		expect(stateOf(workers.state.value, "S1")?.error?.message).toBe("worker exited (code 7)");
 		expect(errors.map(({ kind }) => kind)).toEqual(["worker_exited", "worker_failed"]);
 		await until(() => notes.state.value.kind === "failed");
-		await new Promise((resolve) => setTimeout(resolve, 200));
+		await new Promise(resolve => setTimeout(resolve, 200));
 		expect(starts).toEqual(["session|S1"]);
 		notes.release();
 		control.release();
@@ -166,7 +166,7 @@ describe("failures stay until retry or a rollout (R2)", () => {
 			await vi.waitFor(() => expect(stateOf(workers.state.value, "S1")?.status).toBe("starting"), {
 				timeout: 5_000,
 			});
-			await new Promise((resolve) => setImmediate(resolve));
+			await new Promise(resolve => setImmediate(resolve));
 			await vi.advanceTimersByTimeAsync(120_000);
 			expect(stateOf(workers.state.value, "S1")?.status).toBe("starting");
 			expect(notes.state.value.kind).toBe("loading");
@@ -187,7 +187,7 @@ describe("keep-alive (D9, R3, Q5)", () => {
 		control.release();
 		released.release();
 		await until(() => stateOf(workers.state.value, "free") === undefined, 5_000);
-		await new Promise((resolve) => setTimeout(resolve, 600));
+		await new Promise(resolve => setTimeout(resolve, 600));
 		expect(stateOf(workers.state.value, "held")?.status).toBe("running");
 		expect(stateOf(workers.state.value, "busy")?.status).toBe("running");
 		await until(() => stateOf(workers.state.value, "busy") === undefined, 5_000);
@@ -199,7 +199,7 @@ describe("keep-alive (D9, R3, Q5)", () => {
 		behaviours.set("S1", { localCalls: 1_000 });
 		// Released at once: the calls run 300 ms after the load, with no hold arriving (no reference keeps it busy).
 		(await server.get(Notes, { id: "S1" }, context)).release();
-		await until(() => output.some((line) => line.startsWith("session|S1 local calls sent")));
+		await until(() => output.some(line => line.startsWith("session|S1 local calls sent")));
 		expect(output).toContain("session|S1 local calls sent 0");
 	});
 });
@@ -216,7 +216,7 @@ describe("stop", () => {
 		});
 		expect(starts).toEqual(["session|S1"]);
 		notes.release();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		const again = await server.get(Notes, { id: "S1" }, context);
 		expect(starts).toEqual(["session|S1", "session|S1"]);
 		again.release();
@@ -230,7 +230,7 @@ describe("stop", () => {
 		await workers.stop(Session({ id: "S1" }), context);
 		expect(stateOf(workers.state.value, "S1")).toBeUndefined();
 		notes.release();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		behaviours.set("S1", { log: undefined });
 		const again = await server.get(Notes, { id: "S1" }, context);
 		const stopping = workers.stop(Session({ id: "S1" }), context);
@@ -319,9 +319,9 @@ describe("the rollout step (§4)", () => {
 		await first.block(400, context);
 		await control.blockThenCrash(400, context);
 		// Their event loops are blocked once their timers ran.
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		const rolling = plugins.rollout([workers.step("workers")], built, context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		const stopped = workers.stop(Session({ id: "S1" }), context);
 		const result = await rolling;
 		await stopped;
@@ -355,7 +355,7 @@ describe("the rollout step (§4)", () => {
 		await until(() => plugins.state.value.dirty.includes("@test/notes"));
 		const built = await plugins.build(plugins.state.value.dirty, context);
 		await control.block(300, context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		const abort = new AbortController();
 		const step = workers.step("workers");
 		const waited = plugins.rollout([step], built, withAbortSignal(abort.signal, context));
@@ -381,7 +381,7 @@ describe("GC", () => {
 	it("100 addresses started and stopped leave no state, no record, no suspension (Astra, Sol)", async () => {
 		const refs: WeakRef<object>[] = [];
 		const { server, workers } = await fleet({
-			start: async (address) => {
+			start: async address => {
 				refs.push(new WeakRef(address));
 				return {};
 			},
@@ -404,7 +404,7 @@ describe("GC", () => {
 	it("1,000 failed and retried addresses leave no state, no record and no suspension", async () => {
 		const refs: WeakRef<object>[] = [];
 		const { server, workers } = await fleet({
-			start: async (address) => {
+			start: async address => {
 				refs.push(new WeakRef(address));
 				throw new Error("no worker");
 			},
@@ -441,7 +441,7 @@ describe("fix round 2", () => {
 		expect(stateOf(workers.state.value, "S1")).toMatchObject({ error: { message: "worker failed to start" } });
 		// Opus's second recheck: the component's own kill of a failed start is no `worker_exited`.
 		await until(() => errors.length > 0);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(errors).toMatchObject([
 			{ kind: "worker_failed", address: "session|S1", error: { message: expect.stringContaining("secret") } },
 		]);
@@ -486,7 +486,7 @@ describe("fix round 1", () => {
 		let forked = false;
 		const { server, workers, errors } = await fleet({ start: () => new Promise<never>(() => {}) });
 		const notes = server.hold(Notes, { id: "S1" }, context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		await workers.close(context);
 		forked = stateOf(workers.state.value, "S1") !== undefined;
 		expect([forked, errors]).toEqual([false, []]);
@@ -499,7 +499,7 @@ describe("fix round 1", () => {
 		behaviours.set("S1", { loadMs: 5_000, closeMs: 200, log: join(dir, "log") });
 		const notes = server.hold(Notes, { id: "S1" }, context);
 		await until(() => stateOf(workers.state.value, "S1") !== undefined);
-		await new Promise((resolve) => setTimeout(resolve, 300));
+		await new Promise(resolve => setTimeout(resolve, 300));
 		await workers.stop(Session({ id: "S1" }), context);
 		expect(errors).toEqual([]);
 		expect(await readFile(join(dir, "log"), "utf8")).toBe("store\nhost\n");
@@ -514,12 +514,12 @@ describe("fix round 1", () => {
 		await until(() => plugins.state.value.dirty.length > 0);
 		const built = await plugins.build(plugins.state.value.dirty, context);
 		await control.blockThenCrash(600, context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		const first = plugins.rollout([workers.step("one")], built, context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		const second = plugins.rollout([workers.step("two")], built, context);
 		const outcomes = await Promise.all([first, second]);
-		expect(outcomes.map((result) => listed(result.steps[0]!.hosts))).toEqual([
+		expect(outcomes.map(result => listed(result.steps[0]!.hosts))).toEqual([
 			[["session|S1", "worker: its link is gone"]],
 			[["session|S1", "worker: its link is gone"]],
 		]);

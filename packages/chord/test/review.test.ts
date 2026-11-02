@@ -19,14 +19,14 @@ import { fits } from "../src/schema.ts";
 import { CountingLink } from "./fixtures/counting.ts";
 import { typedLit } from "./fixtures/schemas.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 const ticks = async (n = 10) => {
 	for (let i = 0; i < n; i++) await tick();
 };
 
 function latch() {
 	let open = () => {};
-	const promise = new Promise<void>((resolve) => {
+	const promise = new Promise<void>(resolve => {
 		open = resolve;
 	});
 	return { promise, open };
@@ -61,19 +61,19 @@ describe("review: reload commit", () => {
 		const sources = { a: emitter<number>(), b: emitter<number>({ failSubscribe: true }), c: emitter<number>() };
 		const facet = (version: string, listen: boolean): Facet => ({
 			name: "item",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Item, ({ id }, _principal, self) => {
 					if (listen) self.on("events", sources[id as "a"], () => {});
 					return { version: () => version };
 				}),
 		});
 		host.install(facet("v1", false));
-		const refs = ["a", "b", "c"].map((id) => host.hold(Item, { id }));
-		await Promise.all(refs.map((ref) => ref.ready));
+		const refs = ["a", "b", "c"].map(id => host.hold(Item, { id }));
+		await Promise.all(refs.map(ref => ref.ready));
 		const codeVersion = host.codeVersion;
 		await assert.rejects(host.reload([facet("v2", true)]), /subscribe fails/);
 		assert.equal(host.codeVersion, codeVersion);
-		assert.deepEqual(await Promise.all(refs.map((ref) => ref.version())), ["v1", "v1", "v1"]);
+		assert.deepEqual(await Promise.all(refs.map(ref => ref.version())), ["v1", "v1", "v1"]);
 		assert.equal(sources.a.size, 0);
 		assert.equal(sources.c.size, 0);
 	});
@@ -94,7 +94,7 @@ describe("review: reload commit", () => {
 		});
 		host.install({
 			name: "counted",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					V1,
 					(_input, _principal, self) => ({
@@ -110,7 +110,7 @@ describe("review: reload commit", () => {
 		await host.reload([
 			{
 				name: "counted",
-				setup: (api) =>
+				setup: api =>
 					api.serve(
 						V2,
 						(_input, _principal, self) => ({
@@ -119,7 +119,7 @@ describe("review: reload commit", () => {
 								"count",
 								obj({ total: num() }, { open: true }),
 								{ total: 0 },
-								{ version: 2, migrate: (old) => ({ total: (old as { n: number }).n }) },
+								{ version: 2, migrate: old => ({ total: (old as { n: number }).n }) },
 							),
 						}),
 						{ linger: 60_000 },
@@ -128,7 +128,7 @@ describe("review: reload commit", () => {
 		]);
 		const second = host.hold(V2, {});
 		const values: unknown[] = [];
-		second.count.subscribe((value) => values.push(value));
+		second.count.subscribe(value => values.push(value));
 		await second.ready;
 		await ticks();
 		assert.deepEqual(second.count.value, { total: 3 });
@@ -136,7 +136,7 @@ describe("review: reload commit", () => {
 
 	it("#1 a commit that still fails midway fails the host terminally (no half-published code version serving work)", async () => {
 		const host = createHost({ self: { kind: "host" }, onError: () => {} });
-		host.install({ name: "item", setup: (api) => api.serve(Item, () => ({ version: () => "v1" })) });
+		host.install({ name: "item", setup: api => api.serve(Item, () => ({ version: () => "v1" })) });
 		const ref = host.hold(Item, { id: "a" });
 		await ref.ready;
 		// Everything fallible runs in prepare now, so break an install step directly (white box).
@@ -147,12 +147,12 @@ describe("review: reload commit", () => {
 			};
 		}
 		await assert.rejects(
-			host.reload([{ name: "item", setup: (api) => api.serve(Item, () => ({ version: () => "v2" })) }]),
+			host.reload([{ name: "item", setup: api => api.serve(Item, () => ({ version: () => "v2" })) }]),
 			/install step fails/,
 		);
 		await assert.rejects(
 			ref.version(),
-			(error) => isChordError(error, "unavailable") && error.reason === "host_failed",
+			error => isChordError(error, "unavailable") && error.reason === "host_failed",
 		);
 	});
 
@@ -165,7 +165,7 @@ describe("review: reload commit", () => {
 		});
 		const facet = (version: string): Facet => ({
 			name: "pair",
-			setup: (api) => {
+			setup: api => {
 				api.serve(Item, () => ({ version: () => version }));
 				api.serve(Other, () => ({ version: () => version }));
 			},
@@ -195,7 +195,7 @@ describe("review: leases, invocations, activation", () => {
 		const seen: unknown[] = [];
 		host.install({
 			name: "store",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Store, (_input, _principal, self) => {
 					const count = self.state("count", obj({ n: num() }, { open: true }), { n: 1 });
 					self.on("slow", events, async () => {
@@ -214,13 +214,13 @@ describe("review: leases, invocations, activation", () => {
 			[
 				{
 					name: "store",
-					setup: (api) =>
+					setup: api =>
 						api.serve(Store, (_input, _principal, self) => ({
 							count: self.state(
 								"count",
 								obj({ total: num() }, { open: true }),
 								{ total: 0 },
-								{ version: 2, migrate: (old) => ({ total: (old as { n: number }).n }) },
+								{ version: 2, migrate: old => ({ total: (old as { n: number }).n }) },
 							),
 						})),
 				},
@@ -248,7 +248,7 @@ describe("review: leases, invocations, activation", () => {
 			const connResource = self.resource("conn", {
 				version: 1,
 				open: () => ({ closed: false }),
-				close: (conn) => {
+				close: conn => {
 					conn.closed = true;
 					log.push(`close ${id}`);
 				},
@@ -276,7 +276,7 @@ describe("review: leases, invocations, activation", () => {
 		const forced = host.hold(Worker, { id: "f" }, { principal: { user: "u" } });
 		const forcedCall = forced.work();
 		await ticks();
-		const invalidated = host.invalidatePrincipal((principal) => (principal as { user?: string }).user === "u");
+		const invalidated = host.invalidatePrincipal(principal => (principal as { user?: string }).user === "u");
 		await ticks();
 		assert.equal(forced.status, "gone");
 		assert.deepEqual(log, []);
@@ -288,12 +288,10 @@ describe("review: leases, invocations, activation", () => {
 
 	it("#6 a registry conflict found while finalizing activation unwinds the loser completely", async () => {
 		const errors: unknown[] = [];
-		const host = createHost({ self: { kind: "host" }, onError: (error) => errors.push(error) });
+		const host = createHost({ self: { kind: "host" }, onError: error => errors.push(error) });
 		const Routes = defineRegistry<string>("t.review-routes");
 		const log: string[] = [];
-		const types = ["t.eager-a", "t.eager-b"].map((name) =>
-			local(name, { version: 1, input: obj({}, { open: true }) }),
-		);
+		const types = ["t.eager-a", "t.eager-b"].map(name => local(name, { version: 1, input: obj({}, { open: true }) }));
 		for (const type of types) {
 			host.serve(
 				type,
@@ -310,10 +308,10 @@ describe("review: leases, invocations, activation", () => {
 			);
 		}
 		await ticks(20);
-		assert.equal(log.filter((entry) => entry.startsWith("open")).length, 2);
-		assert.equal(log.filter((entry) => entry.startsWith("close")).length, 1);
+		assert.equal(log.filter(entry => entry.startsWith("open")).length, 2);
+		assert.equal(log.filter(entry => entry.startsWith("close")).length, 1);
 		assert.equal(host.registry(Routes).table().size, 1);
-		assert.ok(errors.some((error) => isChordError(error, "invalid") && error.reason === "registry_conflict"));
+		assert.ok(errors.some(error => isChordError(error, "invalid") && error.reason === "registry_conflict"));
 	});
 
 	it("#6 releasing the last hold while listeners start up does not resurrect the object", async () => {
@@ -356,7 +354,7 @@ describe("review: prepare isolation and contracts", () => {
 		const native = { mutated: false };
 		const facet = (touch: boolean): Facet => ({
 			name: "db",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Db, (_input, _principal, self) => {
 					const db = self.resource("db", { version: 1, open: () => native });
 					if (touch) db.value.mutated = true;
@@ -366,7 +364,7 @@ describe("review: prepare isolation and contracts", () => {
 		host.install(facet(false));
 		const ref = host.hold(Db, {});
 		await ref.ready;
-		await assert.rejects(host.reload([facet(true)]), (error) => isChordError(error, "not_ready"));
+		await assert.rejects(host.reload([facet(true)]), error => isChordError(error, "not_ready"));
 		assert.equal(native.mutated, false);
 		assert.deepEqual(await ref.read(), { mutated: false });
 	});
@@ -375,12 +373,12 @@ describe("review: prepare isolation and contracts", () => {
 		const host = createHost({ self: { kind: "host" }, onError: () => {} });
 		const log: string[] = [];
 		const Fresh = local("t.fresh", { version: 1, input: obj({}, { open: true }) });
-		host.install({ name: "item", setup: (api) => api.serve(Item, () => ({ version: () => "v1" })) });
-		await Promise.all(["a", "b"].map((id) => host.hold(Item, { id }).ready));
+		host.install({ name: "item", setup: api => api.serve(Item, () => ({ version: () => "v1" })) });
+		await Promise.all(["a", "b"].map(id => host.hold(Item, { id }).ready));
 		const plugins = (fail: boolean): Facet[] => [
 			{
 				name: "fresh",
-				setup: (api) =>
+				setup: api =>
 					api.serve(Fresh, (_input, _principal, self) => {
 						self.task(async () => {
 							log.push("task started");
@@ -390,7 +388,7 @@ describe("review: prepare isolation and contracts", () => {
 			},
 			{
 				name: "item",
-				setup: (api) =>
+				setup: api =>
 					api.serve(Item, ({ id }, _principal, self) => {
 						self.get(Fresh, {});
 						if (fail && id === "b") throw new Error("b fails");
@@ -427,7 +425,7 @@ describe("review: prepare isolation and contracts", () => {
 		});
 		host.install({
 			name: "both",
-			setup: (api) => {
+			setup: api => {
 				api.serve(P1, () => ({ variant: "main", get: () => "old" }));
 				api.serve(Consumer, (_input, _principal, self) => {
 					const provider = self.get(P1, {});
@@ -440,7 +438,7 @@ describe("review: prepare isolation and contracts", () => {
 		await host.reload([
 			{
 				name: "both",
-				setup: (api) => {
+				setup: api => {
 					api.serve(P2, () => ({ variant: "main", fetch: () => "new" }));
 					api.serve(Consumer, (_input, _principal, self) => {
 						const provider = self.get(P2, {});
@@ -459,7 +457,7 @@ describe("review: prepare isolation and contracts", () => {
 			let opens = 0;
 			const facet = (rev: number): Facet => ({
 				name: "db",
-				setup: (api) =>
+				setup: api =>
 					api.serve(Db, (_input, _principal, self) => {
 						const port = self.resource("port", {
 							version: rev,
@@ -487,7 +485,7 @@ describe("review: prepare isolation and contracts", () => {
 				assert.deepEqual(log, ["open 1", "close 1", "open 1"]);
 				assert.deepEqual(await ref.read(), { rev: 1 });
 			} else {
-				await assert.rejects(ref.read(), (error) => isChordError(error, "unavailable"));
+				await assert.rejects(ref.read(), error => isChordError(error, "unavailable"));
 			}
 		}
 	});
@@ -498,7 +496,7 @@ describe("review: prepare isolation and contracts", () => {
 		const Dep = local("t.dep", { version: 1, input: obj({}, { open: true }) });
 		const facet = (withDecls: boolean): Facet => ({
 			name: "item",
-			setup: (api) => {
+			setup: api => {
 				api.serve(Dep, (_input, _principal, self) => {
 					self.resource("r", { version: 1, open: () => {}, close: () => void log.push("dep closed") });
 					return {};
@@ -524,7 +522,7 @@ describe("review: prepare isolation and contracts", () => {
 		const ref = host.hold(Item, { id: "a" });
 		await ref.ready;
 		const go = latch();
-		const pinned = host.root(async (ctx) => {
+		const pinned = host.root(async ctx => {
 			await ref.version(ctx);
 			await go.promise;
 		});
@@ -584,7 +582,7 @@ describe("review: prepare isolation and contracts", () => {
 				},
 			},
 		});
-		host.serve(Strict, () => ({ variant: "main", echo: (args) => args }));
+		host.serve(Strict, () => ({ variant: "main", echo: args => args }));
 		const ref = host.hold(Strict, {});
 		assert.deepEqual(await ref.echo({ a: "x", junk: 1 } as never), { a: "x" });
 	});
@@ -610,7 +608,7 @@ describe("review: ctx races", () => {
 		}));
 		host.serve(Runner, (_input, _principal, self) => {
 			const target = self.get(Target, {});
-			self.task(async (ctx) => {
+			self.task(async ctx => {
 				await go.promise;
 				outcome = await target.hit(ctx).catch((error: unknown) => error);
 			});
@@ -634,15 +632,12 @@ describe("review: ctx races", () => {
 		host.serve(Target, () => ({ hit: () => {} }));
 		const target = host.hold(Target, {});
 		await target.ready;
-		const expired = await host.root((ctx) => ctx);
-		await assert.rejects(
-			target.hit(expired),
-			(error) => isChordError(error, "aborted") && error.reason === "expired",
-		);
-		const foreign = await other.root(async (ctx) => {
+		const expired = await host.root(ctx => ctx);
+		await assert.rejects(target.hit(expired), error => isChordError(error, "aborted") && error.reason === "expired");
+		const foreign = await other.root(async ctx => {
 			await assert.rejects(
 				target.hit(ctx),
-				(error) => isChordError(error, "invalid") && error.reason === "foreign_ctx",
+				error => isChordError(error, "invalid") && error.reason === "foreign_ctx",
 			);
 			return true;
 		});
@@ -673,17 +668,17 @@ describe("review: ctx races", () => {
 		const other = createHost({ self: { kind: "host" }, name: "other", onError: () => {} });
 		const target = worker.hold(RemoteTarget, {});
 		await target.ready;
-		const foreign = await other.root((ctx) => target.hit(ctx).catch((error: unknown) => error));
+		const foreign = await other.root(ctx => target.hit(ctx).catch((error: unknown) => error));
 		assert.ok(isChordError(foreign, "invalid") && foreign.reason === "foreign_ctx", String(foreign));
 		const forged = { rootId: "forged", codeVersion: 1, signal: new AbortController().signal } as unknown as Ctx;
 		await assert.rejects(
 			target.hit(forged),
-			(error) => isChordError(error, "invalid") && error.reason === "foreign_ctx",
+			error => isChordError(error, "invalid") && error.reason === "foreign_ctx",
 		);
 		await ticks();
 		assert.equal(hits, 0);
 		assert.equal(link.count("sent", "call"), 0);
-		await worker.root((ctx) => target.hit(ctx));
+		await worker.root(ctx => target.hit(ctx));
 		assert.equal(hits, 1);
 	});
 });

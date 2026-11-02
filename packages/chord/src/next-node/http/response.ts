@@ -173,7 +173,7 @@ function pulled(
 	let sealed: (() => void) | undefined;
 	return new ReadableStream<Uint8Array>(
 		{
-			start: (controller) => {
+			start: controller => {
 				if (signal === undefined) return;
 				// Sealed before the stream exists (an abort while the route returned it): no event will come
 				// (Sol's third recheck: the request never finished, `close` waited its whole bound).
@@ -181,7 +181,7 @@ function pulled(
 				sealed = () => controller.error(signal.reason);
 				signal.addEventListener("abort", sealed, { once: true });
 			},
-			pull: async (controller) => {
+			pull: async controller => {
 				if (signal?.aborted) return controller.error(signal.reason);
 				const want = Math.min(PIECE, end - offset);
 				let chunk: Uint8Array;
@@ -252,7 +252,7 @@ function disposition(response: { readonly download?: string; readonly inline?: t
 	const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
 	const encoded = encodeURIComponent(name).replace(
 		/['()*]/g,
-		(char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+		char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
 	);
 	return `${kind}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }

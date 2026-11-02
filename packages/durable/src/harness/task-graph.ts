@@ -97,7 +97,7 @@ export class TaskGraphView {
 		session.followCommits((publication, context) => {
 			// A commit held in memory changes documents only, which the graph does not show.
 			if (this.#mount === undefined || publication.kind === "memory") return;
-			advance(this.#mount, publication, context, blocking.blocked, (error) => session.report(error));
+			advance(this.#mount, publication, context, blocking.blocked, error => session.report(error));
 		});
 		blocking.subscribeBlocked(() => this.#refreshBlocked());
 		session.subscribeClose(() => {
@@ -106,7 +106,7 @@ export class TaskGraphView {
 			for (const observer of [...(this.#mount?.observers ?? [])]) {
 				contained(
 					() => observer.end(closeEndOf(observer, ends)),
-					(error) => session.report(error),
+					error => session.report(error),
 				);
 			}
 			this.#mount = undefined;
@@ -121,7 +121,7 @@ export class TaskGraphView {
 		let value!: TaskGraph;
 		const attached = await this.#attach((current, release) => {
 			value = current;
-			return guardObserver(observer, release, (error) => this.#session.report(error));
+			return guardObserver(observer, release, error => this.#session.report(error));
 		}, context);
 		const signal = context.abortSignal;
 		if (signal?.aborted) {
@@ -134,7 +134,7 @@ export class TaskGraphView {
 	/** A serialized watch of the graph, an observer of its mount; aborting `context` ends it `aborted`. */
 	async watch(context: Context): Promise<TaskGraphWatch> {
 		const { observer } = await this.#attach(
-			(value, release) => new Watch<TaskGraph>(value, release, (error) => this.#session.report(error)),
+			(value, release) => new Watch<TaskGraph>(value, release, error => this.#session.report(error)),
 			context,
 		);
 		const signal = context.abortSignal;
@@ -151,7 +151,7 @@ export class TaskGraphView {
 		create: (value: TaskGraph, release: () => void) => O,
 		context: Context,
 	): Promise<{ observer: O; detach: () => void }> {
-		return this.#session.readOnLine(async (storage) => {
+		return this.#session.readOnLine(async storage => {
 			const mount = this.#mount ?? {
 				...(await this.#build(storage, context)),
 				observers: new Set<Observer<TaskGraph>>(),
@@ -185,7 +185,7 @@ export class TaskGraphView {
 						blocked === undefined ? ["d", ["tasks", key, "blocked"]] : ["s", ["tasks", key, "blocked"], blocked],
 					);
 				}
-				publish(mount, ops, BACKGROUND_CONTEXT, (error) => this.#session.report(error));
+				publish(mount, ops, BACKGROUND_CONTEXT, error => this.#session.report(error));
 			})
 			// Rejected only once the Session is closing or failed.
 			.catch(() => {});
@@ -197,14 +197,14 @@ export class TaskGraphView {
 		const live = new Map<string, BlockedSubject>();
 		const records: AnyTaskRecord[] = [];
 		for (const status of LIVE_STATUSES) {
-			records.push(...(await scanAll((cursor) => storage.scanTasks({ status }, SCAN_PAGE_SIZE, cursor, context))));
+			records.push(...(await scanAll(cursor => storage.scanTasks({ status }, SCAN_PAGE_SIZE, cursor, context))));
 		}
 		records.sort((a, b) => a.id - b.id);
 		for (const record of records) {
-			const owned = await scanAll((cursor) =>
+			const owned = await scanAll(cursor =>
 				storage.scanConversations({ ownerTaskId: record.id }, SCAN_PAGE_SIZE, cursor, context),
 			);
-			const conversations = owned.map((conversation) => conversation.id).sort((a, b) => a - b);
+			const conversations = owned.map(conversation => conversation.id).sort((a, b) => a - b);
 			const subject = blockedSubject(record);
 			tasks[String(record.id)] = nodeOf(record, conversations, this.#blocking.blocked(subject));
 			live.set(String(record.id), subject);

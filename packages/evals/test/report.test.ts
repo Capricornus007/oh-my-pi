@@ -7,7 +7,7 @@ import { PI_SESSION_SNAPSHOT_ARTIFACT, readTaskObservation } from "../src/report
 
 const temporaryDirectories: string[] = [];
 afterEach(async () => {
-	await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+	await Promise.all(temporaryDirectories.splice(0).map(path => rm(path, { recursive: true, force: true })));
 });
 
 const task: EvalTask = {
@@ -40,7 +40,7 @@ async function writeTaskReport(assertions: ReportAssertion[]) {
 		meta,
 	}));
 	const count = (status: ReportAssertion["status"]): number =>
-		results.filter((result) => result.status === status).length;
+		results.filter(result => result.status === status).length;
 	await writeFile(
 		reportPath,
 		JSON.stringify({
@@ -106,7 +106,7 @@ async function readObservation(assertion: ReportAssertion = {}) {
 describe("readTaskObservation", () => {
 	it.each(["skipped", "todo", "disabled"] as const)(
 		"preserves a skipped outcome for %s cases without harness runs",
-		async (status) => {
+		async status => {
 			const { observation } = await readObservation({ status });
 			expect(observation).toMatchObject({ outcome: "skipped" });
 		},

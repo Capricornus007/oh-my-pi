@@ -5,7 +5,7 @@ import { Weather } from "@example/weather/contract";
 
 const Forecast = local("example.forecast", { version: 1, params: {}, members: { text: str() } });
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Forecast, (_params, self) => {
 		const weather = self.get(Weather, {});
 		return { text: self.derive([weather.celsius], ([celsius]) => `${celsius} degrees`) };

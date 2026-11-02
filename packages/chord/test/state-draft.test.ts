@@ -61,8 +61,8 @@ describe("transactional overlay drafts", () => {
 			return left.rank - right.rank;
 		});
 		const prepared = change.prepare();
-		expect(prepared.value.rows.map((row) => row.rank)).toEqual([1, 2]);
-		expect(prepared.value.rows.map((row) => row.comparisons)).toEqual([1, 1]);
+		expect(prepared.value.rows.map(row => row.rank)).toEqual([1, 2]);
+		expect(prepared.value.rows.map(row => row.comparisons)).toEqual([1, 1]);
 	});
 
 	it("drops writes through detached child references", () => {
@@ -76,7 +76,7 @@ describe("transactional overlay drafts", () => {
 		expect(change.prepare().value).toEqual({ items: [{ value: "kept" }] });
 	});
 
-	it.each(["unshift", "splice"] as const)("inserts 100,000 items with %s without argument overflow", (method) => {
+	it.each(["unshift", "splice"] as const)("inserts 100,000 items with %s without argument overflow", method => {
 		const tracker = track({ values: [-1] });
 		const change = tracker.beginChange();
 		const items = Array.from({ length: 100_000 }, (_, value) => value);

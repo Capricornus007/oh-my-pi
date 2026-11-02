@@ -27,7 +27,7 @@ const root = join(copy, "plugins");
 
 /** Waits until `ready()` holds (the watcher's events arrive on their own time). */
 async function until(ready: () => boolean): Promise<void> {
-	while (!ready()) await new Promise((resolve) => setTimeout(resolve, 10));
+	while (!ready()) await new Promise(resolve => setTimeout(resolve, 10));
 }
 
 /** Replaces `from` with `to` in `file` (under the copy). */
@@ -37,7 +37,7 @@ async function edit(file: string, from: string, to: string): Promise<void> {
 }
 
 /** Waits until every plugin of `names` is marked dirty. */
-const dirty = (...names: string[]) => until(() => names.every((name) => plugins.state.value.dirty.includes(name)));
+const dirty = (...names: string[]) => until(() => names.every(name => plugins.state.value.dirty.includes(name)));
 
 /** The marks, in one line. */
 const marks = () => JSON.stringify(plugins.state.value);
@@ -67,7 +67,7 @@ const plugins = createPlugins(
 		base: [join(copy, "app")],
 		// A stand-in for npm (no network; these plugins have no dependencies).
 		install: { npmCommand: [process.execPath, "-e", ""] },
-		onError: (error) => console.log("plugins:", error.kind),
+		onError: error => console.log("plugins:", error.kind),
 	},
 	context,
 );
@@ -141,7 +141,7 @@ await dirty("@example/notes");
 const early = await plugins.build(plugins.state.value.dirty, context);
 await edit("plugins/notes/label.ts", '"notes v4"', '"notes v5"');
 // The edit's event arrives on its own time (the mark is set already, so no change shows it).
-await new Promise((resolve) => setTimeout(resolve, 200));
+await new Promise(resolve => setTimeout(resolve, 200));
 console.log("6. built before the second edit:");
 print(await plugins.rollout(steps, early, context));
 console.log("   marks:", marks());

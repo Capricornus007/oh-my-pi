@@ -31,7 +31,7 @@ const root = await harness.root(context, { agent: { model: { provider: "faux", m
 const capital = await root.submit({ type: "input", content: "Capital of France?" }, context);
 const answered = await capital.wait(context);
 if (answered.status === "done" && answered.type === "input") {
-	const entry = await root.commit((tx) => tx.entry(AssistantEntry, answered.answer), context);
+	const entry = await root.commit(tx => tx.entry(AssistantEntry, answered.answer), context);
 	const reply = entry?.model?.[0];
 	console.log("answer:", reply?.role === "assistant" ? reply.content : reply);
 }
@@ -40,6 +40,6 @@ if (answered.status === "done" && answered.type === "input") {
 const transcript = await root.entries({}, 10, undefined, context);
 console.log(
 	"transcript:",
-	[...transcript.items].reverse().map((entry) => entry.kind),
+	[...transcript.items].reverse().map(entry => entry.kind),
 );
 await harness.close(context);

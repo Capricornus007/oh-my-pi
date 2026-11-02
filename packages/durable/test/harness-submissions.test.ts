@@ -49,7 +49,7 @@ describe("submissions", () => {
 		const entries = await allEntries(root);
 		expect(entries).toEqual([{ id: settled.entry, conversationId: root.id, kind: "note", data: { text: "x" } }]);
 		expect(await harness.snapshot(LiveDoc, root.id, context)).toEqual({});
-		const tasks = await harness.commit((tx) => tx.scanTasks({ conversationId: root.id }, 10), context);
+		const tasks = await harness.commit(tx => tx.scanTasks({ conversationId: root.id }, 10), context);
 		expect(tasks.items).toEqual([]);
 		await harness.close(context);
 	});
@@ -65,7 +65,7 @@ describe("submissions", () => {
 		await busy.reached;
 		const record = await submission.status(context);
 		if (record.type !== "input" || record.status !== "placed") throw new Error(`Unexpected ${record.status}`);
-		const entry = await root.commit((tx) => tx.entry(UserEntry, record.entry), context);
+		const entry = await root.commit(tx => tx.entry(UserEntry, record.entry), context);
 		expect(entry?.model).toEqual([{ role: "user", content: "hi", timestamp: 42 }]);
 		const live = await harness.snapshot(LiveDoc, root.id, context);
 		expect(live?.run?.inputs).toEqual([submission.id]);
@@ -216,7 +216,7 @@ describe("submissions", () => {
 
 		const passive = await openChat(new ControlledStorage(), chatSetup());
 		const taskId = await passive.root.commit(
-			(tx) => tx.createTask(GenerationTask, {}, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(GenerationTask, {}, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		// A committed task alone does not start scheduling; waiting for it does.
@@ -228,27 +228,27 @@ describe("submissions", () => {
 	it("settles submissions by their current record in the transaction", async () => {
 		const { harness, root } = await openChat(new ControlledStorage(), chatSetup());
 		const session = harness as unknown as SessionImpl;
-		const entry = await root.commit(async (tx) => (await tx.appendEntry(root.id, { kind: "note" })).id, context);
+		const entry = await root.commit(async tx => (await tx.appendEntry(root.id, { kind: "note" })).id, context);
 		const create = (record: SubmissionCreate) =>
-			session.commitWith(async (tx) => (await tx.createSubmission(record)).id, context);
+			session.commitWith(async tx => (await tx.createSubmission(record)).id, context);
 		const queued = await create({ conversationId: root.id, type: "input", status: "queued" });
 		const write = await create({ conversationId: root.id, type: "write", status: "queued" });
 		const answer = { status: "done", answer: entry } as const;
-		await expect(root.commit((tx) => tx.settleSubmission(queued, answer), context)).rejects.toThrow(
+		await expect(root.commit(tx => tx.settleSubmission(queued, answer), context)).rejects.toThrow(
 			"is not a placed input",
 		);
-		await expect(root.commit((tx) => tx.settleSubmission(write, answer), context)).rejects.toThrow(
+		await expect(root.commit(tx => tx.settleSubmission(write, answer), context)).rejects.toThrow(
 			"is not a placed input",
 		);
 		await expect(
 			root.commit(
-				(tx) => tx.settleSubmission(999_999 as SubmissionId, { status: "unanswered", reason: "x" }),
+				tx => tx.settleSubmission(999_999 as SubmissionId, { status: "unanswered", reason: "x" }),
 				context,
 			),
 		).rejects.toThrow("does not exist");
 
 		// A submission created earlier in the same commit settles; a second settlement leaves the first.
-		const placed = await session.commitWith(async (tx) => {
+		const placed = await session.commitWith(async tx => {
 			const { id } = await tx.createSubmission({ conversationId: root.id, type: "input", status: "placed", entry });
 			tx.settleSubmission(id, answer);
 			tx.settleSubmission(id, { status: "unanswered", reason: "late" });
@@ -266,15 +266,15 @@ describe("submissions", () => {
 		const Counter = defineEntry<{ n: number }>("app.counter");
 		const Marker = defineEntry("app.marker");
 		const { harness, root } = await openChat(new ControlledStorage(), chatSetup());
-		const counter = await root.commit((tx) => tx.appendEntry(Counter, root.id, { data: { n: 1 } }), context);
+		const counter = await root.commit(tx => tx.appendEntry(Counter, root.id, { data: { n: 1 } }), context);
 		const n: number = counter.data.n;
 		expect(n).toBe(1);
 		expect(counter).toEqual({ id: counter.id, conversationId: root.id, kind: "app.counter", data: { n: 1 } });
-		const marker = await root.commit((tx) => tx.appendEntry(Marker, root.id, {}), context);
+		const marker = await root.commit(tx => tx.appendEntry(Marker, root.id, {}), context);
 		expect(marker.kind).toBe("app.marker");
-		expect(await root.commit((tx) => tx.entry(Counter, counter.id), context)).toEqual(counter);
-		expect(await root.commit((tx) => tx.entry(Marker, counter.id), context)).toBeUndefined();
-		expect(await root.commit((tx) => tx.entry(Counter, 999_999 as EntryId), context)).toBeUndefined();
+		expect(await root.commit(tx => tx.entry(Counter, counter.id), context)).toEqual(counter);
+		expect(await root.commit(tx => tx.entry(Marker, counter.id), context)).toBeUndefined();
+		expect(await root.commit(tx => tx.entry(Counter, 999_999 as EntryId), context)).toBeUndefined();
 		expect(Counter.is(counter)).toBe(true);
 		expect(AssistantEntry.is(counter)).toBe(false);
 		expect([UserEntry.kind, AssistantEntry.kind]).toEqual(["pi.user", "pi.assistant"]);
@@ -287,7 +287,7 @@ describe("submissions", () => {
 		const { harness, root } = await openChat(new LateResolvingStorage(), setup);
 		const settled = new Set<SubmissionId>();
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of publication.changes) {
 					if (change.type === "submission" && change.value.status === "done") settled.add(change.value.id);
 				}

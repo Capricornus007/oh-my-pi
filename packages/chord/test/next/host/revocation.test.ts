@@ -54,7 +54,7 @@ const Barrier = local("app.barrier", { version: 1, params: {}, members: { n: int
 const { wait } = wireNames(Notes, "reader").methods as { wait: number };
 
 /** A worker of session S1 serving `Notes` (as `serveNotes`, at the address `Notes` names), its parent a raw peer whose holds name their principal. */
-async function worker(setup: (host: FacetHost<TestPrincipal>) => void = (h) => void serveNotes(h)) {
+async function worker(setup: (host: FacetHost<TestPrincipal>) => void = h => void serveNotes(h)) {
 	const host = createHost<TestPrincipal, Revocation>({
 		address: Server(),
 		principal: { kind: "worker", session: "S1" },
@@ -92,7 +92,7 @@ describe("revocation keys", () => {
 			},
 			onError: () => {},
 		});
-		await host.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => serveNotes(h)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => serveNotes(h)) }], context);
 		const peer = await rawParent(host);
 		holdAs(peer, 0, S1);
 		holdAs(peer, 1, { kind: "guest", session: "S2" });
@@ -111,14 +111,14 @@ describe("revocation keys", () => {
 		const host = createHost<TestPrincipal, Revocation>({
 			address: Server(),
 			principal: { kind: "worker", session: "S1" },
-			revokedBy: (principal) => {
+			revokedBy: principal => {
 				// The principal decoded on this host, the cache's key: not the sender's object.
 				cached.push(new WeakRef(principal));
 				return revokedBy(principal);
 			},
 			onError: () => {},
 		});
-		await host.load([{ name: "@test/worker", facet: defineFacet<TestPrincipal>((h) => serveNotes(h)) }], context);
+		await host.load([{ name: "@test/worker", facet: defineFacet<TestPrincipal>(h => serveNotes(h)) }], context);
 		const parent = await rawParent(host);
 		holdAs(parent, 0, { kind: "guest", session: "S9" });
 		await parent.next("bound");
@@ -161,7 +161,7 @@ forEachCodec(() => {
 
 		it("aborts running calls (race 2): the handler's context, no result; a call crossing the gone is ignored", async () => {
 			let probe: ReturnType<typeof serveNotes> | undefined;
-			const { host, parent } = await worker((h) => {
+			const { host, parent } = await worker(h => {
 				probe = serveNotes(h);
 			});
 			holdAs(parent, 0, S1);
@@ -186,10 +186,10 @@ forEachCodec(() => {
 				variants: { v: { state: { n: int() } } },
 			});
 			const aborted: unknown[] = [];
-			const { host, parent } = await worker((h) =>
+			const { host, parent } = await worker(h =>
 				h.serve(Slow, (_, _principal, self) => {
 					self.open(
-						(opening) =>
+						opening =>
 							new Promise((_, reject) =>
 								opening.abortSignal?.addEventListener("abort", () => {
 									aborted.push(opening.abortSignal?.reason);
@@ -236,7 +236,7 @@ forEachCodec(() => {
 					onError: () => {},
 				});
 				const parent = await rawParent(host);
-				const facet = defineFacet<TestPrincipal>((h) => {
+				const facet = defineFacet<TestPrincipal>(h => {
 					serveNotes(h);
 					if (delayed) {
 						h.serve(Barrier, (_params, self) => {
@@ -309,7 +309,7 @@ forEachCodec(() => {
 			resolving.resolve();
 			await transported();
 			await transported();
-			expect(routed.flatMap((peer) => peer.received.filter(({ kind }) => kind === "hold"))).toEqual([]);
+			expect(routed.flatMap(peer => peer.received.filter(({ kind }) => kind === "hold"))).toEqual([]);
 			await host.close(context);
 		});
 
@@ -349,7 +349,7 @@ forEachCodec(() => {
 				onError: () => {},
 			});
 			await host.load([], context);
-			const peers = [S1, { kind: "guest", session: "S2" } as const, S1].map((principal) => {
+			const peers = [S1, { kind: "guest", session: "S2" } as const, S1].map(principal => {
 				const [a, b] = memoryLinkPair();
 				host.accept(a, { principal, codec: testCodec() }, context);
 				return new RawPeer(b);
@@ -372,7 +372,7 @@ forEachCodec(() => {
 				revokedBy,
 				onError: () => {},
 			});
-			await host.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => serveNotes(h)) }], context);
+			await host.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => serveNotes(h)) }], context);
 			const [a, b] = memoryLinkPair();
 			host.accept(a, { principal: S1, codec: testCodec() }, context);
 			const child = new RawPeer(b);
@@ -482,10 +482,10 @@ describe("revocation of this host's own requests over its paths (fix round 1)", 
 		await host.load([], context);
 		let outcome: unknown;
 		void rejection(
-			host.root((ctx) => ctx.get(Remote, {}, { readyTimeout: 60_000 }), context, {
+			host.root(ctx => ctx.get(Remote, {}, { readyTimeout: 60_000 }), context, {
 				principal: { kind: "guest", grant: "g" },
 			}),
-		).then((error) => {
+		).then(error => {
 			outcome = error;
 		});
 		await transported();
@@ -506,7 +506,7 @@ describe("revocation of this host's own requests over its paths (fix round 1)", 
 		await host.load([], context);
 		const pending = rejection(
 			host.root(
-				async (ctx) => {
+				async ctx => {
 					await ctx.get(Remote, {}, { readyTimeout: 500 });
 					throw new Error("revoked request became live");
 				},
@@ -524,7 +524,7 @@ describe("revocation of this host's own requests over its paths (fix round 1)", 
 		});
 		const [up, down] = memoryLinkPair();
 		worker.connect(up, { principal: { kind: "owner" }, trusted: true }, context);
-		const facet = defineFacet<Guest>((h) => h.serve(Remote, () => ({ variant: "view", members: {} })));
+		const facet = defineFacet<Guest>(h => h.serve(Remote, () => ({ variant: "view", members: {} })));
 		await worker.load([{ name: "@test/late", facet }], context);
 		gate.resolve({ link: down, principal: { kind: "owner" }, trusted: true });
 		expect(await pending).toMatchObject({ code: "forbidden", reason: "revoked" });
@@ -538,7 +538,7 @@ describe("revocation of this host's own requests over its paths (fix round 1)", 
 		const routed: RawPeer[] = [];
 		// The drop resolves again at once (slice 10 R2); the next link comes only after the revocation.
 		let next: () => void = () => {};
-		const revoked = new Promise<void>((resolve) => {
+		const revoked = new Promise<void>(resolve => {
 			next = resolve;
 		});
 		const host = createHost<Guest, string>({
@@ -562,7 +562,7 @@ describe("revocation of this host's own requests over its paths (fix round 1)", 
 		await host.load([], context);
 		const states: string[] = [];
 		void host.root(
-			async (ctx) => {
+			async ctx => {
 				const held = await ctx.get(Remote, {}, { readyTimeout: 60_000 }).catch((error: Error) => error);
 				states.push(held instanceof Error ? held.message : "live");
 			},

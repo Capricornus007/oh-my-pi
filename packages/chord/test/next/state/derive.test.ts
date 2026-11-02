@@ -34,7 +34,7 @@ function serveStore(self: Self) {
 		n: self.derive([num], ([v]) => v.n),
 		double: self.derive([num], ([v]) => v.n * 2),
 		set: async (n: number, ctx: typeof context) => {
-			await num.change((draft) => {
+			await num.change(draft => {
 				draft.n = n;
 			}, ctx);
 			return null;
@@ -51,7 +51,7 @@ async function computes() {
 describe("derives across objects", () => {
 	it("update in the batch of the commit that changed their source's object", async () => {
 		const Viewer = local("app.viewer", { version: 1, params: {}, members: { label: str() } });
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Store, (_, self) => serveStore(self));
 			h.serve(Viewer, (_, self) => ({
 				label: self.derive([self.get(Store, {}).double], ([d]) => `double ${d}`),
@@ -71,7 +71,7 @@ describe("the pull model", () => {
 		const { telemetry, count } = await computes();
 		const Diamond = local("app.diamond", { version: 1, params: {}, members: { d: int(), set: method(int()) } });
 		const { host } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Diamond, (_, self) => {
 					const num = self.state(Num);
 					const b = self.derive([num], ([v]) => v.n + 1);
@@ -79,7 +79,7 @@ describe("the pull model", () => {
 					return {
 						d: self.derive([b, c], ([x, y]) => x + y),
 						set: async (n, ctx) => {
-							await num.change((draft) => {
+							await num.change(draft => {
 								draft.n = n;
 							}, ctx);
 							return null;
@@ -99,7 +99,7 @@ describe("the pull model", () => {
 
 	it("leaves unwatched derives dirty until read; a one-off read does not make them eager", async () => {
 		const { telemetry, count } = await computes();
-		const { host } = await loaded((h) => h.serve(Store, (_, self) => serveStore(self)), { telemetry });
+		const { host } = await loaded(h => h.serve(Store, (_, self) => serveStore(self)), { telemetry });
 		const store = await host.get(Store, {}, context);
 		const before = count();
 		await store.set(1, context);
@@ -119,13 +119,13 @@ describe("the pull model", () => {
 			members: { even: obj({ even: int() }), set: method(int()) },
 		});
 		const { host } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Parity, (_, self) => {
 					const num = self.state(Num);
 					return {
 						even: self.derive([num], ([v]) => ({ even: v.n % 2 })),
 						set: async (n, ctx) => {
-							await num.change((draft) => {
+							await num.change(draft => {
 								draft.n = n;
 							}, ctx);
 							return null;
@@ -221,7 +221,7 @@ describe("failures", () => {
 		const watch = await failing.t.watch(context);
 		const calls: unknown[] = [];
 		const gate = Promise.withResolvers<void>();
-		watch.start(async (call) => {
+		watch.start(async call => {
 			calls.push(call);
 			if (calls.length === 1) await gate.promise;
 		});
@@ -247,7 +247,7 @@ async function failingDerives() {
 		params: {},
 		members: { t: int(), u: int(), v: int(), set: method(int()) },
 	});
-	const { host, errors } = await loaded((h) =>
+	const { host, errors } = await loaded(h =>
 		h.serve(Failing, (_, self) => {
 			const num = self.state(Num);
 			const t = self.derive([num], ([v]) => {
@@ -259,7 +259,7 @@ async function failingDerives() {
 				u: self.derive([t], ([x]) => x + 1),
 				v: self.derive([num], ([x]) => x.n),
 				set: async (n, ctx) => {
-					await num.change((draft) => {
+					await num.change(draft => {
 						draft.n = n;
 					}, ctx);
 					return null;
@@ -275,7 +275,7 @@ describe("GC", () => {
 	it("a detached derive is not held by its former sources", async () => {
 		const Viewer = local("app.viewer", { version: 1, params: { id: int() }, members: { label: int() } });
 		const refs: WeakRef<object>[] = [];
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Store, (_, self) => serveStore(self));
 			h.serve(Viewer, (_, self) => {
 				const label = self.derive([self.get(Store, {}).n], ([n]) => n);
@@ -296,7 +296,7 @@ describe("GC", () => {
 			members: { t: int(), set: method(int()) },
 		});
 		const refs: WeakRef<object>[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Paged, (_, self) => {
 				const num = self.state(Num);
 				const t = self.derive([num], ([v]) => {
@@ -307,7 +307,7 @@ describe("GC", () => {
 				return {
 					t,
 					set: async (n, ctx) => {
-						await num.change((draft) => {
+						await num.change(draft => {
 							draft.n = n;
 						}, ctx);
 						return null;
@@ -336,7 +336,7 @@ describe("GC of handed-out errors", () => {
 		const refs: WeakRef<object>[] = [];
 		const kept: unknown[] = [];
 		await (async () => {
-			const { host } = await loaded((h) =>
+			const { host } = await loaded(h =>
 				h.serve(Fresh, (_, self) => {
 					const num = self.state(Num);
 					const t = self.derive([num], ([v]) => {
@@ -348,7 +348,7 @@ describe("GC of handed-out errors", () => {
 					return {
 						t,
 						set: async (n, ctx) => {
-							await num.change((draft) => {
+							await num.change(draft => {
 								draft.n = n;
 							}, ctx);
 							return null;
@@ -358,7 +358,7 @@ describe("GC of handed-out errors", () => {
 			);
 			refs.push(new WeakRef(host));
 			const fresh = await host.get(Fresh, {}, context);
-			(await fresh.t.watch(context)).start(async (call) => {
+			(await fresh.t.watch(context)).start(async call => {
 				if (call.kind === "failed") kept.push(call.error);
 			});
 			await fresh.set(1, context);
@@ -411,14 +411,14 @@ describe("the retired flag", () => {
 			many = self.derive([list], ([value]) => value.items.length > 1);
 			twice = self.derive([many], ([value]) => !value);
 		});
-		await list!.change((draft) => void draft.items.push("a"), context);
+		await list!.change(draft => void draft.items.push("a"), context);
 		const manys = changesOf(await many!.watch(context));
 		const twices = changesOf(await twice!.watch(context));
 		await list!.retire(context);
 		await delivered();
 		expect(manys).toEqual([{ kind: "value", value: false, ops: [], retired: true }]);
 		expect(twices).toEqual([{ kind: "value", value: true, ops: [], retired: true }]);
-		await list!.change((draft) => void draft.items.push("a", "b"), context);
+		await list!.change(draft => void draft.items.push("a", "b"), context);
 		await delivered();
 		expect(manys.at(-1)).toEqual({ kind: "value", value: true, ops: [["r", true]], retired: false });
 	});
@@ -436,16 +436,16 @@ describe("the retired flag", () => {
 				return v.n;
 			});
 		});
-		await num!.change((draft) => {
+		await num!.change(draft => {
 			draft.n = 1;
 		}, context);
-		await gate!.change((draft) => {
+		await gate!.change(draft => {
 			draft.on = 1;
 		}, context);
 		const calls = changesOf(await n!.watch(context));
 		// The retirement makes `n` 0 again, which throws.
 		await num!.retire(context);
-		await num!.change((draft) => {
+		await num!.change(draft => {
 			draft.n = 2;
 		}, context);
 		await delivered();
@@ -469,7 +469,7 @@ describe("the retired flag", () => {
 			}
 			bottom = previous;
 		});
-		await list!.change((draft) => void draft.items.push("a"), context);
+		await list!.change(draft => void draft.items.push("a"), context);
 		const frames = changesOf(await bottom!.watch(context));
 		const visits = vi.spyOn(Derive.prototype, "sourceRetired");
 		try {

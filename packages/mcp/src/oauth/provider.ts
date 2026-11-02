@@ -85,7 +85,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 		const existing = (await this.load()).oauthState;
 		if (existing) return existing;
 		const state = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
-		await this.update((value) => ({ ...value, oauthState: state }));
+		await this.update(value => ({ ...value, oauthState: state }));
 		return state;
 	}
 
@@ -95,7 +95,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 
 	async saveClientInformation(information: OAuthClientInformationMixed): Promise<void> {
 		if (this.configuredClient) return;
-		await this.update((value) => ({ ...value, clientInformation: information }));
+		await this.update(value => ({ ...value, clientInformation: information }));
 	}
 
 	async tokens(): Promise<OAuthTokens | undefined> {
@@ -104,7 +104,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 
 	async saveTokens(tokens: OAuthTokens): Promise<void> {
 		const expiresAt = tokens.expires_in === undefined ? undefined : Date.now() + tokens.expires_in * 1000;
-		await this.update((value) => {
+		await this.update(value => {
 			const next: McpOAuthState = { ...value, tokens };
 			if (expiresAt === undefined) delete next.tokensExpireAt;
 			else next.tokensExpireAt = expiresAt;
@@ -117,7 +117,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 	}
 
 	async saveCodeVerifier(verifier: string): Promise<void> {
-		await this.update((value) => ({ ...value, codeVerifier: verifier }));
+		await this.update(value => ({ ...value, codeVerifier: verifier }));
 	}
 
 	async codeVerifier(): Promise<string> {
@@ -127,7 +127,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 	}
 
 	async invalidateCredentials(kind: "all" | "client" | "tokens" | "verifier" | "discovery"): Promise<void> {
-		await this.update((value) => {
+		await this.update(value => {
 			const next = { ...value };
 			if (kind === "all" || kind === "client") delete next.clientInformation;
 			if (kind === "all" || kind === "tokens") {
@@ -142,7 +142,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
 	}
 
 	async saveDiscoveryState(discovery: OAuthDiscoveryState): Promise<void> {
-		await this.update((value) => ({ ...value, discovery }));
+		await this.update(value => ({ ...value, discovery }));
 	}
 
 	async discoveryState(): Promise<OAuthDiscoveryState | undefined> {

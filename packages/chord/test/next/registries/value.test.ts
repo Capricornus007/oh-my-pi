@@ -55,12 +55,12 @@ describe("older readers (S2)", () => {
 		const mapped: number[] = [];
 		const { host } = await loadedPlugins(
 			{
-				"@app/sum": (host) => {
+				"@app/sum": host => {
 					host.serve(Sum, {
 						compose: total,
 						accepts: {
 							1: {
-								value: (current) => {
+								value: current => {
 									mapped.push(current.total);
 									return current.total;
 								},
@@ -88,7 +88,7 @@ describe("older readers (S2)", () => {
 		const Newer = local("app.newer", { version: 1, params: {}, members: { total: int() } });
 		const Older = local("app.older", { version: 1, params: {}, members: { total: int() } });
 		const { host, errors } = await loadedPlugins({
-			"@app/sum": (host) => {
+			"@app/sum": host => {
 				host.serve(Sum, { compose: total });
 				host.serve(Newer, (_, self) => ({ total: self.derive([self.registry(SumV3)], ([v]) => v.total) }));
 				host.serve(Older, (_, self) => ({ total: self.derive([self.registry(SumV1)], ([v]) => v) }));
@@ -118,12 +118,12 @@ describe("older readers (S2)", () => {
 		const Contributor = local("app.contributor", { version: 1, params: {}, members: { n: int() } });
 		let observer: FollowObserver<unknown> | undefined;
 		const { host } = await loadedPlugins({
-			"@app/mapping": (h) => {
+			"@app/mapping": h => {
 				h.serve(R, {
-					compose: (table) => table.reduce((n, e) => n + e.value, 0),
+					compose: table => table.reduce((n, e) => n + e.value, 0),
 					accepts: {
 						1: {
-							value: (n) => {
+							value: n => {
 								if (n === 0) throw new Error("old version cannot map the empty table");
 								return n;
 							},
@@ -133,7 +133,7 @@ describe("older readers (S2)", () => {
 				h.serve(Contributor, (_, self) => {
 					self.contribute(R, 42);
 					return {
-						n: self.follow(async (followed) => {
+						n: self.follow(async followed => {
 							observer = followed;
 							return { value: 42, detach() {} };
 						}),
@@ -157,12 +157,12 @@ describe("older readers (S2)", () => {
 		const resource = { closed: false };
 		let failRuntime: () => void = () => {};
 		const { host } = await loadedPlugins({
-			"@app/resources": (h) => {
+			"@app/resources": h => {
 				h.serve(Current, {
-					compose: (table) => table.map(({ value }) => value),
+					compose: table => table.map(({ value }) => value),
 					accepts: {
 						1: {
-							value: (current) => {
+							value: current => {
 								if (current.length === 0) throw new Error("no current resource");
 								return current[0]!;
 							},
@@ -177,7 +177,7 @@ describe("older readers (S2)", () => {
 						},
 					);
 					self.contribute(Current, native);
-					self.follow(async (observer) => {
+					self.follow(async observer => {
 						failRuntime = () => observer.end({ kind: "failed", error: new Error("runtime closed") });
 						return { value: 1, detach: () => {} };
 					});
@@ -198,7 +198,7 @@ describe("older readers (S2)", () => {
 		const Nothing = defineRegistry<number, undefined>("app.nothing", { version: 2 });
 		const NothingV1 = defineRegistry<number, string>("app.nothing", { version: 1 });
 		const { host } = await loadedPlugins({
-			"@app/a": (h) => h.serve(Nothing, { compose: () => undefined, accepts: { 1: { value: () => "mapped" } } }),
+			"@app/a": h => h.serve(Nothing, { compose: () => undefined, accepts: { 1: { value: () => "mapped" } } }),
 		});
 		expect((await host.registry(NothingV1, context)).value).toBe("mapped");
 		await host.close(context);
@@ -209,12 +209,12 @@ describe("older readers (S2)", () => {
 		const CountV1 = defineRegistry<number, number>("app.count", { version: 1 });
 		const Counter = local("app.counter", { version: 1, params: {}, members: { set: method(int()) } });
 		const { host } = await loadedPlugins({
-			"@app/count": (h) => {
+			"@app/count": h => {
 				h.serve(Count, {
-					compose: (table) => table.reduce((n, { value }) => n + value, 0),
+					compose: table => table.reduce((n, { value }) => n + value, 0),
 					accepts: {
 						1: {
-							value: (n) => {
+							value: n => {
 								if (n < 0) throw new Error("negative");
 								return n;
 							},
@@ -235,7 +235,7 @@ describe("older readers (S2)", () => {
 		});
 		const old = await host.registry(CountV1, context);
 		const calls: NativeWatchCall<number>[] = [];
-		old.observe({ advance: (call) => calls.push(call), end: () => {} }, context);
+		old.observe({ advance: call => calls.push(call), end: () => {} }, context);
 		const counter = await host.get(Counter, {}, context);
 		await counter.set(-1, context);
 		// Back to the composition mapped before (the same number): the mapping heals.
@@ -257,7 +257,7 @@ describe("readers (S3)", () => {
 
 	it("activate once the registry has a value; a reader of a registry nobody serves parks failed { waiting }, `load` waits for nothing", async () => {
 		const started = Date.now();
-		const { host, errors } = await loadedPlugins({ "@app/reader": (host) => serveReader(host) });
+		const { host, errors } = await loadedPlugins({ "@app/reader": host => serveReader(host) });
 		expect(Date.now() - started).toBeLessThan(1_000);
 		expect(errors).toEqual([]);
 		expect(host.hold(Reader, {}, context).state.value).toMatchObject({
@@ -280,9 +280,9 @@ describe("readers (S3)", () => {
 
 	it("a reader parked on a first `compose` that threw goes on at the first good composition", async () => {
 		const { host, errors } = await loadedPlugins({
-			"@app/sum": (host) => {
+			"@app/sum": host => {
 				host.serve(Sum, {
-					compose: (table) => {
+					compose: table => {
 						const sum = total(table);
 						if (sum.total === 0) throw new Error("empty");
 						return sum;
@@ -290,7 +290,7 @@ describe("readers (S3)", () => {
 				});
 				serveReader(host);
 			},
-			"@app/setter": (host) => setter(host, 0),
+			"@app/setter": host => setter(host, 0),
 		});
 		expect(failures(errors)).toEqual([]);
 		const held = host.hold(Reader, {}, context);
@@ -307,16 +307,16 @@ describe("readers (S3)", () => {
 	it("host.registry before the publication waits for it, then resolves with the provider it served", async () => {
 		const host = createHost({ onError: () => {} });
 		const waiting = host.registry(Sum, context);
-		await host.load([{ name: "@app/sum", facet: defineFacet((h) => h.serve(Sum, { compose: total })) }], context);
+		await host.load([{ name: "@app/sum", facet: defineFacet(h => h.serve(Sum, { compose: total })) }], context);
 		expect((await waiting).value).toEqual({ total: 0 });
 		await host.close(context);
 	});
 
 	it("host.registry waits through no value until a first good composition, woken by it, its wait then gone", async () => {
 		const { host } = await loadedPlugins({
-			"@app/sum": (host) => {
+			"@app/sum": host => {
 				host.serve(Sum, {
-					compose: (table) => {
+					compose: table => {
 						const sum = total(table);
 						if (sum.total === 0) throw new Error("empty");
 						return sum;
@@ -334,9 +334,9 @@ describe("readers (S3)", () => {
 
 	it("once live, a later throwing `compose` changes nothing for the reader: `.value` keeps the last good one", async () => {
 		const { host } = await loadedPlugins({
-			"@app/sum": (host) => {
+			"@app/sum": host => {
 				host.serve(Sum, {
-					compose: (table) => {
+					compose: table => {
 						const sum = total(table);
 						if (sum.total < 0) throw new Error("negative");
 						return sum;
@@ -360,7 +360,7 @@ describe("readers' memory", () => {
 	it("an ended reader is collected while the registry lives: its derive and its read leave the value", async () => {
 		const Reader = local("app.reader", { version: 1, params: { id: int() }, members: { total: int() } });
 		const { host } = await loadedPlugins({
-			"@app/sum": (host) => {
+			"@app/sum": host => {
 				host.serve(Sum, { compose: total, accepts: { 1: { value: ({ total }) => total } } });
 				host.serve(Reader, (_, self) => ({
 					total: self.derive([self.registry(Sum), self.registry(SumV1)], ([v, old]) => v.total + old),
@@ -372,8 +372,8 @@ describe("readers' memory", () => {
 			const reader = await host.get(Reader, { id: 1 }, context);
 			expect(reader.total.value).toBe(2);
 			reader.release();
-			await new Promise((resolve) => setTimeout(resolve, 0));
-			return objects.filter((ref) => ref.deref()?.label === "app.reader(1)");
+			await new Promise(resolve => setTimeout(resolve, 0));
+			return objects.filter(ref => ref.deref()?.label === "app.reader(1)");
 		})();
 		expect(refs.length).toBeGreaterThan(0);
 		await (await host.get(Setter, {}, context)).set(5, context);
@@ -391,12 +391,12 @@ describe("values' memory", () => {
 		const Reader = local("app.old-reader", { version: 1, params: { id: int() }, members: { n: int() } });
 		let mapped: WeakRef<object> | undefined;
 		const { host } = await loadedPlugins({
-			"@app/a": (h) => {
+			"@app/a": h => {
 				h.serve(New, {
 					compose: () => 1,
 					accepts: {
 						1: {
-							value: (n) => {
+							value: n => {
 								const value = { n, payload: new Uint8Array(1_000_000) };
 								mapped = new WeakRef(value);
 								return value;
@@ -422,9 +422,9 @@ describe("values' memory", () => {
 		const Waiting = local("app.waiting", { version: 1, params: {}, members: {} });
 		const Counter = local("app.counter", { version: 1, params: {}, members: { set: method(int()) } });
 		const { host } = await loadedPlugins({
-			"@app/a": (h) => {
+			"@app/a": h => {
 				h.serve(Big, {
-					compose: (table) => {
+					compose: table => {
 						if (first) throw new Error("first");
 						const value = { payload: new Array(1000).fill(table.length) };
 						made.push(new WeakRef(value));
@@ -456,7 +456,7 @@ describe("values' memory", () => {
 		void (await host.registry(Big, context)).value;
 		await settledHeap();
 		// Only the current composition is alive.
-		expect(made.map((ref) => ref.deref() !== undefined)).toEqual([false, true]);
+		expect(made.map(ref => ref.deref() !== undefined)).toEqual([false, true]);
 		await host.close(context);
 	});
 
@@ -464,7 +464,7 @@ describe("values' memory", () => {
 		const Kept = defineRegistry<number, number>("app.kept", { version: 1 });
 		const signal = new AbortController();
 		const { weak, value } = await (async () => {
-			const { host } = await loadedPlugins({ "@app/a": (h) => h.serve(Kept, { compose: () => 7 }) });
+			const { host } = await loadedPlugins({ "@app/a": h => h.serve(Kept, { compose: () => 7 }) });
 			const value = await host.registry(Kept, context);
 			value.observe({ advance: () => {}, end: () => {} }, withAbortSignal(signal.signal, context));
 			expect(getEventListeners(signal.signal, "abort")).toHaveLength(1);
@@ -483,8 +483,8 @@ describe("observe", () => {
 		const Labels = defineRegistry<string, string>("app.labels", { version: 1 });
 		const Label = local("app.label", { version: 1, params: {}, members: { set: method(str()) } });
 		const { host } = await loadedPlugins({
-			"@app/labels": (host) => {
-				host.serve(Labels, { compose: (table) => table.map(({ value }) => value).join(",") });
+			"@app/labels": host => {
+				host.serve(Labels, { compose: table => table.map(({ value }) => value).join(",") });
 				host.serve(Label, (_, self) => {
 					const label = self.writable("a");
 					self.contribute(Labels, label);
@@ -501,7 +501,7 @@ describe("observe", () => {
 		const calls: (NativeWatchCall<string> | WatchEnd)[] = [];
 		const { context: cancellable, cancel } = withCancel(context);
 		const observation = labels.observe(
-			{ advance: (call) => calls.push(call), end: (end) => calls.push(end) },
+			{ advance: call => calls.push(call), end: end => calls.push(end) },
 			cancellable,
 		);
 		expect(observation.value).toBe("a");
@@ -512,11 +512,11 @@ describe("observe", () => {
 		cancel();
 		await label.set("c", context);
 		expect(calls).toEqual([{ kind: "value", value: "b" }, { kind: "aborted" }]);
-		const again = labels.observe({ advance: (call) => calls.push(call), end: (end) => calls.push(end) }, context);
+		const again = labels.observe({ advance: call => calls.push(call), end: end => calls.push(end) }, context);
 		again.detach();
 		await label.set("d", context);
 		expect(calls).toHaveLength(2);
-		labels.observe({ advance: () => {}, end: (end) => calls.push(end) }, context);
+		labels.observe({ advance: () => {}, end: end => calls.push(end) }, context);
 		await host.close(context);
 		expect(calls.at(-1)).toEqual({ kind: "ended" });
 	});
@@ -528,7 +528,7 @@ describe("a reload's new value adapter (fix round 1)", () => {
 		const Old = defineRegistry<number, number>("astra.registry", { version: 1 });
 		const host = createHost({ onError: () => {} });
 		const facet = (factor: number) =>
-			defineFacet((h) => h.serve(R, { compose: () => 7, accepts: { 1: { value: (n) => n * factor } } }));
+			defineFacet(h => h.serve(R, { compose: () => 7, accepts: { 1: { value: n => n * factor } } }));
 		await host.load([{ name: "@astra/reg", facet: facet(2) }], context);
 		const old = await host.registry(Old, context);
 		expect(old.value).toBe(14);

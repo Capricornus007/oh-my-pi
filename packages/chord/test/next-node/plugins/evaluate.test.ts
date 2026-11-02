@@ -28,7 +28,7 @@ const Files = local("test.files", { version: 1, params: {}, members: { text: str
 /** Builds `name`'s `kind` facet under `root` for Node and returns the script and the plugin. */
 async function built(root: string, name: string, kind = "worker"): Promise<{ script: BuiltScript; plugin: Plugin }> {
 	const { plugins } = await discoverPlugins([root], { kinds: KINDS }, context);
-	const plugin = plugins.find((each) => each.name === name)!;
+	const plugin = plugins.find(each => each.name === name)!;
 	const result = await buildFacet(
 		plugin,
 		kind,

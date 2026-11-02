@@ -24,7 +24,7 @@ else run();
 
 function run(): void {
 	const results: MemoryResults = { count: COUNT, schemasMB: 0, candidates: {} };
-	const names = [...candidates.map((c) => c.name), "typebox interpreter"];
+	const names = [...candidates.map(c => c.name), "typebox interpreter"];
 	for (const name of names) {
 		const output = execFileSync(process.execPath, ["--expose-gc", import.meta.filename, "--child", name], {
 			encoding: "utf8",

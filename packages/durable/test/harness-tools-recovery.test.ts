@@ -65,11 +65,11 @@ function call(name: string, id = "c1"): AssistantMessage {
 const DONE = fauxAssistantMessage([fauxText("done")]);
 
 function results(entries: readonly EntryRecord[]): ToolResultMessage[] {
-	return entries.filter((entry) => ToolResultEntry.is(entry)).map((entry) => entry.model![0] as ToolResultMessage);
+	return entries.filter(entry => ToolResultEntry.is(entry)).map(entry => entry.model![0] as ToolResultMessage);
 }
 
 function text(message: ToolResultMessage | undefined): string {
-	return (message?.content ?? []).map((item) => (item.type === "text" ? item.text : "")).join("|");
+	return (message?.content ?? []).map(item => (item.type === "text" ? item.text : "")).join("|");
 }
 
 async function toolTaskId(harness: Harness): Promise<TaskId> {
@@ -153,7 +153,7 @@ describe("tool recovery", () => {
 							await aborted(callContext.abortSignal!);
 						}
 						const slots = (await reopened!.snapshot(LiveDoc, 1 as never, callContext))?.tools ?? [];
-						seen.push(slots.find((slot) => slot.taskId === api.taskId)?.status);
+						seen.push(slots.find(slot => slot.taskId === api.taskId)?.status);
 						return {};
 					},
 					{ replay: "safe" },
@@ -174,7 +174,7 @@ describe("tool recovery", () => {
 			const id = (await crashed.root.submit({ type: "input", content: "go" }, context)).id;
 			await started.promise;
 			const slot = async (harness: Harness, name: string) =>
-				(await harness.snapshot(LiveDoc, crashed.root.id, context))?.tools?.find((each) => each.name === name);
+				(await harness.snapshot(LiveDoc, crashed.root.id, context))?.tools?.find(each => each.name === name);
 			const live = (harness: Harness) => slot(harness, "work");
 			const workId = (await live(crashed.harness))!.taskId!;
 			if (sibling) await waitFor(async () => (await slot(crashed.harness, "quick"))?.status === "done");
@@ -189,7 +189,7 @@ describe("tool recovery", () => {
 			expect((await (await next.harness.submission(id, context))!.wait(context)).status).toBe("done");
 			// The rerun shows the slot running again.
 			expect(seen).toEqual(["running"]);
-			const [result] = results(await allEntries(next.root)).filter((message) => message.toolCallId === "w");
+			const [result] = results(await allEntries(next.root)).filter(message => message.toolCallId === "w");
 			expect(result!.isError).toBe(false);
 			await next.harness.close(context);
 			await crashed.harness.close(context);
@@ -339,7 +339,7 @@ describe("tool recovery", () => {
 		opened = await open(path, setup);
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
 		expect(observed).toBe(2);
-		expect((await allEntries(opened.root)).map((entry) => entry.kind)).toEqual([
+		expect((await allEntries(opened.root)).map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.system",
 			"pi.assistant",
@@ -381,8 +381,8 @@ describe("tool recovery", () => {
 		const requests: string[] = [];
 		setup.faux.setResponses([
 			call("bad"),
-			(request) => {
-				const result = request.messages.find((message) => message.role === "toolResult");
+			request => {
+				const result = request.messages.find(message => message.role === "toolResult");
 				requests.push(result?.role === "toolResult" ? text(result) : "none");
 				return DONE;
 			},
@@ -392,8 +392,8 @@ describe("tool recovery", () => {
 		expect(settled.status).toBe("done");
 		expect(results(await allEntries(opened.root))).toEqual([]);
 		expect(requests).toEqual(["Tool result unavailable: history ends before this call completed."]);
-		const tasks = await opened.harness.commit((tx) => tx.scanTasks({ conversationId: opened.root.id }, 20), context);
-		const faulted = tasks.items.find((task) => task.kind === "pi.tool")!;
+		const tasks = await opened.harness.commit(tx => tx.scanTasks({ conversationId: opened.root.id }, 20), context);
+		const faulted = tasks.items.find(task => task.kind === "pi.tool")!;
 		expect(faulted.state).toMatchObject({ status: "terminal", outcome: { status: "faulted" } });
 		await opened.harness.close(context);
 	});

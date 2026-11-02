@@ -38,7 +38,7 @@ type Deferred = { readonly promise: Promise<void>; readonly resolve: () => void 
 
 function deferred(): Deferred {
 	let resolve!: () => void;
-	const promise = new Promise<void>((done) => {
+	const promise = new Promise<void>(done => {
 		resolve = done;
 	});
 	return { promise, resolve };
@@ -200,12 +200,12 @@ export class LateResolvingStorage extends ControlledStorage {
 			const result = await super.commit(batches, receive, commitContext);
 			const stored = batches.slice(0, result.stored);
 			await flush();
-			if (stored.some((writes) => this.gap?.(writes) === true)) {
+			if (stored.some(writes => this.gap?.(writes) === true)) {
 				this.gap = undefined;
 				// What the gap started runs before the commit resolves.
 				await flush();
 			}
-			if (stored.some((writes) => this.rejectAfterAdopt?.(writes) === true)) {
+			if (stored.some(writes => this.rejectAfterAdopt?.(writes) === true)) {
 				this.rejectAfterAdopt = undefined;
 				throw new Error("reclaim failed");
 			}
@@ -227,7 +227,7 @@ export function openTestSession(): {
 	const session = new SessionImpl(storage, Date.now, () => 600_000);
 	const publications: CommitPublication[] = [];
 	session.observeCommits({
-		advance: (publication) => {
+		advance: publication => {
 			publications.push(publication);
 		},
 		end: () => {},
@@ -276,10 +276,10 @@ export function documentCopyChanges(
 
 /** Create one conversation and return its ID. */
 export async function createConversation(session: SessionImpl): Promise<ConversationId> {
-	return session.commit(async (tx) => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id, context);
+	return session.commit(async tx => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id, context);
 }
 
 /** Resolve after pending microtasks and one macrotask turn. */
 export function flush(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 0));
+	return new Promise(resolve => setTimeout(resolve, 0));
 }

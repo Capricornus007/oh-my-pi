@@ -29,7 +29,7 @@ function loopback(path: string, init: RequestInit & { headers?: Record<string, s
 
 /** Resolves with `value` after `ms`. */
 function sleepThen<T>(ms: number, value: T): Promise<T> {
-	return new Promise((resolve) => setTimeout(() => resolve(value), ms));
+	return new Promise(resolve => setTimeout(() => resolve(value), ms));
 }
 
 /** The connection of `loopback`'s requests. */
@@ -40,7 +40,7 @@ describe("startup", () => {
 		const server = await served({ "@app/who": whoami }, { load: false });
 		const registry = vi.spyOn(server.host, "registry");
 		const early = server.http.fetch(loopback("/whoami"), LOOPBACK);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		await server.load();
 		expect(await (await early).text()).toBe("null");
 		const calls = registry.mock.calls.length;
@@ -89,12 +89,12 @@ describe("Host and principals", () => {
 
 	it("admits hosts a writable contribution adds and removes at runtime", async () => {
 		const Tunnel = local("app.tunnel", { version: 1, params: {}, members: { name: method(arr(str())) } });
-		const tunnel = defineFacet<TestPrincipal>((host) =>
+		const tunnel = defineFacet<TestPrincipal>(host =>
 			host.serve(Tunnel, (_, self) => {
 				const contribution = self.writable<HttpContribution>({ hosts: [] });
 				self.contribute(Http, contribution);
 				return {
-					name: async (hosts) => {
+					name: async hosts => {
 						contribution.set({ hosts });
 						return null;
 					},
@@ -211,7 +211,7 @@ describe("default headers", () => {
 		const server = await served({
 			"@app/page": contributing({
 				routes: {
-					"GET /page": async (request) => {
+					"GET /page": async request => {
 						nonce = request.nonce;
 						return { kind: "html", body: `<script nonce="${request.nonce}"></script>` };
 					},
@@ -251,7 +251,7 @@ describe("default headers", () => {
 				relays: [
 					{
 						name: "radius",
-						verify: (request) =>
+						verify: request =>
 							request.headers.get("x-relay") === "secret"
 								? { origin: "https://me.relay.example", framer: "https://relay.example" }
 								: undefined,
@@ -355,7 +355,7 @@ describe("reloads and close", () => {
 		});
 		const server = await served({ "@app/v": old });
 		const running = send(server.port, "GET", "/v");
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		const next = contributing({ routes: { "GET /v": async () => ({ kind: "html", body: "new" }) } });
 		await server.host.reload(server.facets({ "@app/v": next }), context);
 		expect((await send(server.port, "GET", "/v")).body.toString()).toBe("new");
@@ -371,7 +371,7 @@ describe("reloads and close", () => {
 				"@app/slow": contributing({
 					routes: {
 						"GET /quick": async () => {
-							await new Promise((resolve) => setTimeout(resolve, 30));
+							await new Promise(resolve => setTimeout(resolve, 30));
 							return { kind: "html", body: "done" };
 						},
 						"GET /stuck": async (_request, ctx: Ctx) => {
@@ -385,7 +385,7 @@ describe("reloads and close", () => {
 		);
 		const quick = send(server.port, "GET", "/quick");
 		const stuck = send(server.port, "GET", "/stuck");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		const closing = server.http.close(context);
 		expect((await server.http.fetch(loopback("/quick"), LOOPBACK)).status).toBe(503);
 		expect((await quick).body.toString()).toBe("done");
@@ -468,7 +468,7 @@ describe("cancellation", () => {
 		await server.http.close(context);
 		expect((await answer).status).toBe(503);
 		gate.resolve();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(later).toBe(0);
 		await server.close();
 	});
@@ -494,7 +494,7 @@ describe("cancellation", () => {
 	// which never errored; the request never finished.
 	it.each(["inside the route", "after the route returned"] as const)(
 		"ends a request whose bytes Response was born sealed (aborted %s)",
-		async (when) => {
+		async when => {
 			const abort = new AbortController();
 			const entered = Promise.withResolvers<void>();
 			let reads = 0;
@@ -525,7 +525,7 @@ describe("cancellation", () => {
 			await entered.promise;
 			if (when === "after the route returned") abort.abort(new Error("client gone"));
 			await answer;
-			await new Promise((resolve) => setImmediate(resolve));
+			await new Promise(resolve => setImmediate(resolve));
 			const started = Date.now();
 			await server.http.close(context);
 			expect([Date.now() - started < 500, reads, bornSealed]).toEqual([true, 0, when === "inside the route"]);
@@ -552,7 +552,7 @@ describe("cancellation", () => {
 		const abort = new AbortController();
 		await server.http.fetch(loopback("/", { signal: abort.signal }), LOOPBACK);
 		abort.abort(new Error("client gone"));
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		const started = Date.now();
 		await server.http.close(context);
 		expect(Date.now() - started).toBeLessThan(500);
@@ -566,7 +566,7 @@ describe("cancellation", () => {
 		await server.http.close(withAbortSignal(AbortSignal.abort(), context));
 		await server.load();
 		expect((await waiting).status).toBe(503);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		await server.close();
 	});
 
@@ -575,7 +575,7 @@ describe("cancellation", () => {
 		const pending = server.http.fetch(loopback("/whoami"), LOOPBACK);
 		await server.http.close(withAbortSignal(AbortSignal.timeout(20), context));
 		expect([200, 503]).toContain((await pending).status);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		await server.close();
 	});
 
@@ -625,14 +625,14 @@ describe("cancellation", () => {
 		const answer = server.http.fetch(loopback("/"), LOOPBACK);
 		await entered.promise;
 		await server.http.close(context);
-		const settled = await Promise.race([answer.then((response) => response.status), sleepThen(30, "pending")]);
+		const settled = await Promise.race([answer.then(response => response.status), sleepThen(30, "pending")]);
 		expect(settled).toBe(503);
 		gate.resolve();
 		await server.close();
 	});
 
 	// Astra's recheck R2, Sol's N3: a held `Response` went on calling `read` after its scope was sealed.
-	it.each(["the request aborted", "the component closed"] as const)("reads no bytes after %s", async (kind) => {
+	it.each(["the request aborted", "the component closed"] as const)("reads no bytes after %s", async kind => {
 		let reads = 0;
 		let readAfterSeal = false;
 		const abort = new AbortController();
@@ -659,7 +659,7 @@ describe("cancellation", () => {
 		await reader.read();
 		if (kind === "the request aborted") abort.abort(new Error("client gone"));
 		else await server.http.close(context);
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		await expect(reader.read()).rejects.toThrow();
 		expect({ reads, readAfterSeal }).toEqual({ reads: 1, readAfterSeal: false });
 		await server.close();
@@ -672,7 +672,7 @@ describe("cancellation", () => {
 			{
 				"@app/body": contributing({
 					routes: {
-						"POST /body": async (request) => {
+						"POST /body": async request => {
 							const value = await request.json();
 							writes++;
 							return { kind: "json", value };
@@ -698,7 +698,7 @@ describe("cancellation", () => {
 
 describe("answers", () => {
 	// Sol's recheck N8: `Response` threw on a body for these statuses.
-	it.each([204, 205, 304])("answers %s without a body", async (status) => {
+	it.each([204, 205, 304])("answers %s without a body", async status => {
 		const server = await served(
 			{ "@app/s": contributing({ routes: { "GET /": async () => ({ kind: "json", value: null, status }) } }) },
 			{ config: { listen: undefined } },

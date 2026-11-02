@@ -201,7 +201,7 @@ export const LiveDoc = defineDoc<LiveState>({
 	// Version 1 named a compaction's trigger `reason`, in `compactions` and `compactionFailure`. Versions 1 and 2 (as
 	// builds before `run.turns` stored it) may lack `run.turns`: a run in flight across the upgrade counts its turns
 	// from 0. Version 2 already names the trigger `trigger`, so renaming leaves it alone.
-	migrate: (value) => {
+	migrate: value => {
 		const live = value as { run?: JsonObject; compactions?: JsonObject[]; compactionFailure?: JsonObject };
 		const { run, compactions, compactionFailure } = live;
 		return {
@@ -216,10 +216,10 @@ export const LiveDoc = defineDoc<LiveState>({
 	// spans at most one generation or the overlapping execution of one round's tools. A slot holds output only while
 	// running, so every base is small; a nested call's result lives in its caller's task documents, never here. Do not
 	// add a delta-count bound; the tool output benchmark checks this rule.
-	checkpointWhen: (value) =>
+	checkpointWhen: value =>
 		value.generation === undefined &&
-		!(value.tools ?? []).some((slot) => slot.status === "running") &&
-		!(value.nestedTools ?? []).some((slot) => slot.status === "running"),
+		!(value.tools ?? []).some(slot => slot.status === "running") &&
+		!(value.nestedTools ?? []).some(slot => slot.status === "running"),
 });
 
 /** A copy of a version 1 compaction status or failure with `reason` renamed `trigger`, its keys in their order. */
@@ -324,14 +324,14 @@ export function addCompactionStatus(live: Draft<LiveState>, status: CompactionSt
 
 /** The status of compaction task `taskId`, if listed. */
 export function compactionStatus(live: Draft<LiveState>, taskId: TaskId): Draft<CompactionStatus> | undefined {
-	return live.compactions?.find((status) => status.taskId === taskId);
+	return live.compactions?.find(status => status.taskId === taskId);
 }
 
 /** Remove the status of compaction task `taskId`, and the list once empty. */
 export function removeCompactionStatus(live: Draft<LiveState>, taskId: TaskId): void {
 	const statuses = live.compactions;
 	if (statuses === undefined) return;
-	const index = statuses.findIndex((status) => status.taskId === taskId);
+	const index = statuses.findIndex(status => status.taskId === taskId);
 	if (index >= 0) statuses.splice(index, 1);
 	if (statuses.length === 0) delete live.compactions;
 }
@@ -350,7 +350,7 @@ export function failCompactionStatus(live: Draft<LiveState>, taskId: TaskId, err
  * the commit that creates its task, task IDs ascend in commit order, and removal keeps the order.
  */
 export function toolSlot(live: Draft<LiveState>, taskId: TaskId): Draft<ToolSlot | NestedToolSlot> | undefined {
-	const slot = live.tools?.find((each) => each.taskId === taskId);
+	const slot = live.tools?.find(each => each.taskId === taskId);
 	if (slot !== undefined || live.nestedTools === undefined) return slot;
 	const nested = live.nestedTools;
 	let low = 0;

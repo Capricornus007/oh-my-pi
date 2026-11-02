@@ -37,7 +37,7 @@ let slowAdd: PromiseWithResolvers<void> | undefined;
 
 /** The notes plugin, its banner and the text `add` prefixes differing per version: a pure object (no `self.open`). */
 function notesPlugin(banner: string) {
-	return defineFacet((host) =>
+	return defineFacet(host =>
 		host.serve(Notes, (_, self) => {
 			const list = self.state(List);
 			return {
@@ -45,7 +45,7 @@ function notesPlugin(banner: string) {
 				banner: constant(banner),
 				add: async ({ text }: { text: string }, ctx: Context) => {
 					await slowAdd?.promise;
-					await list.change((draft) => void draft.list.push(`${text} (${banner})`), ctx);
+					await list.change(draft => void draft.list.push(`${text} (${banner})`), ctx);
 					return list.value.list.length;
 				},
 			};
@@ -53,10 +53,9 @@ function notesPlugin(banner: string) {
 	);
 }
 
-
 /** The search plugin: its engine is a native, so every reload of it restarts the object. */
 function searchPlugin(engine: string) {
-	return defineFacet((host) =>
+	return defineFacet(host =>
 		host.serve(Search, (_, self) => {
 			const index = self.open(
 				async () => {
@@ -78,7 +77,7 @@ function searchPlugin(engine: string) {
 	);
 }
 
-const clockPlugin = defineFacet((host) => host.serve(Clock, () => ({ zone: constant("UTC") })));
+const clockPlugin = defineFacet(host => host.serve(Clock, () => ({ zone: constant("UTC") })));
 
 /** Shows a reference's state as text. */
 function shown(state: RefState): string {
@@ -87,7 +86,7 @@ function shown(state: RefState): string {
 
 // 1. A host with three plugins, loaded once. A reload passes the complete set; a facet passed as the very same object
 // is an unchanged plugin (untouched), any other value for a loaded name a changed one.
-const host = createHost({ onError: (error) => console.log(`  reported: ${error.kind}`) });
+const host = createHost({ onError: error => console.log(`  reported: ${error.kind}`) });
 const search = searchPlugin("lucene");
 const notesV2 = notesPlugin("v2");
 const searchV2 = searchPlugin("tantivy");
@@ -129,7 +128,7 @@ console.log("   list:", notes.list.value, "banner", notes.banner.value, "(same d
 const index = await host.get(Search, {}, context);
 const slowReindex = Promise.withResolvers<void>();
 const reindexing = index.reindex(context);
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 const restart = await host.reload(
 	[
 		{ name: "@example/notes", facet: notesV2 },
@@ -141,12 +140,12 @@ const restart = await host.reload(
 console.log("3. reload:", JSON.stringify(restart.objects), "- the reference shows", shown(index.state.value));
 slowReindex.resolve();
 await reindexing;
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("   search now", shown(index.state.value), "on", index.engine.value);
 
 // 4. A removal: the clock plugin is gone. Its object ends; its holder's request is not ended, it waits `not_served`.
 const clock = host.hold(Clock, {}, context);
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 const removal = await host.reload(
 	[
 		{ name: "@example/notes", facet: notesV2 },
@@ -166,11 +165,11 @@ await host.reload(
 	],
 	context,
 );
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 console.log("5. served again: clock holder", shown(clock.state.value), clock.zone.value);
 
 // 6. A staging error rejects the reload and changes nothing.
-const broken = defineFacet((h) =>
+const broken = defineFacet(h =>
 	h.serve(Notes, () => {
 		throw new Error("a typo in the new factory");
 	}),

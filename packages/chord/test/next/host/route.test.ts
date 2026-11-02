@@ -183,7 +183,7 @@ forEachCodec(() => {
 
 		it("a returned link closed already fails the holders", async () => {
 			const { tab } = await relayed({
-				resolve: async (address) => {
+				resolve: async address => {
 					const [a, b] = memoryLinkPair();
 					b.close();
 					await flushed();
@@ -201,7 +201,7 @@ forEachCodec(() => {
 		it("a link closing before its handshake fails its holders: no re-resolve loop over a worker dying at start", async () => {
 			let attempts = 0;
 			const { tab } = await relayed({
-				resolve: async (address) => {
+				resolve: async address => {
 					attempts++;
 					const [a, b] = memoryLinkPair();
 					setTimeout(() => b.close(), 10);
@@ -234,7 +234,7 @@ forEachCodec(() => {
 			vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"], now: 0 });
 			let attempts = 0;
 			const { tab } = await relayed({
-				resolve: async (address) => {
+				resolve: async address => {
 					attempts++;
 					// Its other end is never read: no hello, no close.
 					const [a] = memoryLinkPair();
@@ -265,7 +265,7 @@ forEachCodec(() => {
 			let finish: () => void = () => {};
 			const { tab, resolves, routeLinks, server } = await relayed({
 				resolve: async (_address, worker) => {
-					await new Promise<void>((resolve) => {
+					await new Promise<void>(resolve => {
 						finish = resolve;
 					});
 					return worker();
@@ -335,7 +335,7 @@ forEachCodec(() => {
 			const { tab, server, routeLinks } = await relayed({
 				resolve: async (_address, worker, context) => {
 					routing = context.abortSignal;
-					await new Promise<void>((resolve) => {
+					await new Promise<void>(resolve => {
 						finish = resolve;
 					});
 					return worker();
@@ -402,7 +402,7 @@ forEachCodec(() => {
 							[
 								{
 									name: "@test/worker",
-									facet: defineFacet<TestPrincipal>((h) => void serveNotes(h, PlacedNotes)),
+									facet: defineFacet<TestPrincipal>(h => void serveNotes(h, PlacedNotes)),
 								},
 							],
 							context,
@@ -412,8 +412,8 @@ forEachCodec(() => {
 				},
 				withContextValue(App, "the app's", context),
 			);
-			const facet = defineFacet<TestPrincipal>((h) =>
-				h.serve(Who, () => ({ variant: "v", members: { app: async (ctx) => ctx.value(App) ?? "none" } })),
+			const facet = defineFacet<TestPrincipal>(h =>
+				h.serve(Who, () => ({ variant: "v", members: { app: async ctx => ctx.value(App) ?? "none" } })),
 			);
 			await server.load([{ name: "@test/server", facet }], context);
 			server.hold(PlacedNotes, { session: "S1" }, context);

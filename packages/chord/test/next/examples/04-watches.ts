@@ -17,7 +17,7 @@ const Counter = local("example.counter", {
 	members: { count: obj({ n: int() }), double: int(), half: int(), bump: method(), reset: method() },
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Counter, (_, self) => {
 		const count = self.state(Count);
 		return {
@@ -27,13 +27,13 @@ const facet = defineFacet((host) => {
 				if (c.n % 2 === 1) throw new Error(`${c.n} has no half`);
 				return c.n / 2;
 			}),
-			bump: async (ctx) => {
-				await count.change((draft) => {
+			bump: async ctx => {
+				await count.change(draft => {
 					draft.n++;
 				}, ctx);
 				return null;
 			},
-			reset: async (ctx) => {
+			reset: async ctx => {
 				await count.retire(ctx);
 				return null;
 			},
@@ -43,7 +43,7 @@ const facet = defineFacet((host) => {
 
 // A derive whose compute throws is reported once per failure episode (`derive_failed`).
 const host = createHost({
-	onError: (error) => {
+	onError: error => {
 		if (error.kind === "derive_failed") console.log(`reported: ${error.object}.${error.member}: ${error.error}`);
 		else console.error("background error:", error);
 	},
@@ -56,20 +56,20 @@ const counter = await host.get(Counter, {}, context);
 // previous value into it.
 const watch = await counter.count.watch(context);
 console.log("acquired:", watch.value);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("count frame:", call.value, JSON.stringify(call.ops));
 });
 
 // A derive's frame carries the diff of its old and new value.
 const { context: cancellable, cancel } = withCancel(context);
 const doubled = await counter.double.watch(cancellable);
-doubled.start(async (call) => {
+doubled.start(async call => {
 	if (call.kind === "value") console.log("double frame:", call.value, JSON.stringify(call.ops));
 });
 
 // A failing derive: one `failed` call per failure, the watch stays open; the next value replaces the root.
 const half = await counter.half.watch(context);
-half.start(async (call) => {
+half.start(async call => {
 	if (call.kind === "failed") console.log("half failed:", (call.error as Error).message);
 	else console.log("half frame:", call.value, JSON.stringify(call.ops));
 });
@@ -77,20 +77,20 @@ half.start(async (call) => {
 // A slow listener: commits made while it is busy fold into its next call, with the newest value and the ops since
 // its previous call (an `s` on one path replaces the one before it).
 const slow = await counter.count.watch(context);
-slow.start(async (call) => {
+slow.start(async call => {
 	if (call.kind !== "value") return;
 	console.log("slow frame:", call.value, JSON.stringify(call.ops));
-	await new Promise((resolve) => setTimeout(resolve, 20));
+	await new Promise(resolve => setTimeout(resolve, 20));
 });
 
 await counter.bump(context);
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 await counter.bump(context);
 await counter.bump(context);
-await new Promise((resolve) => setTimeout(resolve, 50));
+await new Promise(resolve => setTimeout(resolve, 50));
 // Retiring the singleton resets it to initial(): watches get a root replacement.
 await counter.reset(context);
-await new Promise((resolve) => setTimeout(resolve, 50));
+await new Promise(resolve => setTimeout(resolve, 50));
 
 // Cancelling the watch's context ends it; stop() ends it too. Releasing the reference ends the watches taken through it.
 cancel();

@@ -27,10 +27,10 @@ function started(behaviour: WorkerBehaviour) {
 			onOutput: () => {},
 		},
 		{
-			control: (message) => control.push(message),
+			control: message => control.push(message),
 			linkLost: () => {},
 			linkClosed: () => {},
-			exited: (value) => {
+			exited: value => {
 				exit = value;
 			},
 		},

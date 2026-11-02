@@ -64,14 +64,14 @@ function workerFacet(start: Start) {
 		version: 1,
 		initial: () => ({ entries: entriesOf(start.entries) }),
 	});
-	return defineFacet<P>((host) => {
+	return defineFacet<P>(host => {
 		host.serve(Store, (_, self) => {
 			const doc = self.state(Doc);
 			return {
 				doc,
 				stream: (token, ctx) =>
 					doc
-						.change((draft) => {
+						.change(draft => {
 							draft.entries[draft.entries.length - 1]!.text += token;
 						}, ctx)
 						.then(() => null),
@@ -81,7 +81,7 @@ function workerFacet(start: Start) {
 			const store = self.get(Store, {});
 			return {
 				variant: "owner",
-				members: { doc: store.doc, stream: (token, ctx) => store.stream(token, ctx), ping: async (n) => n + 1 },
+				members: { doc: store.doc, stream: (token, ctx) => store.stream(token, ctx), ping: async n => n + 1 },
 			};
 		});
 	});
@@ -121,13 +121,13 @@ function counted(link: Link): Counted {
 			sent += message.byteLength;
 			link.send(message);
 		},
-		onMessage: (listener) =>
-			link.onMessage((message) => {
+		onMessage: listener =>
+			link.onMessage(message => {
 				received += message.byteLength;
 				listener(message);
 			}),
 		close: () => link.close(),
-		onClose: (listener) => link.onClose(listener),
+		onClose: listener => link.onClose(listener),
 	};
 }
 
@@ -137,15 +137,15 @@ type Timed = Link & { longest: number };
 function timed(link: Link): Timed {
 	const timing: Timed = {
 		longest: 0,
-		send: (message) => link.send(message),
-		onMessage: (listener) =>
-			link.onMessage((message) => {
+		send: message => link.send(message),
+		onMessage: listener =>
+			link.onMessage(message => {
 				const start = performance.now();
 				listener(message);
 				timing.longest = Math.max(timing.longest, performance.now() - start);
 			}),
 		close: () => link.close(),
-		onClose: (listener) => link.onClose(listener),
+		onClose: listener => link.onClose(listener),
 	};
 	return timing;
 }
@@ -166,7 +166,7 @@ async function server(kind: WorkerKind, entries: Start["entries"]) {
 		Session,
 		{
 			authorize: () => true,
-			resolve: async (address) => {
+			resolve: async address => {
 				const start = { id: address.params.id, entries };
 				const principal = { kind: "worker", session: start.id } as const;
 				if (kind === "memory") {
@@ -214,21 +214,21 @@ async function memoryTab(on: Host<P>): Promise<{ readonly tab: Host<P>; readonly
 /** A tab on `on` over a loopback WebSocket (`ws` serving, Node's own `WebSocket` in the tab), the server's end counted. */
 async function webSocketTab(on: Host<P>) {
 	const wss = new WebSocketServer({ host: "127.0.0.1", port: 0 });
-	await new Promise((resolve) => wss.once("listening", resolve));
+	await new Promise(resolve => wss.once("listening", resolve));
 	const accepted = Promise.withResolvers<Counted>();
-	wss.on("connection", (socket) => {
+	wss.on("connection", socket => {
 		const link = counted(webSocketLink(socket));
 		on.accept(link, { principal: { kind: "owner" } }, context);
 		accepted.resolve(link);
 	});
 	const { port } = wss.address() as AddressInfo;
 	const host = await tab(webSocketLink(new WebSocket(`ws://127.0.0.1:${port}`)));
-	const close = () => new Promise((resolve) => wss.close(resolve));
+	const close = () => new Promise(resolve => wss.close(resolve));
 	return { tab: host, link: await accepted.promise, close };
 }
 
 /** A worker with `entries` served directly to a tab over one memory link (no relay), the worker's end counted. */
-async function direct(entries: Start["entries"], wrap: (link: Link) => Link = (link) => link) {
+async function direct(entries: Start["entries"], wrap: (link: Link) => Link = link => link) {
 	const worker = workerHost({ id: "D", entries });
 	await worker.load([{ name: "@bench/worker", facet: workerFacet({ id: "D", entries }) }], context);
 	const [a, b] = memoryLinkPair();
@@ -271,7 +271,7 @@ async function commits(holder: Host<P>, session: string, tabLink: Counted, worke
 	const worker0 = workerLink?.received ?? 0;
 	let total = 0;
 	for (let i = 0; i < runs; i++) {
-		const arrived = new Promise<void>((resolve) => {
+		const arrived = new Promise<void>(resolve => {
 			frame = resolve;
 		});
 		const start = performance.now();
@@ -375,7 +375,7 @@ class Throttled implements Link {
 	constructor(link: Link, rate: number) {
 		this.#link = link;
 		this.#rate = rate;
-		link.onMessage((message) => this.#queue.push(message));
+		link.onMessage(message => this.#queue.push(message));
 	}
 
 	send(message: Uint8Array): void {
@@ -412,14 +412,14 @@ class Throttled implements Link {
 /** The heap in use once queued work ran and garbage was collected, repeatedly. */
 async function settledHeap(): Promise<number> {
 	for (let i = 0; i < 5; i++) {
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		gc();
 	}
 	return process.memoryUsage().heapUsed;
 }
 
 /** Lets every host handle what the last step delivered (memory links deliver in microtasks). */
-const settle = () => new Promise((resolve) => setImmediate(resolve));
+const settle = () => new Promise(resolve => setImmediate(resolve));
 
 const STEP = 10;
 
@@ -599,7 +599,7 @@ async function calls(): Promise<void> {
 if (process.argv[2] === "worker") {
 	// A forked child's `process` is an IPC port.
 	const link = ipcLink(process as unknown as IpcPort);
-	const start = await new Promise<Start>((resolve) => {
+	const start = await new Promise<Start>(resolve => {
 		const listener = (message: unknown) => {
 			if (message instanceof Uint8Array) return;
 			process.off("message", listener);

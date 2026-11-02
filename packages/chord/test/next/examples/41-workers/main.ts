@@ -30,9 +30,9 @@ const workers = createWorkers(
 		entry: fileURLToPath(new URL("./worker.ts", import.meta.url)),
 		execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
 		authorize: () => true,
-		principal: (address) => ({ kind: "worker", session: address.params.id }),
+		principal: address => ({ kind: "worker", session: address.params.id }),
 		start: () => ({}),
-		lock: (address) => `example-41:${process.pid}:${address.key}`,
+		lock: address => `example-41:${process.pid}:${address.key}`,
 		idleMs: () => 300,
 		plugins,
 		onError: console.error,
@@ -43,7 +43,7 @@ await server.load([], context);
 
 // 2. Every change of the workers' state, printed.
 const watch = await workers.state.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind !== "value") return;
 	const entries = Object.entries(call.value).map(([key, state]) => `${key} ${state.status}`);
 	console.log(`   workers: ${entries.join(", ") || "none"}`);
@@ -58,7 +58,7 @@ console.log(`2. "${greeting.text.value}" (worker pid ${greeting.pid.value}, serv
 greeting.release();
 console.log("3. released; waiting for the idle stop");
 while (Object.keys(workers.state.value).length > 0) {
-	await new Promise((resolve) => setTimeout(resolve, 50));
+	await new Promise(resolve => setTimeout(resolve, 50));
 }
 console.log("4. stopped");
 

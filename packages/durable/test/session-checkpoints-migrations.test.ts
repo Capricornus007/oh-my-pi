@@ -19,8 +19,7 @@ import {
 
 function documentWrites(writes: readonly StorageWrite[]): readonly StorageWrite[] {
 	return writes.filter(
-		(write) =>
-			write.type === "document.create" || write.type === "document.change" || write.type === "document.retire",
+		write => write.type === "document.create" || write.type === "document.change" || write.type === "document.retire",
 	);
 }
 
@@ -37,12 +36,12 @@ describe("Session document checkpoints", () => {
 		});
 		const { session, storage } = openTestSession();
 		for (let count = 0; count <= 2; count++) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(Doc)).count = count;
 			}, context);
 		}
-		const kinds = storage.commits.flatMap((writes) =>
-			writes.flatMap((write) => (write.type === "document.change" ? [write.content.kind] : [])),
+		const kinds = storage.commits.flatMap(writes =>
+			writes.flatMap(write => (write.type === "document.change" ? [write.content.kind] : [])),
 		);
 		expect(kinds).toEqual(["delta", "base"]);
 	});
@@ -79,7 +78,7 @@ describe("Session document checkpoints", () => {
 		});
 		const { session, storage, publications } = openTestSession();
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(BaseDoc);
 			await tx.doc(DeltaDoc);
 			await tx.doc(DefaultDoc);
@@ -87,17 +86,17 @@ describe("Session document checkpoints", () => {
 		expect(calls).toHaveLength(0);
 		expect(falseCalls).toHaveLength(0);
 		expect(documentWrites(storage.commits.at(-1)!)).toSatisfy((writes: readonly StorageWrite[]) =>
-			writes.every((write) => write.type === "document.create" && write.content.kind === "base"),
+			writes.every(write => write.type === "document.create" && write.content.kind === "base"),
 		);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(BaseDoc)).items.push("x");
 			(await tx.doc(DeltaDoc)).count++;
 			(await tx.doc(DefaultDoc)).count++;
 		}, context);
 		await flush();
-		const writes = storage.admittedCommits.at(-1)!.filter((write) => write.type === "document.change");
-		expect(writes.map((write) => write.content.kind)).toEqual(["base", "delta", "delta"]);
+		const writes = storage.admittedCommits.at(-1)!.filter(write => write.type === "document.change");
+		expect(writes.map(write => write.content.kind)).toEqual(["base", "delta", "delta"]);
 		expect(calls).toHaveLength(1);
 		expect(falseCalls).toHaveLength(1);
 		const snapshot = (await session.snapshot(BaseDoc, context))!;
@@ -135,7 +134,7 @@ describe("Session document checkpoints", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ count: 0 }),
-			migrate: (value) => ({ count: value.count as number }),
+			migrate: value => ({ count: value.count as number }),
 			checkpointWhen: (_value, _ops, info) => {
 				seen.push(info.deltasSinceBase);
 				return false;
@@ -143,11 +142,11 @@ describe("Session document checkpoints", () => {
 		});
 		const { session, storage } = openTestSession();
 		const increment = async (token: typeof V1): Promise<void> => {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(token)).count++;
 			}, context);
 		};
-		await session.commit((tx) => tx.doc(V1).then(() => undefined), context);
+		await session.commit(tx => tx.doc(V1).then(() => undefined), context);
 		await increment(V1);
 		await increment(V1);
 		await increment(V1);
@@ -156,7 +155,7 @@ describe("Session document checkpoints", () => {
 		expect(seen).toEqual([0, 1, 2, 0]);
 		const kinds = storage.commits
 			.slice(-4)
-			.map((writes) => (writes[0]!.type === "document.change" ? writes[0]!.content.kind : writes[0]!.type));
+			.map(writes => (writes[0]!.type === "document.change" ? writes[0]!.content.kind : writes[0]!.type));
 		expect(kinds).toEqual(["delta", "delta", "base", "delta"]);
 
 		// A required version base resets the count without calling the predicate.
@@ -179,10 +178,10 @@ describe("Session document checkpoints", () => {
 			},
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Doc).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Doc).then(() => undefined), context);
 		const commits = storage.commits.length;
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const value = await tx.doc(Doc);
 			value.items.push("x");
 			value.items.pop();
@@ -190,7 +189,7 @@ describe("Session document checkpoints", () => {
 		expect(calls).toBe(0);
 		expect(storage.commits).toHaveLength(commits);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const value = await tx.doc(Doc);
 			const first = value.items.shift()!;
 			value.items.unshift(first);
@@ -226,7 +225,7 @@ describe("Session document checkpoints", () => {
 			},
 		});
 		const { session, storage, publications } = openTestSession();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(First);
 			await tx.doc(Second);
 		}, context);
@@ -237,7 +236,7 @@ describe("Session document checkpoints", () => {
 		const published = publications.length;
 
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				(await tx.doc(First)).count = 1;
 				(await tx.doc(Second)).count = 2;
 			}, context),
@@ -250,7 +249,7 @@ describe("Session document checkpoints", () => {
 		expect(await session.snapshot(Second, context)).toBe(second);
 
 		throwCheckpoint = false;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(First)).count = 3;
 			(await tx.doc(Second)).count = 4;
 		}, context);
@@ -271,15 +270,15 @@ describe("Session document checkpoints", () => {
 			},
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Doc).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Doc).then(() => undefined), context);
 		for (let value = 1; value <= 8; value++) {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				(await tx.doc(Doc)).values.push(value);
 			}, context);
 		}
-		const changes = storage.commits.flat().filter((write) => write.type === "document.change");
+		const changes = storage.commits.flat().filter(write => write.type === "document.change");
 		expect(changes).toHaveLength(8);
-		expect(changes.every((write) => write.content.kind === "delta")).toBe(true);
+		expect(changes.every(write => write.content.kind === "delta")).toBe(true);
 		expect(calls).toBe(8);
 		await session.unloadDocuments();
 		expect(await session.snapshot(Doc, context)).toEqual({ values: [1, 2, 3, 4, 5, 6, 7, 8] });
@@ -296,8 +295,8 @@ describe("Session document checkpoints", () => {
 			checkpointWhen: () => false,
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Doc).then(() => undefined), context);
-		await session.commit(async (tx) => {
+		await session.commit(tx => tx.doc(Doc).then(() => undefined), context);
+		await session.commit(async tx => {
 			const value = await tx.doc(Doc);
 			for (let index = 0; index < 4_100; index++) value[`field${index}`] = 1;
 		}, context);
@@ -325,8 +324,8 @@ describe("Session document checkpoints", () => {
 			},
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Doc).then(() => undefined), context);
-		await session.commit(async (tx) => {
+		await session.commit(tx => tx.doc(Doc).then(() => undefined), context);
+		await session.commit(async tx => {
 			(await tx.doc(Doc)).count = 1;
 			await tx.retireDoc(Doc);
 		}, context);
@@ -364,7 +363,7 @@ describe("Session document migrations", () => {
 			},
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		await session.unloadDocuments();
 		const commits = storage.commits.length;
 
@@ -405,7 +404,7 @@ describe("Session document migrations", () => {
 			},
 		});
 		const { session, storage, publications } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		await session.unloadDocuments();
 		// An observer of the older shape.
 		const watch = (await session.watchDoc(Old, context))!;
@@ -426,7 +425,7 @@ describe("Session document migrations", () => {
 			}),
 		);
 
-		await session.commit((tx) => tx.doc(Current).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Current).then(() => undefined), context);
 		await flush();
 		expect(storage.commits.at(-1)![0]).toMatchObject({
 			type: "document.change",
@@ -441,7 +440,7 @@ describe("Session document migrations", () => {
 		await current.stop();
 		expect(await session.snapshot(Current, context)).toBe(snapshot);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Current)).count = 7;
 		}, context);
 		expect(storage.commits.at(-1)![0]).toMatchObject({
@@ -468,18 +467,18 @@ describe("Session document migrations", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ count: 0, migrated: false }),
-			migrate: (value) => {
+			migrate: value => {
 				migrations++;
 				return { count: value.count as number, migrated: true };
 			},
 		});
 		const { session, storage, publications } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		await session.unloadDocuments();
 		const commits = storage.commits.length;
 
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				(await tx.doc(Current)).count = 8;
 				throw new Error("rollback");
 			}, context),
@@ -488,7 +487,7 @@ describe("Session document migrations", () => {
 		expect(await session.snapshot(Current, context)).toEqual({ count: 1, migrated: true });
 		expect(migrations).toBe(1);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const value = await tx.doc(Current);
 			value.count = 9;
 			value.migrated = false;
@@ -535,15 +534,13 @@ describe("Session document migrations", () => {
 			initial: () => ({ ok: true }),
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		await session.unloadDocuments();
 		const commits = storage.commits.length;
 		await expect(session.snapshot(Invalid, context)).rejects.toThrow("strict JSON");
-		await expect(session.commit((tx) => tx.doc(Invalid).then(() => undefined), context)).rejects.toThrow(
-			"strict JSON",
-		);
+		await expect(session.commit(tx => tx.doc(Invalid).then(() => undefined), context)).rejects.toThrow("strict JSON");
 		expect(storage.commits).toHaveLength(commits);
-		await session.commit((tx) => tx.doc(Other).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Other).then(() => undefined), context);
 		expect(await session.snapshot(Other, context)).toEqual({ ok: true });
 	});
 
@@ -570,16 +567,16 @@ describe("Session document migrations", () => {
 			initial: () => ({ count: 3 }),
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(V2).then(() => undefined), context);
+		await session.commit(tx => tx.doc(V2).then(() => undefined), context);
 		await session.unloadDocuments();
 		const commits = storage.commits.length;
 
 		await expect(session.snapshot(V1, context)).rejects.toThrow("newer version 2 than 1");
-		await expect(session.commit((tx) => tx.doc(V1).then(() => undefined), context)).rejects.toThrow(
+		await expect(session.commit(tx => tx.doc(V1).then(() => undefined), context)).rejects.toThrow(
 			"newer version 2 than 1",
 		);
 		await expect(session.snapshot(V3WithoutMigration, context)).rejects.toThrow("requires migration from version 2");
-		await expect(session.commit((tx) => tx.doc(V3WithoutMigration).then(() => undefined), context)).rejects.toThrow(
+		await expect(session.commit(tx => tx.doc(V3WithoutMigration).then(() => undefined), context)).rejects.toThrow(
 			"requires migration from version 2",
 		);
 		expect(storage.commits).toHaveLength(commits);
@@ -598,15 +595,15 @@ describe("Session document migrations", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ count: 0 }),
-			migrate: (value) => ({ count: value.count as number }),
+			migrate: value => ({ count: value.count as number }),
 			checkpointWhen: () => {
 				throw new Error("must not run");
 			},
 		});
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(Old).then(() => undefined), context);
+		await session.commit(tx => tx.doc(Old).then(() => undefined), context);
 		await session.unloadDocuments();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(Current);
 			await tx.retireDoc(Current);
 		}, context);
@@ -641,7 +638,7 @@ describe("Session document migrations", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ count: 0 }),
-			migrate: (value) => ({ count: value.count as number }),
+			migrate: value => ({ count: value.count as number }),
 		});
 		defineDoc<{ count: number }>({
 			checkpointWhen: () => false,
@@ -649,13 +646,13 @@ describe("Session document migrations", () => {
 			version: 2,
 			scope: "session",
 			initial: () => ({ count: 0 }),
-			migrate: (value) => {
+			migrate: value => {
 				secondMigrations++;
 				return { count: value.count as number };
 			},
 		});
 		const { session, storage } = openTestSession();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			await tx.doc(FirstV1);
 			await tx.doc(SecondV1);
 		}, context);
@@ -692,7 +689,7 @@ describe("Session historical document snapshots", () => {
 			scope: "conversation",
 			history: "rewindable",
 			fork: "asOf",
-			initial: (seed) => ({ seed, count: 0 }),
+			initial: seed => ({ seed, count: 0 }),
 		});
 		const migrations: number[] = [];
 		const V3 = defineDoc<{ count: number; version: number }>({
@@ -713,12 +710,12 @@ describe("Session historical document snapshots", () => {
 		let firstEntry!: EntryId;
 		let secondEntry!: EntryId;
 		let thirdEntry!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			firstEntry = (await tx.appendEntry(conversationId, { kind: "first" })).id;
 			(await tx.doc(V1, conversationId)).count = 1;
 			(await tx.doc(Family, conversationId, "member", "seed")).count = 1;
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			secondEntry = (await tx.appendEntry(conversationId, { kind: "second" })).id;
 			(await tx.doc(V1, conversationId)).count = 2;
 		}, context);
@@ -728,7 +725,7 @@ describe("Session historical document snapshots", () => {
 		expect(migrations).toEqual([1]);
 		expect(storage.commits).toHaveLength(commits);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			thirdEntry = (await tx.appendEntry(conversationId, { kind: "third" })).id;
 			await tx.doc(V3, conversationId);
 		}, context);
@@ -749,8 +746,7 @@ describe("Session historical document snapshots", () => {
 		});
 
 		const childId = await session.commit(
-			async (tx) =>
-				(await tx.forkConversation(conversationId, secondEntry, { ownership: { kind: "ownerless" } })).id,
+			async tx => (await tx.forkConversation(conversationId, secondEntry, { ownership: { kind: "ownerless" } })).id,
 			context,
 		);
 		expect(await session.snapshotAsOf(V3, childId, firstEntry, context)).toEqual({ count: 1, version: 3 });
@@ -777,21 +773,21 @@ describe("Session historical document snapshots", () => {
 		const { session } = openTestSession();
 		const conversationId = await createConversation(session);
 		const beforeCreation = await session.commit(
-			async (tx) => (await tx.appendEntry(conversationId, { kind: "before" })).id,
+			async tx => (await tx.appendEntry(conversationId, { kind: "before" })).id,
 			context,
 		);
 		let createdAt!: EntryId;
 		let retiredAt!: EntryId;
 		let recreatedAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			createdAt = (await tx.appendEntry(conversationId, { kind: "create" })).id;
 			(await tx.doc(Doc, conversationId)).value = "old";
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			retiredAt = (await tx.appendEntry(conversationId, { kind: "retire" })).id;
 			await tx.retireDoc(Doc, conversationId);
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			recreatedAt = (await tx.appendEntry(conversationId, { kind: "recreate" })).id;
 			(await tx.doc(Doc, conversationId)).value = "new";
 		}, context);
@@ -821,17 +817,17 @@ describe("Session tracker cache across definition versions", () => {
 		version: 2,
 		scope: "session",
 		initial: () => ({ names: [] }),
-		migrate: (value) => ({ names: [value.name as string] }),
+		migrate: value => ({ names: [value.name as string] }),
 	});
 
 	it("migrates a document cached by an older token without unloading", async () => {
 		const { session, storage } = openTestSession();
-		await session.commit((tx) => tx.doc(V1Doc), context);
+		await session.commit(tx => tx.doc(V1Doc), context);
 		expect(await session.snapshot(V1Doc, context)).toEqual({ name: "first" });
 
 		// Reloaded extension code accesses the still-cached document with a newer token.
 		expect(await session.snapshot(V2Doc, context)).toEqual({ names: ["first"] });
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(V2Doc)).names.push("second");
 		}, context);
 		const write = documentWrites(storage.commits.at(-1)!)[0]!;
@@ -844,10 +840,10 @@ describe("Session tracker cache across definition versions", () => {
 
 	it("sends observers of an older shape a root replacement after a newer token writes", async () => {
 		const { session } = openTestSession();
-		await session.commit((tx) => tx.doc(V1Doc), context);
+		await session.commit(tx => tx.doc(V1Doc), context);
 		const watch = (await session.watchDoc(V1Doc, context))!;
 		const frames: (readonly unknown[])[] = [];
-		const delivered = new Promise<void>((resolve) => {
+		const delivered = new Promise<void>(resolve => {
 			watch.start(
 				onValue(async ({ ops }) => {
 					frames.push(ops);
@@ -855,7 +851,7 @@ describe("Session tracker cache across definition versions", () => {
 				}),
 			);
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(V2Doc)).names.push("second");
 		}, context);
 		await delivered;
@@ -866,11 +862,11 @@ describe("Session tracker cache across definition versions", () => {
 
 	it("serves an older token from Storage after a newer token migrated only in memory", async () => {
 		const { session } = openTestSession();
-		await session.commit((tx) => tx.doc(V1Doc), context);
+		await session.commit(tx => tx.doc(V1Doc), context);
 		await session.unloadDocuments();
 		expect(await session.snapshot(V2Doc, context)).toEqual({ names: ["first"] });
 		expect(await session.snapshot(V1Doc, context)).toEqual({ name: "first" });
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(V1Doc)).name = "renamed";
 		}, context);
 		expect(await session.snapshot(V2Doc, context)).toEqual({ names: ["renamed"] });

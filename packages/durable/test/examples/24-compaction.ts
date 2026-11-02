@@ -35,7 +35,7 @@ async function respond(transcript: TranscriptContext): Promise<AssistantMessage>
 	const held = hold;
 	hold = undefined;
 	await held;
-	const question = transcript.messages.findLast((message) => message.role === "user");
+	const question = transcript.messages.findLast(message => message.role === "user");
 	return fauxAssistantMessage(`A detailed answer to "${text(question)}": ${"details ".repeat(200)}`);
 }
 const faux = fauxProvider({ models: [{ id: "tiny", contextWindow: 3000, maxTokens: 1000 }] });
@@ -78,7 +78,7 @@ for (const question of [
 // 2. A manual compaction while an answer is still being written. The summary is ready first, waits in the inbox,
 // and is placed right after the answer.
 let finishAnswer!: () => void;
-hold = new Promise((resolve) => {
+hold = new Promise(resolve => {
 	finishAnswer = resolve;
 });
 const busy = await root.submit({ type: "input", content: "How do we get around?" }, context);
@@ -118,6 +118,6 @@ async function show(conversation: Conversation, label: string): Promise<void> {
 function text(message: Message | undefined): string {
 	if (message === undefined || message.role === "system") return "";
 	if (typeof message.content === "string") return message.content;
-	const block = message.content.find((content) => content.type === "text");
+	const block = message.content.find(content => content.type === "text");
 	return block?.type === "text" ? block.text.replaceAll("\n", " ") : "";
 }

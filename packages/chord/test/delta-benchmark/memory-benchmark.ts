@@ -112,12 +112,12 @@ for (let trial = 0; trial < trials; trial++) {
 	}
 }
 
-const summary = scenarios.flatMap((scenario) =>
-	modes.map((mode) => {
-		const selected = results.filter((result) => result.scenario === scenario && result.mode === mode);
+const summary = scenarios.flatMap(scenario =>
+	modes.map(mode => {
+		const selected = results.filter(result => result.scenario === scenario && result.mode === mode);
 		const values: Record<string, { median: number | null; range: readonly [number, number] | null }> = {};
 		for (const metric of metrics) {
-			const samples = selected.map((result) => result[metric]);
+			const samples = selected.map(result => result[metric]);
 			values[metric] = { median: median(samples), range: range(samples) };
 		}
 		return { scenario, mode, metrics: values };

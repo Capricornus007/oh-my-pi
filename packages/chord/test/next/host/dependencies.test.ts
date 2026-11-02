@@ -28,7 +28,7 @@ describe("the dependency check", () => {
 	it("breaks a dependent off a cycle with the cycle's error: it would wait on a ring that never heals", async () => {
 		const Ping = local("app.ping", { version: 1, params: {}, members: { n: int() } });
 		const Pong = local("app.pong", { version: 1, params: {}, members: { n: int() } });
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Ping, (_, self) => ({ n: self.get(Pong, {}).n }));
 			h.serve(Pong, (_, self) => ({ n: self.get(Ping, {}).n }));
 			h.serve(View, (_, self) => ({ n: self.get(Ping, {}).n }));
@@ -45,13 +45,13 @@ describe("the dependency check", () => {
 
 	it("breaks a dependent whose dependency ended (gone): the request cannot come back", async () => {
 		const errors: HostError[] = [];
-		const client = createHost<TestPrincipal>({ onError: (error) => errors.push(error) });
+		const client = createHost<TestPrincipal>({ onError: error => errors.push(error) });
 		const peer = await rawParent(client);
 		await client.load(
 			[
 				{
 					name: "@test/view",
-					facet: defineFacet<TestPrincipal>((h) =>
+					facet: defineFacet<TestPrincipal>(h =>
 						h.serve(View, (_, self) => ({ n: self.get(Notes, { session: "S1" }).count })),
 					),
 				},
@@ -71,7 +71,7 @@ describe("the dependency check", () => {
 	it("goes live once every dependency is: one parked on two, the second binding last", async () => {
 		const client = createHost<TestPrincipal>({ onError: () => {} });
 		const peer = await rawParent(client);
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, self) => {
 				const a = self.get(Notes, { session: "S1" }).count;
 				const b = self.get(Notes, { session: "S2" }).count;
@@ -93,9 +93,9 @@ describe("the dependency check", () => {
 
 	it("breaks a dependent whose dependency a relay's authorize refused: forbidden heals only by retry() (fix round 1, Fable)", async () => {
 		const errors: HostError[] = [];
-		const client = createHost<TestPrincipal>({ onError: (error) => errors.push(error) });
+		const client = createHost<TestPrincipal>({ onError: error => errors.push(error) });
 		const peer = await rawParent(client);
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, self) => ({ n: self.get(Notes, { session: "S1" }).count })),
 		);
 		await client.load([{ name: "@test/view", facet }], context);
@@ -128,13 +128,13 @@ describe("the dependency check", () => {
 		const Back = local("app.back", { version: 1, params: {}, members: { n: int() } });
 		const { workers } = await relayed({
 			trusted: true,
-			server: (h) => {
+			server: h => {
 				// The server's host object starts the worker; its A and the worker's B then start in the same turns, so
 				// the activation chains miss the ring (M§7's gap).
 				h.serve(Kick, (_p, self) => ({ n: self.get(B, {}).n }));
 				h.serve(A, (_p, _principal, self) => ({ variant: "v", members: { n: self.get(B, {}).n } }));
 			},
-			worker: (h) => {
+			worker: h => {
 				h.serve(Front, (_p, self) => ({ n: self.get(A, {}).n }));
 				h.serve(Back, (_p, self) => ({ n: self.get(B, {}).n }));
 				h.serve(B, (_p, _principal, self) => {
@@ -164,7 +164,7 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 	const Missing = local("app.missing", { version: 1, params: {}, members: { n: int() } });
 
 	it("is reported once after readyTimeout whatever the blocker: a missing local provider; nothing fails", async () => {
-		const { host, errors } = await loaded((h) => h.serve(View, (_, self) => ({ n: self.get(Missing, {}).n })), {
+		const { host, errors } = await loaded(h => h.serve(View, (_, self) => ({ n: self.get(Missing, {}).n })), {
 			readyTimeout: 1_000,
 		});
 		const view = host.hold(View, { id: 1 }, context);
@@ -183,8 +183,8 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 
 	it("names the first blocker in declaration order with its state; its clock runs from parking, with no link yet too", async () => {
 		const errors: HostError[] = [];
-		const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: (error) => errors.push(error) });
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: error => errors.push(error) });
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, self) => ({
 				n: self.derive([self.get(Notes, { session: "S1" }).count, self.get(Missing, {}).n], ([a, b]) => a + b),
 			})),
@@ -204,7 +204,7 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 	it("keeps declaration order across registries and references: the parked cause and the report name the first (Astra)", async () => {
 		const Registry = defineRegistry<number, number>("app.missing-registry", { version: 1 });
 		const { host, errors } = await loaded(
-			(h) =>
+			h =>
 				h.serve(View, (_, self) => {
 					self.registry(Registry);
 					return { n: self.get(Missing, {}).n };
@@ -245,20 +245,16 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 		const gate = Promise.withResolvers<void>();
 		const entered = Promise.withResolvers<void>();
 		const pinKey = ChordObject.prototype.pinKey;
-		const held = vi.spyOn(ChordObject.prototype, "pinKey").mockImplementation(async function (
-			this: ChordObject,
-			member,
-			key,
-			version,
-			pinContext,
-		) {
-			entered.resolve();
-			await gate.promise;
-			return pinKey.call(this, member, key, version, pinContext);
-		});
+		const held = vi
+			.spyOn(ChordObject.prototype, "pinKey")
+			.mockImplementation(async function (this: ChordObject, member, key, version, pinContext) {
+				entered.resolve();
+				await gate.promise;
+				return pinKey.call(this, member, key, version, pinContext);
+			});
 		try {
 			const { host, errors } = await loaded(
-				(h) => {
+				h => {
 					h.serve(Keys, (_, self) => ({ rows: self.state(Rows) }));
 					h.serve(View, (_, self) => {
 						const row = self.get(Keys, {}).rows.at("a");
@@ -285,9 +281,9 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 
 	it("reports a ring across hosts whose member there waits on a failed dependency (it shows failed here)", async () => {
 		const errors: HostError[] = [];
-		const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: (error) => errors.push(error) });
+		const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: error => errors.push(error) });
 		const peer = await rawParent(client);
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, self) => ({ n: self.get(Notes, { session: "S1" }).count })),
 		);
 		await client.load([{ name: "@test/view", facet }], context);
@@ -309,14 +305,14 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 	});
 
 	it("is reported once per parking episode: again for an attempt that parks after leaving parking", async () => {
-		const { host, errors } = await loaded((h) => h.serve(View, (_, self) => ({ n: self.get(Missing, {}).n })), {
+		const { host, errors } = await loaded(h => h.serve(View, (_, self) => ({ n: self.get(Missing, {}).n })), {
 			readyTimeout: 1_000,
 		});
 		const view = host.hold(View, { id: 1 }, context);
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(errors.map(({ kind }) => kind)).toEqual(["parked_long"]);
 		// A reload of its plugin replaces the parked attempt: a new episode, its clock from its own parking.
-		const changed = defineFacet((h) => h.serve(View, (_, self) => ({ n: self.get(Missing, {}).n })));
+		const changed = defineFacet(h => h.serve(View, (_, self) => ({ n: self.get(Missing, {}).n })));
 		await host.reload([{ name: "@test/app", facet: changed }], context);
 		await vi.advanceTimersByTimeAsync(999);
 		expect(errors).toHaveLength(1);
@@ -334,9 +330,9 @@ describe("parked_long (dependency model §7, audit A11)", () => {
 
 	it("is not reported for an attempt that leaves parking within readyTimeout: its timer stops", async () => {
 		const errors: HostError[] = [];
-		const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: (error) => errors.push(error) });
+		const client = createHost<TestPrincipal>({ readyTimeout: 1_000, onError: error => errors.push(error) });
 		const peer = await rawParent(client);
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, self) => ({ n: self.get(Notes, { session: "S1" }).count })),
 		);
 		await client.load([{ name: "@test/view", facet }], context);
@@ -360,7 +356,7 @@ describe("a getter of a parked object (fix round 1, Astra 6)", () => {
 			[
 				{
 					name: "@test/view",
-					facet: defineFacet<TestPrincipal>((h) =>
+					facet: defineFacet<TestPrincipal>(h =>
 						h.serve(View, (_, self) => ({ n: self.get(Notes, { session: "S1" }).count })),
 					),
 				},

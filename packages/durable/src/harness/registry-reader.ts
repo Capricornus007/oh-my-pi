@@ -17,10 +17,10 @@ export function registryReader<Tool extends ToolRegistration = ToolRegistration>
 ): RegistryReader<Tool> {
 	return {
 		snapshot: () => value.value,
-		subscribe: (listener) => {
+		subscribe: listener => {
 			const observation = value.observe(
 				{
-					advance: (call) => {
+					advance: call => {
 						// A failed composition keeps the last snapshot: nothing to reconsider.
 						if (call.kind === "value") listener();
 					},

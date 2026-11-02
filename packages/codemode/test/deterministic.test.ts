@@ -25,10 +25,10 @@ function remote(options: CodemodeSandboxBaseOptions, delayFirst = false): Remote
 		...options,
 		remote: () => ({
 			execute: (request, exchange) => {
-				const wrapped: CodemodeRemoteExchange = async (messages) => {
+				const wrapped: CodemodeRemoteExchange = async messages => {
 					const reply = structuredClone(await exchange(structuredClone(messages)));
 					if (delayFirst && reply?.type === "result" && reply.seq === 1) {
-						await new Promise((resolve) => setTimeout(resolve, 30));
+						await new Promise(resolve => setTimeout(resolve, 30));
 					}
 					return reply;
 				};
@@ -76,11 +76,11 @@ function start(
 		tools: [{ name: "echo" }, { name: "wait" }],
 		timeoutMs: 20_000,
 		...options,
-		onStarted: (value) => {
+		onStarted: value => {
 			fingerprint = value;
 			events.push("started");
 		},
-		onCall: (call) => {
+		onCall: call => {
 			calls.push(call);
 			events.push(`call ${call.id}`);
 			if (call.name === "wait") return;
@@ -187,7 +187,7 @@ for (const [backend, create] of Object.entries(BACKENDS)) {
 				[1, 3],
 				[2, 3],
 			]);
-			expect(recorded.calls.map((call) => [call.id, call.target, call.name, call.args])).toEqual([
+			expect(recorded.calls.map(call => [call.id, call.target, call.name, call.args])).toEqual([
 				[1, "tool", "echo", 1],
 				[2, "tool", "echo", 2],
 				[3, "tool", "echo", 3],
@@ -215,7 +215,7 @@ for (const [backend, create] of Object.entries(BACKENDS)) {
 				return found;`,
 				{
 					globals: [{ name: "search", spread: true }],
-					answer: (call) =>
+					answer: call =>
 						call.args === "fail"
 							? { ok: false, message: "no" }
 							: { ok: true, value: call.name === "search" ? ["found"] : call.args },
@@ -399,7 +399,7 @@ async function waitFor(check: () => boolean): Promise<void> {
 	const deadline = Date.now() + 5000;
 	while (!check()) {
 		if (Date.now() > deadline) throw new Error("Condition was not reached");
-		await new Promise((resolve) => setTimeout(resolve, 5));
+		await new Promise(resolve => setTimeout(resolve, 5));
 	}
 }
 

@@ -43,7 +43,7 @@ describe("parts", () => {
 			lastSeq: store.lastSeq,
 			nextId: store.nextId,
 		});
-		const kinds = parts.map((part) =>
+		const kinds = parts.map(part =>
 			part.kind === "put" || part.kind === "table" || part.kind === "index"
 				? `${part.kind} ${part.table.split(":")[1]}`
 				: part.kind,
@@ -75,7 +75,7 @@ describe("parts", () => {
 	it("are lossless: stored values and versions, NULL cells absent, a migrating table's state, revisions as stored", async () => {
 		store = await archiveStore();
 		const parts = await exported(store);
-		const edits = parts.filter((part) => part.kind === "put" && part.table.endsWith(":edits"));
+		const edits = parts.filter(part => part.kind === "put" && part.table.endsWith(":edits"));
 		expect(edits.slice(0, 2)).toEqual([
 			{
 				kind: "put",
@@ -92,12 +92,12 @@ describe("parts", () => {
 				columns: {},
 			},
 		]);
-		expect(parts.find((part) => part.kind === "table" && part.table.endsWith(":notes"))).toMatchObject({
+		expect(parts.find(part => part.kind === "table" && part.table.endsWith(":notes"))).toMatchObject({
 			version: 2,
 			state: "migrating",
 		});
-		const notes = parts.filter((part) => part.kind === "put" && part.table.endsWith(":notes"));
-		expect(notes.map((part) => (part.kind === "put" ? part.version : 0)).filter((v) => v === 2)).toHaveLength(100);
+		const notes = parts.filter(part => part.kind === "put" && part.table.endsWith(":notes"));
+		expect(notes.map(part => (part.kind === "put" ? part.version : 0)).filter(v => v === 2)).toHaveLength(100);
 		const documents = parts.flatMap((part): unknown[][] =>
 			part.kind === "document.create"
 				? [[part.record.key, part.record.revision, part.record.history]]
@@ -137,7 +137,7 @@ describe("revisions", () => {
 		};
 		const create: StagedWrite = {
 			order: "write",
-			apply: async (step) => {
+			apply: async step => {
 				await insertDocument(step, record, "{}");
 				return [];
 			},
@@ -147,14 +147,14 @@ describe("revisions", () => {
 			const ops = JSON.stringify([["s", ["n"], n]]);
 			const delta: StagedWrite = {
 				order: "write",
-				apply: async (step) => {
+				apply: async step => {
 					await insertRevision(step, record.id, step.seq, "delta", 1, ops);
 					return [];
 				},
 			};
 			await store.commit([delta], OPEN, context);
 		}
-		const revisions = (await exported(store)).flatMap((part) => (part.kind === "document.revision" ? [part] : []));
+		const revisions = (await exported(store)).flatMap(part => (part.kind === "document.revision" ? [part] : []));
 		expect(revisions.map(({ seq }) => seq)).toEqual(Array.from({ length: count }, (_, index) => index + 1));
 	});
 });

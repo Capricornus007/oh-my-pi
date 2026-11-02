@@ -86,8 +86,8 @@ describe("turn limit", () => {
 			reason: "turn_limit",
 			inputs: [submission.id],
 		});
-		const generations = await harness.commit((tx) => tx.scanTasks({ conversationId: root.id }, 20), context);
-		const generation = generations.items.find((task) => task.kind === GenerationTask.definition.name);
+		const generations = await harness.commit(tx => tx.scanTasks({ conversationId: root.id }, 20), context);
+		const generation = generations.items.find(task => task.kind === GenerationTask.definition.name);
 		expect(generation?.state).toMatchObject({ status: "terminal", outcome: { status: "completed" } });
 		expect(setup.reports).toEqual([]);
 		await harness.close(context);
@@ -107,7 +107,7 @@ describe("turn limit", () => {
 	// #11043
 	it("runs onYield at the limit, and a continuation starts the count over", async () => {
 		let yields = 0;
-		const { setup, harness, root } = await limited(2, (chat) =>
+		const { setup, harness, root } = await limited(2, chat =>
 			addHooks(chat.registry, GenerationTask, {
 				onYield: () => (yields++ === 0 ? { continue: "keep going" } : undefined),
 			}),
@@ -229,7 +229,7 @@ describe("turn limit", () => {
 
 	// #11043
 	it("lets terminate settle done at the limit, and writes a handoff's reset before ending", async () => {
-		const { setup, harness, root } = await limited(1, (chat) =>
+		const { setup, harness, root } = await limited(1, chat =>
 			addHooks(chat.registry, ToolTask, {
 				afterTool: (call, result) =>
 					call.id === "t"
@@ -241,8 +241,8 @@ describe("turn limit", () => {
 		expect((await (await root.submit({ type: "input", content: "one" }, context)).wait(context)).status).toBe("done");
 		const handedOff = await (await root.submit({ type: "input", content: "two" }, context)).wait(context);
 		expect(handedOff).toMatchObject({ status: "unanswered", reason: "turn_limit" });
-		const resets = (await allEntries(root)).filter((entry) => ResetEntry.is(entry));
-		expect(resets.map((entry) => (entry.model?.[0] as { content: string }).content)).toEqual(["fresh"]);
+		const resets = (await allEntries(root)).filter(entry => ResetEntry.is(entry));
+		expect(resets.map(entry => (entry.model?.[0] as { content: string }).content)).toEqual(["fresh"]);
 		await harness.close(context);
 	});
 
@@ -252,7 +252,7 @@ describe("turn limit", () => {
 		let continued: string | undefined;
 		setup.faux.setResponses([
 			round("c1"),
-			(request) => {
+			request => {
 				continued = request.messages.at(-1)?.role;
 				return fauxAssistantMessage([fauxText("finished")]);
 			},
@@ -262,7 +262,7 @@ describe("turn limit", () => {
 		expect((await harness.snapshot(LiveDoc, root.id, context))?.run?.turns).toBe(0);
 		const settled = await resumed.wait(context);
 		if (settled.status !== "done" || settled.type === "write") throw new Error(`Unexpected ${settled.status}`);
-		const answer = (await allEntries(root)).find((entry) => entry.id === settled.answer);
+		const answer = (await allEntries(root)).find(entry => entry.id === settled.answer);
 		expect(textOf(answer?.model?.[0])).toBe("finished");
 		expect(continued).toBe("toolResult");
 		await harness.close(context);
@@ -276,7 +276,7 @@ describe("turn limit", () => {
 			setup.registry,
 			tool("spawn", async (_args, api, callContext) => {
 				child = await api.commit(
-					async (tx) => (await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } })).id,
+					async tx => (await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } })).id,
 					callContext,
 				);
 				return { output: [] };

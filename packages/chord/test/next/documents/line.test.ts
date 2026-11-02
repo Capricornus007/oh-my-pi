@@ -9,11 +9,11 @@ describe("the line", () => {
 		const line = new Line();
 		const order: string[] = [];
 		const first = await line.acquire();
-		const second = line.acquire().then((release) => {
+		const second = line.acquire().then(release => {
 			order.push("second");
 			return release;
 		});
-		const third = line.acquire().then((release) => {
+		const third = line.acquire().then(release => {
 			order.push("third");
 			return release;
 		});

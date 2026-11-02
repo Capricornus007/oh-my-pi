@@ -36,10 +36,10 @@ const checkUntyped = checkAccepts as (contract: unknown, accepts: unknown) => un
 const toV1 = (note: { text: string; tag: string }) => ({ text: note.text });
 
 describe("state mappings", () => {
-	const v2 = evolve(NotesV1, (e) => e.state("editor", "notes", arr(NoteV2)));
+	const v2 = evolve(NotesV1, e => e.state("editor", "notes", arr(NoteV2)));
 
 	it("a changed member maps the current member to the old one", () => {
-		const accepts: AcceptsTable<typeof v2> = { 1: { state: { editor: { notes: (current) => current.map(toV1) } } } };
+		const accepts: AcceptsTable<typeof v2> = { 1: { state: { editor: { notes: current => current.map(toV1) } } } };
 		expect(checkAccepts(v2, accepts)).toEqual({ versions: [{ version: 1, fingerprint: NotesV1.fingerprint }] });
 		// @ts-expect-error: the changed member needs a mapping
 		expect(() => checkAccepts(v2, { 1: { state: { editor: {} } } })).toThrow(
@@ -50,13 +50,13 @@ describe("state mappings", () => {
 			"notes accepts[1].state.editor.notes: expected a function",
 		);
 		// @ts-expect-error: the mapping returns the old shape, not the current one
-		checkAccepts(v2, { 1: { state: { editor: { notes: (current) => current.map((note) => note.tag) } } } });
+		checkAccepts(v2, { 1: { state: { editor: { notes: current => current.map(note => note.tag) } } } });
 	});
 
 	it("a removed member maps the variant's whole current state, or refuses", () => {
-		const v3 = evolve(v2, (e) => e.removeState("editor", "count"));
+		const v3 = evolve(v2, e => e.removeState("editor", "count"));
 		const accepts: AcceptsTable<typeof v3> = {
-			1: { state: { editor: { notes: (current) => current.map(toV1), count: (state) => state.notes.length } } },
+			1: { state: { editor: { notes: current => current.map(toV1), count: state => state.notes.length } } },
 			2: { state: { editor: { count: "refuse" } } },
 		};
 		expect(checkAccepts(v3, accepts).versions.map(({ version }) => version)).toEqual([1, 2]);
@@ -68,7 +68,7 @@ describe("state mappings", () => {
 	it("an absent section is allowed only when nothing is needed there", () => {
 		// @ts-expect-error: the state section is needed
 		expect(() => checkAccepts(v2, { 1: {} })).toThrow("notes accepts[1].state.editor: missing mapping");
-		const v3 = evolve(v2, (e) => e.addState("reader", "count", int()));
+		const v3 = evolve(v2, e => e.addState("reader", "count", int()));
 		expect(() => checkAccepts(v3, { 2: {} })).not.toThrow();
 		expect(() => checkAccepts(v3, { 2: { state: {}, methods: {} } })).not.toThrow();
 	});
@@ -76,9 +76,9 @@ describe("state mappings", () => {
 	it("unnecessary mappings are refused", () => {
 		expect(() =>
 			// @ts-expect-error: reader.notes did not change
-			checkAccepts(v2, { 1: { state: { editor: { notes: (c) => c.map(toV1) }, reader: { notes: (c) => c } } } }),
+			checkAccepts(v2, { 1: { state: { editor: { notes: c => c.map(toV1) }, reader: { notes: c => c } } } }),
 		).toThrow("notes accepts[1].state.reader: unnecessary mapping");
-		const v3 = evolve(v2, (e) => e.addState("reader", "count", int()));
+		const v3 = evolve(v2, e => e.addState("reader", "count", int()));
 		// @ts-expect-error: added members need nothing
 		expect(() => checkAccepts(v3, { 2: { state: { reader: { count: () => 0 } } } })).toThrow(
 			"notes accepts[2].state.reader: unnecessary mapping",
@@ -86,57 +86,57 @@ describe("state mappings", () => {
 	});
 
 	it("is checked by edit, not by schema: a no-op edit and a reverted change still need mappings", () => {
-		const noop = evolve(NotesV1, (e) => e.state("reader", "notes", arr(Note)));
+		const noop = evolve(NotesV1, e => e.state("reader", "notes", arr(Note)));
 		// @ts-expect-error: the edit needs an (identity) mapping
 		expect(() => checkAccepts(noop, { 1: {} })).toThrow("notes accepts[1].state.reader: missing mapping");
-		expect(() => checkAccepts(noop, { 1: { state: { reader: { notes: (current) => current } } } })).not.toThrow();
-		const reverted = evolve(v2, (e) => e.state("editor", "notes", arr(Note)));
-		expect(() => checkAccepts(reverted, { 1: { state: { editor: { notes: (current) => current } } } })).not.toThrow();
-		const readded = evolve(NotesV1, (e) => e.removeState("editor", "count").addState("editor", "count", int()));
-		expect(() => checkAccepts(readded, { 1: { state: { editor: { count: (current) => current } } } })).not.toThrow();
+		expect(() => checkAccepts(noop, { 1: { state: { reader: { notes: current => current } } } })).not.toThrow();
+		const reverted = evolve(v2, e => e.state("editor", "notes", arr(Note)));
+		expect(() => checkAccepts(reverted, { 1: { state: { editor: { notes: current => current } } } })).not.toThrow();
+		const readded = evolve(NotesV1, e => e.removeState("editor", "count").addState("editor", "count", int()));
+		expect(() => checkAccepts(readded, { 1: { state: { editor: { count: current => current } } } })).not.toThrow();
 	});
 });
 
 describe("method mappings", () => {
 	it("changed args map old to current; a changed result maps current to old; both need both", () => {
-		const args = evolve(NotesV1, (e) => e.args("add", NoteV2));
+		const args = evolve(NotesV1, e => e.args("add", NoteV2));
 		expect(() =>
-			checkAccepts(args, { 1: { methods: { add: { args: (old) => ({ ...old, tag: "" }) } } } }),
+			checkAccepts(args, { 1: { methods: { add: { args: old => ({ ...old, tag: "" }) } } } }),
 		).not.toThrow();
 		expect(() =>
 			// @ts-expect-error: only args changed
-			checkAccepts(args, { 1: { methods: { add: { args: (old) => ({ ...old, tag: "" }), result: (r) => r } } } }),
+			checkAccepts(args, { 1: { methods: { add: { args: old => ({ ...old, tag: "" }), result: r => r } } } }),
 		).toThrow("notes accepts[1].methods.add.result: unnecessary mapping");
 		// @ts-expect-error: args must produce the current shape
-		checkAccepts(args, { 1: { methods: { add: { args: (old) => old } } } });
+		checkAccepts(args, { 1: { methods: { add: { args: old => old } } } });
 
-		const result = evolve(NotesV1, (e) => e.result("add", int()));
+		const result = evolve(NotesV1, e => e.result("add", int()));
 		expect(() =>
-			checkAccepts(result, { 1: { methods: { add: { result: (current) => String(current) } } } }),
+			checkAccepts(result, { 1: { methods: { add: { result: current => String(current) } } } }),
 		).not.toThrow();
 		// @ts-expect-error: the result mapping is missing
 		expect(() => checkAccepts(result, { 1: { methods: { add: {} } } })).toThrow(
 			"notes accepts[1].methods.add.result: missing mapping",
 		);
 
-		const both = evolve(NotesV1, (e) => e.method("add", NoteV2, int()));
+		const both = evolve(NotesV1, e => e.method("add", NoteV2, int()));
 		const accepts: AcceptsTable<typeof both> = {
-			1: { methods: { add: { args: (old) => ({ ...old, tag: "" }), result: (current) => String(current) } } },
+			1: { methods: { add: { args: old => ({ ...old, tag: "" }), result: current => String(current) } } },
 		};
 		expect(() => checkAccepts(both, accepts)).not.toThrow();
 		// @ts-expect-error: both sides changed
-		expect(() => checkAccepts(both, { 1: { methods: { add: { args: (old) => ({ ...old, tag: "" }) } } } })).toThrow(
+		expect(() => checkAccepts(both, { 1: { methods: { add: { args: old => ({ ...old, tag: "" }) } } } })).toThrow(
 			"notes accepts[1].methods.add.result: missing mapping",
 		);
 	});
 
 	it("a removed method takes a call replacement or refuses", () => {
-		const v2 = evolve(NotesV1, (e) => e.removeMethod("clear"));
+		const v2 = evolve(NotesV1, e => e.removeMethod("clear"));
 		const call = async (args: null) => args;
 		expect(() => checkAccepts(v2, { 1: { methods: { clear: { call } } } })).not.toThrow();
 		expect(() => checkAccepts(v2, { 1: { methods: { clear: "refuse" } } })).not.toThrow();
 		// @ts-expect-error: a removed method has no args mapping
-		expect(() => checkAccepts(v2, { 1: { methods: { clear: { args: (old) => old } } } })).toThrow(
+		expect(() => checkAccepts(v2, { 1: { methods: { clear: { args: old => old } } } })).toThrow(
 			'notes accepts[1].methods.clear: expected { call } or "refuse"',
 		);
 		// @ts-expect-error: the removed method needs a replacement or a refusal
@@ -144,28 +144,28 @@ describe("method mappings", () => {
 	});
 
 	it("a method removed from one variant that had it counts as removed", () => {
-		const v2 = evolve(NotesV1, (e) => e.removeMethod("add").addMethod("editor", "add", Note, str()));
+		const v2 = evolve(NotesV1, e => e.removeMethod("add").addMethod("editor", "add", Note, str()));
 		// @ts-expect-error: reader lost `add`
-		expect(() => checkAccepts(v2, { 1: { methods: { add: { args: (old) => old, result: (r) => r } } } })).toThrow(
+		expect(() => checkAccepts(v2, { 1: { methods: { add: { args: old => old, result: r => r } } } })).toThrow(
 			'notes accepts[1].methods.add: expected { call } or "refuse"',
 		);
 		expect(() => checkAccepts(v2, { 1: { methods: { add: "refuse" } } })).not.toThrow();
 	});
 
 	it("call and refuse are also allowed for changed methods", () => {
-		const v2 = evolve(NotesV1, (e) => e.args("add", NoteV2));
-		expect(() => checkAccepts(v2, { 1: { methods: { add: { call: async (old) => old.text } } } })).not.toThrow();
+		const v2 = evolve(NotesV1, e => e.args("add", NoteV2));
+		expect(() => checkAccepts(v2, { 1: { methods: { add: { call: async old => old.text } } } })).not.toThrow();
 		expect(() => checkAccepts(v2, { 1: { methods: { add: "refuse" } } })).not.toThrow();
 		expect(() =>
 			// @ts-expect-error: call cannot be combined with args
-			checkAccepts(v2, { 1: { methods: { add: { call: async () => "", args: (old) => ({ ...old, tag: "" }) } } } }),
+			checkAccepts(v2, { 1: { methods: { add: { call: async () => "", args: old => ({ ...old, tag: "" }) } } } }),
 		).toThrow('notes accepts[1].methods.add: expected { call } or "refuse"');
 		// @ts-expect-error: call returns the old result type
 		checkAccepts(v2, { 1: { methods: { add: { call: async () => 1 } } } });
 	});
 
 	it("added methods and methods added to a new variant need nothing", () => {
-		const v2 = evolve(NotesV1, (e) => e.addMethod("reader", "clear", nul(), nul()));
+		const v2 = evolve(NotesV1, e => e.addMethod("reader", "clear", nul(), nul()));
 		expect(checkAccepts(v2, { 1: {} }).versions).toHaveLength(1);
 		// @ts-expect-error: unnecessary mapping
 		expect(() => checkAccepts(v2, { 1: { methods: { clear: "refuse" } } })).toThrow(
@@ -174,7 +174,7 @@ describe("method mappings", () => {
 	});
 
 	it("refuses wrong shapes", () => {
-		const v2 = evolve(NotesV1, (e) => e.args("add", NoteV2));
+		const v2 = evolve(NotesV1, e => e.args("add", NoteV2));
 		expect(() => checkUntyped(v2, { 1: { methods: { add: { args: 1 } } } })).toThrow(
 			"notes accepts[1].methods.add.args: expected a function",
 		);
@@ -193,7 +193,7 @@ describe("method mappings", () => {
 
 describe("keyed mappings (slice 7b)", () => {
 	const Store = local("store", { version: 1, params: {}, members: { notes: keyed(Note), drafts: keyed(Note) } });
-	const V2 = evolve(Store, (e) => e.keyed("notes", NoteV2).removeKeyed("drafts"));
+	const V2 = evolve(Store, e => e.keyed("notes", NoteV2).removeKeyed("drafts"));
 
 	it("needs a function or refuse for a changed keyed member, refuse for a removed one", () => {
 		expect(checkAccepts(V2, { 1: { keyed: { notes: toV1, drafts: "refuse" } } }).versions).toHaveLength(1);
@@ -210,7 +210,7 @@ describe("keyed mappings (slice 7b)", () => {
 
 describe("versions", () => {
 	it("refuses unknown versions and the current version", () => {
-		const v2 = evolve(NotesV1, (e) => e);
+		const v2 = evolve(NotesV1, e => e);
 		// @ts-expect-error: version 3 does not exist
 		expect(() => checkAccepts(v2, { 3: {} })).toThrow("notes accepts[3]: not an older version");
 		// @ts-expect-error: version 2 is current
@@ -219,16 +219,16 @@ describe("versions", () => {
 	});
 
 	it("maps directly over several versions: every edit after the accepted version counts", () => {
-		const v2 = evolve(NotesV1, (e) => e.args("add", NoteV2));
-		const v3 = evolve(v2, (e) => e.result("add", int()).removeState("editor", "count"));
+		const v2 = evolve(NotesV1, e => e.args("add", NoteV2));
+		const v3 = evolve(v2, e => e.result("add", int()).removeState("editor", "count"));
 		const accepts: AcceptsTable<typeof v3> = {
 			1: {
 				state: { editor: { count: "refuse" } },
-				methods: { add: { args: (old) => ({ ...old, tag: "" }), result: (current) => String(current) } },
+				methods: { add: { args: old => ({ ...old, tag: "" }), result: current => String(current) } },
 			},
 			2: {
-				state: { editor: { count: (state) => state.notes.length } },
-				methods: { add: { result: (r) => `${r}` } },
+				state: { editor: { count: state => state.notes.length } },
+				methods: { add: { result: r => `${r}` } },
 			},
 		};
 		expect(checkAccepts(v3, accepts).versions).toEqual([
@@ -244,7 +244,7 @@ describe("versions", () => {
 	});
 
 	it("never calls a mapping", () => {
-		const v2 = evolve(NotesV1, (e) => e.args("add", NoteV2).removeMethod("clear").state("editor", "count", str()));
+		const v2 = evolve(NotesV1, e => e.args("add", NoteV2).removeMethod("clear").state("editor", "count", str()));
 		const mappings = { args: vi.fn(), call: vi.fn(), count: vi.fn() };
 		checkUntyped(v2, {
 			1: {
@@ -252,14 +252,14 @@ describe("versions", () => {
 				methods: { add: { args: mappings.args }, clear: { call: mappings.call } },
 			},
 		});
-		expect(Object.values(mappings).map((mapping) => mapping.mock.calls.length)).toEqual([0, 0, 0]);
+		expect(Object.values(mappings).map(mapping => mapping.mock.calls.length)).toEqual([0, 0, 0]);
 	});
 
 	it("local tables are flat: state without a variant level", () => {
 		const v1 = local("info", { version: 1, params: {}, members: { title: str(), save: method(str()) } });
-		const v2 = evolve(v1, (e) => e.state("title", int()).args("save", int()));
+		const v2 = evolve(v1, e => e.state("title", int()).args("save", int()));
 		const accepts: AcceptsTable<typeof v2> = {
-			1: { state: { title: (current) => String(current) }, methods: { save: { args: (old) => old.length } } },
+			1: { state: { title: current => String(current) }, methods: { save: { args: old => old.length } } },
 		};
 		expect(() => checkAccepts(v2, accepts)).not.toThrow();
 		expect(() =>

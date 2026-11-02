@@ -52,7 +52,7 @@ function IsLabel(value: string): boolean {
 function NormalizeHostname(value: string): string {
 	return (
 		value
-			.replace(/[\uff01-\uff5e]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0)) // RE_FULLWIDTH_MAPPING
+			.replace(/[\uff01-\uff5e]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xfee0)) // RE_FULLWIDTH_MAPPING
 			.normalize("NFC")
 			// biome-ignore lint/suspicious/noMisleadingCharacterClass: a set of single code points to remove (u flag), by design.
 			.replace(/[\u00ad\u034f\u180b-\u180d\u200b\ufe00-\ufe0f\u{e0100}-\u{e01ef}]/gu, "") // RE_IGNORED_MAPPING
@@ -67,6 +67,6 @@ export function IsIdnHostname(value: string): boolean {
 	const normalized = NormalizeHostname(value);
 	if (normalized.length > 253) return false;
 	const labels = normalized.split(".");
-	const hasBidiChars = labels.some((label) => FormatBidi.HasBidiChars(label));
-	return labels.every((label) => IsLabel(label) && (!hasBidiChars || FormatBidi.SatisfiesBidiRule(label)));
+	const hasBidiChars = labels.some(label => FormatBidi.HasBidiChars(label));
+	return labels.every(label => IsLabel(label) && (!hasBidiChars || FormatBidi.SatisfiesBidiRule(label)));
 }

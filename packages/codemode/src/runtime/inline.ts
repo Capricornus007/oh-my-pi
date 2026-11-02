@@ -80,7 +80,7 @@ export function inlineLauncher(
 				exhausted = true;
 				return true;
 			},
-			post: (message) => {
+			post: message => {
 				const terminal = message.type === "done" || message.type === "crash";
 				// Only the first terminal message counts: a crash caused by interrupting a settled VM is noise.
 				if (terminal && settled) return;
@@ -100,7 +100,7 @@ export function inlineLauncher(
 			},
 		});
 		return {
-			post: (message) => {
+			post: message => {
 				if (!stopped) session.deliver(message);
 			},
 			stop: async () => {

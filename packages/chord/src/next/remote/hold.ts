@@ -529,7 +529,7 @@ export class Hold implements Holder, UnboundRequest {
 			index,
 			source,
 			subscriber: {
-				advance: (call) => {
+				advance: call => {
 					this.#touch();
 					if (call.kind === "failed") {
 						this.#memberFailed(followed, call.error);
@@ -570,10 +570,10 @@ export class Hold implements Holder, UnboundRequest {
 		this.#retired = NO_RETIRED;
 		if (retired.length > 0 && failed.length > 0) {
 			// A failed member's retirement travels with its next value, never with its failure.
-			const kept = retired.filter((index) => failed.some(({ member }) => member === index));
+			const kept = retired.filter(index => failed.some(({ member }) => member === index));
 			if (kept.length > 0) {
 				this.#retired = kept;
-				retired = retired.filter((index) => !kept.includes(index));
+				retired = retired.filter(index => !kept.includes(index));
 			}
 		}
 		context.telemetry.metrics?.counter("chord.link.encodes").add(1);

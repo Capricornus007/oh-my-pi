@@ -33,7 +33,7 @@ const Notebook = local("example.notebook", {
 // The example's own window into the object: its keyed handle, to watch other keys from outside.
 let notes: KeyedHandle<Note> | undefined;
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Notebook, (_, self) => {
 		notes = self.state(Notes);
 		const handle = notes;
@@ -43,7 +43,7 @@ const facet = defineFacet((host) => {
 			write: async ({ id, body }, ctx) => {
 				await handle.change(
 					id,
-					(draft) => {
+					draft => {
 						draft.body = body;
 					},
 					ctx,
@@ -58,13 +58,13 @@ const facet = defineFacet((host) => {
 	});
 });
 
-const host = createHost({ onError: (error) => console.error("background error:", error) });
+const host = createHost({ onError: error => console.error("background error:", error) });
 await host.load([{ name: "@example/notebook", facet }], context);
 const notebook = await host.get(Notebook, {}, context);
 
 // A watch of the state member: every value call carries the value, its ops and the retired flag.
 const pinned = await notebook.pinned.watch(context);
-pinned.start(async (call) => {
+pinned.start(async call => {
 	if (call.kind === "value") console.log("pinned:", call.value, call.retired ? "(retired)" : "");
 });
 
@@ -73,12 +73,12 @@ await notebook.write({ id: "pinned", body: "buy milk" }, context);
 console.log("watch of an absent key:", await notes!.watch("later", context));
 await notebook.write({ id: "later", body: "call Anna" }, context);
 const later = (await notes!.watch("later", context))!;
-later.start(async (call) => {
+later.start(async call => {
 	if (call.kind === "value") console.log("later:", call.value, call.retired ? "(retired)" : "");
 });
 await notebook.remove("later", context);
 await notebook.remove("pinned", context);
 
 // Frames are delivered after the commit, asynchronously: let them arrive before closing.
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 await host.close(context);

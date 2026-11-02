@@ -36,7 +36,7 @@ const edit = defineTool({
 	name: "edit",
 	description: "Replace a file's content",
 	parameters: obj({ path: str(), content: str() }),
-	execute: async (args) => {
+	execute: async args => {
 		files.set(args.path, args.content);
 		return { output: [{ type: "text", text: `wrote ${args.path}` }] };
 	},
@@ -53,7 +53,7 @@ const RunTests = defineTask<{ attempt: number }, { phase: "run" }, boolean>({
 			console.log(`  [tests, attempt ${task.input.attempt}] ${result.output}`);
 			// The handle is fetched before the commit: inside it, runtime reads would wait for the commit itself.
 			const conversation = (await runtime.conversation(runtime.conversationId, ctx))!;
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				// Admitted with this commit, before its own table writes: placed when the run ends.
 				if (!result.passed && task.input.attempt < 3) {
 					await conversation.submit(tx, {
@@ -83,7 +83,7 @@ const TestsAfterEdits = defineExtension({
 				// The run's own entries, from its first input to its answer; a compaction never removes them.
 				const range = { minEntryId: run.first, maxEntryId: run.last, order: "ascending" } as const;
 				const { items } = await api.entries(range, 1000, undefined, ctx);
-				const edited = items.some((entry) => {
+				const edited = items.some(entry => {
 					const message = entry.model?.[0];
 					return ToolResultEntry.is(entry) && message?.role === "toolResult" && message.toolName === "edit";
 				});
@@ -134,7 +134,7 @@ for (const entry of page.items) {
 	if (entry.kind === "app.tests") console.log("tests:", (entry.data as { output: string }).output);
 	else if (message?.role === "user") console.log(">", message.content);
 	else if (message?.role === "assistant") {
-		const text = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+		const text = message.content.flatMap(part => (part.type === "text" ? [part.text] : [])).join("");
 		if (text !== "") console.log("agent:", text);
 	}
 }

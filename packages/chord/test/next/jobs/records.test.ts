@@ -35,13 +35,13 @@ async function working(
 			jobs.push(
 				self.job(Work, {
 					run: async ({ text }, ctx) => {
-						await ctx.state.change((draft) => {
+						await ctx.state.change(draft => {
 							draft.output = `${text} started`;
 						}, ctx);
 						await untilAborted(ctx);
 						return text;
 					},
-					finish: (outcome) => finish(attempt, outcome),
+					finish: outcome => finish(attempt, outcome),
 				}),
 			);
 		},
@@ -87,7 +87,7 @@ describe("runs across attempts", () => {
 					await untilAborted(ctx);
 					// Accepted after an abort (§15), refused once the attempt's seal cut the run off.
 					await ctx.state
-						.change((draft) => {
+						.change(draft => {
 							draft.output = "late";
 						}, context)
 						.then(late.resolve, late.resolve);
@@ -109,7 +109,7 @@ describe("runs across attempts", () => {
 	it("a finish sealed mid-way is not counted as a failure and runs again on the next live attempt", async () => {
 		const gate = Promise.withResolvers<void>();
 		const attempts: number[] = [];
-		const { jobs, restart, errors } = await working(async (attempt) => {
+		const { jobs, restart, errors } = await working(async attempt => {
 			attempts.push(attempt);
 			if (attempt === 1) await gate.promise;
 		});
@@ -182,7 +182,7 @@ describe("the object's end during an admitted commit", () => {
 			};
 			return commit([...writes, held], fence, ctx);
 		};
-		const started = attempts[0]!.tx(async (tx) => {
+		const started = attempts[0]!.tx(async tx => {
 			(await tx.draft(saved)).n = 1;
 			return tx.start(job, { text: "a" });
 		}, context);
@@ -243,7 +243,7 @@ function runner(
 	finished: Finished[],
 	options: { readonly gates?: Promise<void>[]; readonly native?: boolean } = {},
 ) {
-	return defineFacet((h) =>
+	return defineFacet(h =>
 		h.serve(Runner, (_, self) => {
 			if (options.native)
 				self.open(
@@ -386,10 +386,10 @@ describe("a reservation released after a swap (final review)", () => {
 			[
 				{
 					name: "@app/reserve",
-					facet: defineFacet((h) =>
+					facet: defineFacet(h =>
 						h.serve(Owner, (_, self) => {
 							job = self.job(V1, {
-								run: async (args) => {
+								run: async args => {
 									seen.push(args.n);
 									return 42;
 								},
@@ -421,7 +421,7 @@ describe("a reservation released after a swap (final review)", () => {
 		const starting = job!.start({ n: 1 }, context);
 		await entered.promise;
 		const run = await starting;
-		const v2 = defineFacet((h) =>
+		const v2 = defineFacet(h =>
 			h.serve(Owner, (_, self) => {
 				self.job(V2, { run: async () => 43 });
 				return {};

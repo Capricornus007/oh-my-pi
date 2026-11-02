@@ -38,7 +38,7 @@ describe("retirement", () => {
 		});
 		const initial = list!.value;
 		const changes = changesOf(await list!.watch(context));
-		await list!.change((draft) => void draft.items.push("a"), context);
+		await list!.change(draft => void draft.items.push("a"), context);
 		await list!.retire(context);
 		await delivered();
 		expect(changes).toEqual([
@@ -52,9 +52,9 @@ describe("retirement", () => {
 		const { attempts } = await restartable(objects, (_, self) => {
 			list = self.state(ListV1);
 		});
-		await list!.change((draft) => void draft.items.push("a"), context);
+		await list!.change(draft => void draft.items.push("a"), context);
 		const changes = changesOf(await list!.watch(context));
-		await attempts[0]!.tx(async (tx) => {
+		await attempts[0]!.tx(async tx => {
 			await tx.retire(list!);
 			(await tx.draft(list!)).items.push("b");
 		}, context);
@@ -81,10 +81,10 @@ describe("across attempts", () => {
 			handles.push(self.state(List));
 		});
 		const changes = changesOf(await handles[0]!.watch(context));
-		await handles[0]!.change((draft) => void draft.items.push("a"), context);
+		await handles[0]!.change(draft => void draft.items.push("a"), context);
 		await restart();
 		expect(handles[1]!.value).toEqual({ items: ["a"] });
-		await handles[1]!.change((draft) => void draft.items.push("b"), context);
+		await handles[1]!.change(draft => void draft.items.push("b"), context);
 		await delivered();
 		// The watch taken through the first attempt's handle follows the slot across attempts.
 		expect(valuesOf(changes)).toEqual([{ items: ["a"] }, { items: ["a", "b"] }]);
@@ -96,7 +96,7 @@ describe("across attempts", () => {
 		const { restart } = await restartable(objects, (attempt, self) => {
 			if (attempt === 1) list = self.state(ListV1);
 		});
-		await list!.change((draft) => void draft.items.push("a"), context);
+		await list!.change(draft => void draft.items.push("a"), context);
 		const watch = await list!.watch(context);
 		await restart();
 		expect(await watch.closed).toEqual({ kind: "ended" });
@@ -108,7 +108,7 @@ describe("across attempts", () => {
 			if (attempt === 2) throw new Error("factory threw");
 			if (attempt !== 2) handles.push(self.state(ListV1));
 		});
-		await handles[0]!.change((draft) => void draft.items.push("a"), context);
+		await handles[0]!.change(draft => void draft.items.push("a"), context);
 		fail();
 		await rejection(retry());
 		expect(failure(errors)).toBe("app.restartable(1): factory threw");
@@ -125,7 +125,7 @@ describe("across attempts", () => {
 				initials++;
 				return { entries: [] };
 			},
-			migrate: (old) => ({ entries: (old.items as string[]).map((text) => ({ text })) }),
+			migrate: old => ({ entries: (old.items as string[]).map(text => ({ text })) }),
 		});
 		const Notes1 = defineState("notes", {
 			schema: obj({ n: int() }),
@@ -138,7 +138,7 @@ describe("across attempts", () => {
 			version: 2,
 			initial: () => ({ n: 0, m: 0 }),
 			keyed: true,
-			migrate: (old) => ({ n: old.n as number, m: 1 }),
+			migrate: old => ({ n: old.n as number, m: 1 }),
 		});
 		const lists: SingletonHandle<JsonObject>[] = [];
 		const notes: KeyedHandle<JsonObject>[] = [];
@@ -149,10 +149,10 @@ describe("across attempts", () => {
 			// The new code's handle in its own factory: the values are still at version 1 until the activation.
 			if (attempt === 2) inFactory.push(rejectionOf(() => lists[1]!.value));
 		});
-		await lists[0]!.change((draft) => void (draft.items as string[]).push("a"), context);
+		await lists[0]!.change(draft => void (draft.items as string[]).push("a"), context);
 		await notes[0]!.change(
 			"k",
-			(draft) => {
+			draft => {
 				draft.n = 5;
 			},
 			context,
@@ -193,7 +193,7 @@ describe("across attempts", () => {
 			schema: obj({ items: arr(str()) }),
 			version: 2,
 			initial: () => ({ items: [] }),
-			migrate: (old) => old as { items: string[] },
+			migrate: old => old as { items: string[] },
 		});
 		const cases = [
 			[ListV1, KeyedList, "list: declared keyed, its documents are not"],
@@ -238,7 +238,7 @@ describe("persisted singletons", () => {
 	async function outboxKinds(store: ChordStore): Promise<string[][]> {
 		const commits = await store.outbox!.read(0, 100, context);
 		return commits.map(({ writes }) =>
-			writes.map((write) => (write.kind === "document.change" ? `change:${write.content.kind}` : write.kind)),
+			writes.map(write => (write.kind === "document.change" ? `change:${write.content.kind}` : write.kind)),
 		);
 	}
 
@@ -246,10 +246,10 @@ describe("persisted singletons", () => {
 		const store = await memoryStore({ outbox: true });
 		const first = await prefsIn(store);
 		expect(first.prefs().value).toEqual({ theme: "light", n: 0 });
-		await first.prefs().change((draft) => {
+		await first.prefs().change(draft => {
 			draft.theme = "dark";
 		}, context);
-		await first.prefs().change((draft) => {
+		await first.prefs().change(draft => {
 			draft.n = 1;
 		}, context);
 		await first.host.close(context);
@@ -270,7 +270,7 @@ describe("persisted singletons", () => {
 	it("migrate a stored older version at load; the next change writes the migrated base back", async () => {
 		const store = await memoryStore({ outbox: true });
 		const old = await prefsIn(store);
-		await old.prefs().change((draft) => {
+		await old.prefs().change(draft => {
 			draft.n = 1;
 		}, context);
 		await old.host.close(context);
@@ -278,13 +278,13 @@ describe("persisted singletons", () => {
 			schema: obj({ theme: str(), n: int() }),
 			version: 2,
 			initial: () => ({ theme: "light", n: 0 }),
-			migrate: (value) => ({ theme: "migrated", n: Number(value.n) }),
+			migrate: value => ({ theme: "migrated", n: Number(value.n) }),
 			persist: true,
 			checkpointWhen: () => false,
 		});
 		const { host, prefs } = await prefsIn(store, V2 as unknown as typeof Prefs);
 		expect(prefs().value).toEqual({ theme: "migrated", n: 1 });
-		await prefs().change((draft) => {
+		await prefs().change(draft => {
 			draft.n = 2;
 		}, context);
 		expect((await outboxKinds(store)).at(-1)).toEqual(["change:base"]);
@@ -309,7 +309,7 @@ describe("persisted singletons", () => {
 			checkpointWhen: () => false,
 		});
 		const writer = await prefsIn(store, V2 as unknown as typeof Prefs);
-		await writer.prefs().change((draft) => {
+		await writer.prefs().change(draft => {
 			draft.n = 1;
 		}, context);
 		await writer.host.close(context);
@@ -318,7 +318,7 @@ describe("persisted singletons", () => {
 			[Edited, "prefs: stored with another schema at version 2 (a schema changed without a bump)"],
 		] as const) {
 			const { host, errors } = await loaded(
-				(h) =>
+				h =>
 					h.serve(StoreRestartable, (_, self) => {
 						self.state(definition);
 						return { touch: async () => null };
@@ -343,7 +343,7 @@ describe("persisted singletons", () => {
 			(self as StoreSelf).state(Prefs);
 		}).catch((error: unknown) => error);
 		expect(String(keyed)).toContain("persist needs a stable identity");
-		const storeless = await storeRestartable(objects, (_, self) => void self.state(Prefs)).catch((error) => error);
+		const storeless = await storeRestartable(objects, (_, self) => void self.state(Prefs)).catch(error => error);
 		expect(String(storeless)).toContain("persist needs a store");
 		const store = await memoryStore();
 		const { fail, retry, errors } = await storeRestartable(
@@ -360,7 +360,7 @@ describe("persisted singletons", () => {
 
 /** The message of the last reported activation failure's error. */
 function failure(errors: readonly HostError[]): string | undefined {
-	const last = errors.findLast((error) => error.kind === "activation_failed");
+	const last = errors.findLast(error => error.kind === "activation_failed");
 	return last?.kind === "activation_failed" ? last.failure.error.message : undefined;
 }
 

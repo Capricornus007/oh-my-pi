@@ -236,7 +236,7 @@ class Editor {
 		if (!INDEX_NAME.test(name)) throw new Error(`${what}: expected [a-z0-9_]+`);
 		if (this.#indexes.has(name)) throw new Error(`${what} exists`);
 		// Checked against the columns at this edit: the migration creates the index here, whatever later edits do.
-		const byName = new Map(describeColumns(this.#schemas, this.#what).map((column) => [column.name, column]));
+		const byName = new Map(describeColumns(this.#schemas, this.#what).map(column => [column.name, column]));
 		const checked = orderColumns(byName, columns, what);
 		this.#indexes.set(name, checked);
 		this.#after.push({ kind: "index", name, columns: checked });
@@ -302,5 +302,5 @@ class Editor {
 
 /** `name` with ASCII letters lowercased and nothing else changed, as SQLite folds identifiers. */
 function foldAscii(name: string): string {
-	return name.replace(/[A-Z]+/g, (letters) => letters.toLowerCase());
+	return name.replace(/[A-Z]+/g, letters => letters.toLowerCase());
 }

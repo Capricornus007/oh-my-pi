@@ -13,7 +13,7 @@ import { context, contributing, served } from "./support.ts";
 async function raw(port: number, text: string): Promise<{ readonly status: string; readonly body: string }> {
 	const socket = connect(port, "127.0.0.1");
 	let out = "";
-	socket.on("data", (chunk) => {
+	socket.on("data", chunk => {
 		out += chunk.toString("latin1");
 	});
 	socket.on("error", () => {});
@@ -27,8 +27,8 @@ async function raw(port: number, text: string): Promise<{ readonly status: strin
 /** A route answering its path and params, under `GET /who` and `GET /n/:name`. */
 const echo = contributing({
 	routes: {
-		"GET /who": async (request) => ({ kind: "json", value: request.path }),
-		"GET /n/:name": async (request) => ({ kind: "json", value: request.params }),
+		"GET /who": async request => ({ kind: "json", value: request.path }),
+		"GET /n/:name": async request => ({ kind: "json", value: request.params }),
 	},
 });
 
@@ -90,7 +90,7 @@ describe("mounting on an app's own Node server", () => {
 			for (const [name, value] of response.headers) res.appendHeader(name, value);
 			res.writeHead(response.status).end(Buffer.from(await response.arrayBuffer()));
 		});
-		await new Promise<void>((resolve) => own.listen(0, "127.0.0.1", resolve));
+		await new Promise<void>(resolve => own.listen(0, "127.0.0.1", resolve));
 		const address = own.address();
 		const port = typeof address === "object" && address !== null ? address.port : 0;
 		const host = `Host: 127.0.0.1:${port}`;
@@ -107,7 +107,7 @@ describe("mounting on an app's own Node server", () => {
 			"HTTP/1.1 403 Forbidden",
 		);
 		expect((await get(`GET /who HTTP/1.1\r\n${host}\r\n`)).status).toBe("HTTP/1.1 200 OK");
-		await new Promise((resolve) => own.close(resolve));
+		await new Promise(resolve => own.close(resolve));
 		await server.close();
 	});
 });
@@ -118,9 +118,9 @@ describe("Web requests", () => {
 			{
 				"@app/r": contributing({
 					routes: {
-						"GET /plain": async (request) => ({ kind: "json", value: request.path }),
-						"GET /headers": async (request) => ({ kind: "json", value: request.headers.get("x-thing") }),
-						"POST /body": async (request) => ({ kind: "json", value: await request.json() }),
+						"GET /plain": async request => ({ kind: "json", value: request.path }),
+						"GET /headers": async request => ({ kind: "json", value: request.headers.get("x-thing") }),
+						"POST /body": async request => ({ kind: "json", value: await request.json() }),
 					},
 				}),
 			},
@@ -167,7 +167,7 @@ describe("the request's scope", () => {
 			{ config: { listen: { host: "127.0.0.1", port: 0 }, closeTimeout: 2000 } },
 		);
 		const request = httpRequest({ host: "127.0.0.1", port: server.port, path: "/large", agent: false });
-		const response = await new Promise<IncomingMessage>((resolve) => {
+		const response = await new Promise<IncomingMessage>(resolve => {
 			request.on("response", (arrived: IncomingMessage) => {
 				arrived.pause();
 				resolve(arrived);
@@ -179,10 +179,10 @@ describe("the request's scope", () => {
 			length += chunk.length;
 		});
 		response.pause();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		const sealedBeforeFlush = signal?.aborted;
 		const closing = server.http.close(context);
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		response.resume();
 		await once(response, "end");
 		await closing;
@@ -206,7 +206,7 @@ describe("the request's scope", () => {
 		request.on("error", () => {});
 		request.end();
 		const signal = await entered.promise;
-		const aborted = new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true }));
+		const aborted = new Promise(resolve => signal.addEventListener("abort", resolve, { once: true }));
 		request.destroy();
 		await aborted;
 		expect(signal.aborted).toBe(true);

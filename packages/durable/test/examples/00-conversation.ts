@@ -15,7 +15,7 @@ const context = BACKGROUND_CONTEXT;
 // transaction `tx`; everything it writes is saved together when the callback
 // returns, or discarded if it throws.
 // "ownerless" means no task created this conversation.
-const standalone = await session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
+const standalone = await session.commit(tx => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
 console.log("standalone conversation:", standalone);
 
 await session.close(context);

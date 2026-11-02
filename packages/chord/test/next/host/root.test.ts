@@ -12,7 +12,7 @@ const Info = local("app.info", { version: 1, params: { id: int() }, members: { i
 function serveInfo(h: Parameters<Parameters<typeof loaded>[0]>[0]): void {
 	h.serve(Info, ({ id }) => ({
 		id: constant(id),
-		wait: async (ctx) => {
+		wait: async ctx => {
 			await sleep(60_000, ctx);
 			return null;
 		},
@@ -23,21 +23,21 @@ describe("host.root", () => {
 	it("gives fn a call context: the host's principal (or the given one), this host's incarnation, `ctx.get`", async () => {
 		const host = createHost<TestPrincipal>({ principal: { kind: "server" }, onError: () => {} });
 		await host.load([{ name: "@app/info", facet: defineFacet<TestPrincipal>(serveInfo) }], context);
-		const seen = await host.root(async (ctx) => {
+		const seen = await host.root(async ctx => {
 			const info = await ctx.get(Info, { id: 7 });
 			return { principal: ctx.principal, incarnation: ctx.incarnation, id: info.id.value };
 		}, context);
 		expect(seen).toMatchObject({ principal: { kind: "server" }, id: 7 });
 		const owner = { kind: "owner", access: "local" } as const;
-		expect(await host.root(async (ctx) => ctx.principal, context, { principal: owner })).toEqual(owner);
+		expect(await host.root(async ctx => ctx.principal, context, { principal: owner })).toEqual(owner);
 		await host.close(context);
 	});
 
 	it("runs anonymous with an explicit undefined principal; only an omitted one takes the host's (slice 10 §6)", async () => {
 		const host = createHost<TestPrincipal>({ principal: { kind: "server" }, onError: () => {} });
 		await host.load([], context);
-		expect(await host.root(async (ctx) => ctx.principal, context, { principal: undefined })).toBeUndefined();
-		expect(await host.root(async (ctx) => ctx.principal, context, {})).toEqual({ kind: "server" });
+		expect(await host.root(async ctx => ctx.principal, context, { principal: undefined })).toBeUndefined();
+		expect(await host.root(async ctx => ctx.principal, context, {})).toEqual({ kind: "server" });
 		await host.close(context);
 	});
 
@@ -51,25 +51,25 @@ describe("host.root", () => {
 			variants: { main: { methods: { read: method(undefined, str()) } } },
 		});
 		const host = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((h) => {
+		const facet = defineFacet<TestPrincipal>(h => {
 			serveInfo(h);
 			h.serve(Secrets, () => ({ variant: "main", members: { read: async () => "secret" } }));
 		});
 		await host.load([{ name: "@app/secrets", facet }], context);
 		const anonymous = { principal: undefined };
-		const refused = await rejection(host.root(async (ctx) => ctx.get(Secrets, {}), context, anonymous));
+		const refused = await rejection(host.root(async ctx => ctx.get(Secrets, {}), context, anonymous));
 		expect(refused).toMatchObject({
 			code: "forbidden",
 			message: "app.secrets: an anonymous caller gets no remote object",
 		});
-		expect(await host.root(async (ctx) => (await ctx.get(Info, { id: 3 })).id.value, context, anonymous)).toBe(3);
+		expect(await host.root(async ctx => (await ctx.get(Info, { id: 3 })).id.value, context, anonymous)).toBe(3);
 		await host.close(context);
 	});
 
 	it("seals the context when fn settles: its references released, its signal aborted, `ctx.get` refused `released`", async () => {
 		const { host } = await loaded(serveInfo);
 		let kept: Ctx | undefined;
-		const info = await host.root(async (ctx) => {
+		const info = await host.root(async ctx => {
 			kept = ctx;
 			return ctx.get(Info, { id: 1 });
 		}, context);
@@ -90,7 +90,7 @@ describe("host.root", () => {
 		const { context: cancellable, cancel } = withCancel(context);
 		let kept: Ctx | undefined;
 		let call: Promise<unknown> | undefined;
-		const running = host.root(async (ctx) => {
+		const running = host.root(async ctx => {
 			kept = ctx;
 			const info = await ctx.get(Info, { id: 1 });
 			call = info.wait(context);
@@ -128,7 +128,7 @@ describe("host.root", () => {
 
 	it("a `ctx.get` before `load` resolved parks until it did", async () => {
 		const host = createHost({ onError: () => {} });
-		const result = host.root(async (ctx) => (await ctx.get(Info, { id: 3 })).id.value, context);
+		const result = host.root(async ctx => (await ctx.get(Info, { id: 3 })).id.value, context);
 		await flushed();
 		await host.load([{ name: "@app/info", facet: defineFacet(serveInfo) }], context);
 		expect(await result).toBe(3);
@@ -137,7 +137,7 @@ describe("host.root", () => {
 
 	it("`host.close` seals every open scope (an fn sleeping on its ctx ends); after it, `root` rejects `released`", async () => {
 		const { host } = await loaded(serveInfo);
-		const sleeping = rejection(host.root((ctx) => sleep(60_000, ctx), context));
+		const sleeping = rejection(host.root(ctx => sleep(60_000, ctx), context));
 		await flushed();
 		await host.close(context);
 		expect(await sleeping).toMatchObject({ code: "released", reason: "closed" });
@@ -148,14 +148,14 @@ describe("host.root", () => {
 		const { host } = await loaded(serveInfo);
 		const settled = withCancel(context);
 		let kept: Ctx | undefined;
-		await host.root(async (ctx) => {
+		await host.root(async ctx => {
 			kept = ctx;
 		}, settled.context);
 		expect(kept!.abortSignal?.aborted).toBe(true);
 		expect(settled.context.abortSignal?.aborted).toBe(false);
 		const closing = withCancel(context);
 		let slept: "running" | "ended" = "running";
-		const sleeping = host.root(async (ctx) => {
+		const sleeping = host.root(async ctx => {
 			try {
 				await sleep(60_000, ctx);
 			} finally {
@@ -197,7 +197,7 @@ describe("host.root", () => {
 		const { context: long } = withCancel(context);
 		const refs = await (async () => {
 			const made: WeakRef<object>[] = [];
-			await host.root(async (ctx) => {
+			await host.root(async ctx => {
 				made.push(new WeakRef(ctx), new WeakRef(await ctx.get(Info, { id: 1 })));
 			}, long);
 			return made;

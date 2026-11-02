@@ -30,7 +30,7 @@ const Coding = defineExtension({
 	name: "coding",
 	sections: [
 		section("preamble", () => "You are a coding agent. Use the tools to inspect the project.", { tag: false }),
-		section("cwd", (input) => input.env?.cwd),
+		section("cwd", input => input.env?.cwd),
 	],
 });
 const registry = createRegistry();
@@ -64,8 +64,8 @@ const root = await harness.root(context, { agent: { model: { provider: "faux", m
 
 const lastBashOutput = async () => {
 	const page = await root.entries({}, 10, undefined, context);
-	const result = page.items.find((entry) => ToolResultEntry.is(entry))?.model?.[0] as ToolResultMessage;
-	return result.content.map((part) => (part.type === "text" ? part.text.trim() : "")).join("");
+	const result = page.items.find(entry => ToolResultEntry.is(entry))?.model?.[0] as ToolResultMessage;
+	return result.content.map(part => (part.type === "text" ? part.text.trim() : "")).join("");
 };
 
 await (await root.submit({ type: "input", content: "Where are we?" }, context)).wait(context);

@@ -171,7 +171,7 @@ type MethodNeed =
 function needs(data: ContractData, index: number): Needs {
 	const old = data.versions[index]!;
 	const current = data.versions.at(-1)!;
-	const changes = new Set(data.versions.slice(index + 1).flatMap((version) => version.changes.map(changeKey)));
+	const changes = new Set(data.versions.slice(index + 1).flatMap(version => version.changes.map(changeKey)));
 	const changed = (...change: Change) => changes.has(changeKey(change));
 	const state = new Map<string, Map<string, StateNeed>>();
 	const methods = new Map<string, { removed: boolean; args: boolean; result: boolean }>();

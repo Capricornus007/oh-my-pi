@@ -25,10 +25,10 @@ let count = 0;
 /** Commit `n` chat lines, one entry each. */
 const chat = async (n: number): Promise<void> => {
 	for (let index = 0; index < n; index++) {
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "chat", data: `line ${++count}` }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "chat", data: `line ${++count}` }), context);
 	}
 };
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 /** One line per item: ranges of entries, gaps, and the "load earlier" marker. */
 function render(label: string, view: TranscriptView): void {
@@ -64,7 +64,7 @@ const window = { min: 10, max: 20 };
 let watch = await root.watch(context, window);
 let view = transcript.merge(watch.value);
 render("attach", view);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind !== "value") return;
 	const { value } = call;
 	view = transcript.merge(value);
@@ -86,7 +86,7 @@ await chat(40);
 watch = await root.watch(context, { ...window, ...transcript.resume });
 view = transcript.merge(watch.value);
 render("resume after 40 missed", view);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind !== "value") return;
 	const { value } = call;
 	view = transcript.merge(value);

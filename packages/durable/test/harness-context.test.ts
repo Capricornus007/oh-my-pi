@@ -20,7 +20,7 @@ async function setup() {
 	const { harness } = await openHarness(new MemoryStorage());
 	const root = await harness.root(context);
 	const append = (draft: EntryDraft): Promise<EntryRecord> =>
-		root.commit((tx) => tx.appendEntry(root.id, draft), context);
+		root.commit(tx => tx.appendEntry(root.id, draft), context);
 	const message = (model: Message, kind = "message"): Promise<EntryRecord> => append({ kind, model: [model] });
 	return { harness, root, append, message };
 }
@@ -50,13 +50,10 @@ async function countingSetup(options: { readonly settings?: HarnessSettings; rea
 	const registry = createRegistry();
 	const harness = await Harness.open(storage, { models: createModels(), registry, ...options }, context);
 	const root = await harness.root(context);
-	const first = await root.commit(
-		(tx) => tx.appendEntry(root.id, { kind: "message", model: [user("first")] }),
-		context,
-	);
+	const first = await root.commit(tx => tx.appendEntry(root.id, { kind: "message", model: [user("first")] }), context);
 	for (let index = 0; index < 20; index++) {
 		await root.commit(
-			(tx) => tx.appendEntry(root.id, { kind: "message", model: [assistant(`old ${index}`)] }),
+			tx => tx.appendEntry(root.id, { kind: "message", model: [assistant(`old ${index}`)] }),
 			context,
 		);
 	}
@@ -64,7 +61,7 @@ async function countingSetup(options: { readonly settings?: HarnessSettings; rea
 }
 
 function ids(entries: readonly EntryRecord[]): EntryId[] {
-	return entries.map((entry) => entry.id);
+	return entries.map(entry => entry.id);
 }
 
 afterEach(() => {
@@ -385,10 +382,10 @@ describe("conversation context", () => {
 		});
 
 		// A head between a call and its results leaves stray results that are not sent.
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "reset", head: second.id }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "reset", head: second.id }), context);
 		const parentView = await root.context(context);
 		expect(parentView.messages.map(describeMessage)).toEqual([]);
-		expect(parentView.entries.map((entry) => entry.kind)).toEqual(["reset", "message"]);
+		expect(parentView.entries.map(entry => entry.kind)).toEqual(["reset", "message"]);
 	});
 
 	// #10512
@@ -432,7 +429,7 @@ describe("conversation context", () => {
 			phases: {
 				run: async (_task, runtime, taskContext) => {
 					const write = (draft: EntryDraft) =>
-						runtime.commit(async (tx) => {
+						runtime.commit(async tx => {
 							await tx.appendEntry(root.id, draft);
 							return undefined;
 						}, taskContext);
@@ -482,7 +479,7 @@ describe("conversation context", () => {
 		});
 		addTask(registry, Reads);
 		const id = await harness.commit(
-			(tx) => tx.createTask(Reads, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
+			tx => tx.createTask(Reads, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
 			context,
 		);
 		harness.resume();
@@ -507,7 +504,7 @@ describe("conversation context", () => {
 			initial: () => ({ phase: "run" }),
 			phases: {
 				run: async (_task, runtime, taskContext) => {
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						await tx.appendEntry(root.id, { kind: "message", model: [user("from child")] });
 						return undefined;
 					}, taskContext);
@@ -526,7 +523,7 @@ describe("conversation context", () => {
 			phases: {
 				start: async (_task, runtime, taskContext) => {
 					await read("parent", () => runtime.context(root.id, taskContext), taskContext);
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						const child = await tx.createTask(
 							Child,
 							{},
@@ -548,11 +545,11 @@ describe("conversation context", () => {
 		for (const task of [Child, Parent, Probe]) addTask(registry, task);
 		harness.resume();
 		const options = { ownership: { kind: "conversation" }, conversationId: root.id } as const;
-		const parent = await harness.commit((tx) => tx.createTask(Parent, {}, options), context);
+		const parent = await harness.commit(tx => tx.createTask(Parent, {}, options), context);
 		expect((await harness.waitForTask(parent, context)).state.outcome).toEqual(DONE.outcome);
 		await root.waitForIdle(context);
 		const probe = async (name: string) => {
-			const id = await harness.commit((tx) => tx.createTask(Probe, { name }, options), context);
+			const id = await harness.commit(tx => tx.createTask(Probe, { name }, options), context);
 			expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
 			await root.waitForIdle(context);
 		};
@@ -634,7 +631,7 @@ describe("conversation context", () => {
 						return { kind: "message", model: [user(`u${next++}`)] };
 					};
 					const append = (conversationId: typeof root.id) =>
-						runtime.commit(async (tx) => {
+						runtime.commit(async tx => {
 							const added = 1 + random(3);
 							for (let index = 0; index < added; index++) {
 								written.push(await tx.appendEntry(conversationId, draft()));
@@ -646,11 +643,11 @@ describe("conversation context", () => {
 						const whole = await root.context(taskContext);
 						expect(await runtime.context(root.id, taskContext)).toEqual(whole);
 						const contributed = whole.contributions.flat();
-						const first = contributed.findIndex((message) => message.role === "system");
+						const first = contributed.findIndex(message => message.role === "system");
 						if (
 							first > 0 &&
 							whole.messages[0] === contributed[first] &&
-							contributed.slice(0, first).some((message) => message.role === "assistant")
+							contributed.slice(0, first).some(message => message.role === "assistant")
 						) {
 							count("baseline past assistant");
 						}
@@ -685,7 +682,7 @@ describe("conversation context", () => {
 		addTask(registry, Steps);
 		harness.resume();
 		const id = await harness.commit(
-			(tx) => tx.createTask(Steps, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
+			tx => tx.createTask(Steps, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
 			context,
 		);
 		expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
@@ -716,7 +713,7 @@ describe("conversation context", () => {
 			phases: {
 				run: async (_task, runtime, taskContext) => {
 					const append = (conversationId: typeof root.id, draft: EntryDraft) =>
-						runtime.commit(async (tx) => {
+						runtime.commit(async tx => {
 							await tx.appendEntry(conversationId, draft);
 							return undefined;
 						}, taskContext);
@@ -750,7 +747,7 @@ describe("conversation context", () => {
 					const omitted = await root.fork(first.id, { ownership: { kind: "ownerless" } }, taskContext);
 					await append(omitted.id, { kind: "message", model: [assistant("answer")] });
 					let host: EntryRecord | undefined;
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						host = await tx.appendEntry(omitted.id, {
 							kind: "host.system",
 							model: [system({ legacy: "Legacy." })],
@@ -783,7 +780,7 @@ describe("conversation context", () => {
 		addTask(registry, Steps);
 		harness.resume();
 		const id = await harness.commit(
-			(tx) => tx.createTask(Steps, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
+			tx => tx.createTask(Steps, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
 			context,
 		);
 		expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
@@ -816,7 +813,7 @@ describe("conversation context", () => {
 		addTask(registry, Mutate);
 		harness.resume();
 		const id = await harness.commit(
-			(tx) => tx.createTask(Mutate, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
+			tx => tx.createTask(Mutate, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
 			context,
 		);
 		expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
@@ -832,7 +829,7 @@ describe("conversation context", () => {
 				if (key === "scanEntries") {
 					return async (...args: Parameters<Storage["scanEntries"]>) => {
 						const page = await target.scanEntries(...args);
-						return { ...page, items: page.items.map((item) => Object.freeze(structuredClone(item))) };
+						return { ...page, items: page.items.map(item => Object.freeze(structuredClone(item))) };
 					};
 				}
 				return typeof value === "function" ? value.bind(target) : value;
@@ -841,7 +838,7 @@ describe("conversation context", () => {
 		const registry = createRegistry();
 		const harness = await Harness.open(storage, { models: createModels(), registry }, context);
 		const root = await harness.root(context);
-		await root.commit((tx) => tx.appendEntry(root.id, { kind: "message", model: [user("hello")] }), context);
+		await root.commit(tx => tx.appendEntry(root.id, { kind: "message", model: [user("hello")] }), context);
 		const Mutate = defineTask<Record<string, never>, { phase: "run" }, null>({
 			name: "test.context-shallow",
 			version: 1,
@@ -862,7 +859,7 @@ describe("conversation context", () => {
 		addTask(registry, Mutate);
 		harness.resume();
 		const id = await harness.commit(
-			(tx) => tx.createTask(Mutate, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
+			tx => tx.createTask(Mutate, {}, { ownership: { kind: "conversation" }, conversationId: root.id }),
 			context,
 		);
 		expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
@@ -899,10 +896,10 @@ describe("conversation context", () => {
 		for (const task of [Late, Probe]) addTask(registry, task);
 		harness.resume();
 		const options = { ownership: { kind: "conversation" }, conversationId: root.id } as const;
-		const lateId = await harness.commit((tx) => tx.createTask(Late, {}, options), context);
+		const lateId = await harness.commit(tx => tx.createTask(Late, {}, options), context);
 		expect((await harness.waitForTask(lateId, context)).state.outcome).toEqual(DONE.outcome);
 		// The conversation is busy again when the late read finishes; its range must not be kept.
-		const probeId = await harness.commit((tx) => tx.createTask(Probe, { name: "probe" }, options), context);
+		const probeId = await harness.commit(tx => tx.createTask(Probe, { name: "probe" }, options), context);
 		scans.resolve();
 		await late;
 		probeStart.resolve();
@@ -924,7 +921,7 @@ describe("conversation context", () => {
 		harness.resume();
 		const options = { ownership: { kind: "conversation" }, conversationId: root.id } as const;
 		const probe = async (name: string) => {
-			const id = await harness.commit((tx) => tx.createTask(Probe, { name }, options), context);
+			const id = await harness.commit(tx => tx.createTask(Probe, { name }, options), context);
 			expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
 			await root.waitForIdle(context);
 		};
@@ -950,7 +947,7 @@ describe("conversation context", () => {
 		harness.resume();
 		const options = { ownership: { kind: "conversation" }, conversationId: root.id } as const;
 		for (const name of ["first", "second"]) {
-			const id = await harness.commit((tx) => tx.createTask(Probe, { name }, options), context);
+			const id = await harness.commit(tx => tx.createTask(Probe, { name }, options), context);
 			expect((await harness.waitForTask(id, context)).state.outcome).toEqual(DONE.outcome);
 			await root.waitForIdle(context);
 		}

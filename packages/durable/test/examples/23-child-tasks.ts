@@ -69,7 +69,7 @@ const Checkout = defineTask<{ cards: string[] }, CheckoutState, string>({
 	initial: () => ({ phase: "pay" }),
 	phases: {
 		pay: async (task, runtime, taskContext) => {
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				const payments: TaskId<PaymentResult>[] = [];
 				for (const card of task.input.cards) {
 					payments.push(await tx.createTask(Payment, { card }, { ownership: { kind: "task", taskId: task.id } }));
@@ -79,8 +79,8 @@ const Checkout = defineTask<{ cards: string[] }, CheckoutState, string>({
 		},
 		decide: async (task, runtime, taskContext) => {
 			const outcomes = await runtime.outcomes(task.state.checkpoint.payments, taskContext);
-			console.log(`  payments: ${outcomes.map((outcome) => outcome.status).join(", ")}`);
-			const paid = outcomes.every((outcome) => outcome.status === "completed");
+			console.log(`  payments: ${outcomes.map(outcome => outcome.status).join(", ")}`);
+			const paid = outcomes.every(outcome => outcome.status === "completed");
 			await runtime.commit(
 				() =>
 					paid
@@ -110,12 +110,12 @@ function printGraph(graph: TaskGraph): void {
 		const state = node.state;
 		const status = state.status === "waiting" ? `waiting on ${state.on.join(", ")}` : state.status;
 		console.log(`  ${"  ".repeat(depth)}${node.kind} ${node.id}: ${status}`);
-		for (const child of nodes.filter((candidate) => candidate.owner === node.id)) print(child, depth + 1);
+		for (const child of nodes.filter(candidate => candidate.owner === node.id)) print(child, depth + 1);
 	};
-	for (const node of nodes.filter((candidate) => candidate.owner === undefined)) print(node, 0);
+	for (const node of nodes.filter(candidate => candidate.owner === undefined)) print(node, 0);
 }
 const checkout = (root: Conversation, cards: string[]) =>
-	root.commit((tx) => tx.createTask(Checkout, { cards }, { ownership: { kind: "conversation" } }), context);
+	root.commit(tx => tx.createTask(Checkout, { cards }, { ownership: { kind: "conversation" } }), context);
 
 let harness = await open();
 let root = await harness.root(context);
@@ -127,7 +127,7 @@ console.log(`  checkout: ${(await harness.waitForTask(id, context)).state.outcom
 console.log("The customer cancels:");
 id = await checkout(root, ["visa-5", "visa-6", "visa-7", "visa-8"]);
 harness.resume();
-await new Promise((resolve) => setTimeout(resolve, 20));
+await new Promise(resolve => setTimeout(resolve, 20));
 const graph = await harness.watchTaskGraph(context);
 printGraph(graph.value);
 await graph.stop();
@@ -136,7 +136,7 @@ console.log(`  checkout: ${(await harness.waitForTask(id, context)).state.outcom
 
 console.log("The process stops while the payments run, and a new one continues:");
 id = await checkout(root, ["visa-9", "visa-10", "visa-11", "visa-12"]);
-await new Promise((resolve) => setTimeout(resolve, 20));
+await new Promise(resolve => setTimeout(resolve, 20));
 await harness.close(context);
 harness = await open();
 root = await harness.root(context);

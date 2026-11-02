@@ -158,7 +158,7 @@ export class Derive extends Source implements Dependent {
 			try {
 				this.batch.count("chord.derive.computes");
 				// A failing source throws its own error here, so a derive over a failed derive fails with the same error.
-				const values = this.#sources.map((source) => source.value);
+				const values = this.#sources.map(source => source.value);
 				let value: JsonValue;
 				try {
 					value = this.#compute(values);
@@ -185,8 +185,8 @@ export class Derive extends Source implements Dependent {
  */
 export function mapShared<E, R extends JsonValue>(f: (element: E) => R): (elements: readonly E[]) => R[] {
 	const results = new WeakMap<object, R>();
-	return (elements) =>
-		elements.map((element) => {
+	return elements =>
+		elements.map(element => {
 			// The decided rule: identity caching for objects only.
 			if (typeof element !== "object" || element === null) return f(element);
 			let result = results.get(element);

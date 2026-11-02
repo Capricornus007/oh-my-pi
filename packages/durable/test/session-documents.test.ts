@@ -70,7 +70,7 @@ const MemberDoc = defineDocFamily<Member, string>({
 	version: 1,
 	family: true,
 	scope: "session",
-	initial: (seed) => {
+	initial: seed => {
 		seeds.push(seed);
 		return { seed, hits: 0 };
 	},
@@ -79,7 +79,7 @@ const MemberDoc = defineDocFamily<Member, string>({
 async function setupLive(): Promise<ReturnType<typeof openTestSession> & { readonly conversationId: ConversationId }> {
 	const harness = openTestSession();
 	const conversationId = await createConversation(harness.session);
-	await harness.session.commit(async (tx) => {
+	await harness.session.commit(async tx => {
 		const live = await tx.doc(LiveDoc, conversationId);
 		live.items.push("a", "b");
 	}, context);
@@ -90,7 +90,7 @@ describe("Session document transactions", () => {
 	it("creates an initial base on first access and adopts it after Storage success", async () => {
 		const { session, storage, publications } = openTestSession();
 		const conversationId = await createConversation(session);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.message = "hello";
 		}, context);
@@ -114,7 +114,7 @@ describe("Session document transactions", () => {
 		expect(published.record.createdAt).toBe(publication.seq);
 		expect(published.value).toBe(snapshot);
 		expect(published.conversationId).toBe(conversationId);
-		const create = storage.admittedCommits.at(-1)!.find((write) => write.type === "document.create")!;
+		const create = storage.admittedCommits.at(-1)!.find(write => write.type === "document.create")!;
 		expect(create.content.value).toBe(published.value);
 	});
 
@@ -133,7 +133,7 @@ describe("Session document transactions", () => {
 		const { session, conversationId } = await setupLive();
 		const first = (await session.snapshot(LiveDoc, conversationId, context))!;
 		expect(await session.snapshot(LiveDoc, conversationId, context)).toBe(first);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.nested.count = 1;
 		}, context);
@@ -148,7 +148,7 @@ describe("Session document transactions", () => {
 
 	it("adopts by pointer swap and shares operation payloads with the published revision", async () => {
 		const { session, storage, publications, conversationId } = await setupLive();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.other = { label: "y" };
 			live.items.push("c");
@@ -157,11 +157,11 @@ describe("Session document transactions", () => {
 		const snapshot = (await session.snapshot(LiveDoc, conversationId, context))!;
 		const published = documentValues(publications.at(-1)!)[0]!;
 		expect(published.value).toBe(snapshot);
-		const admitted = storage.admittedCommits.at(-1)!.find((write) => write.type === "document.change")!;
+		const admitted = storage.admittedCommits.at(-1)!.find(write => write.type === "document.change")!;
 		expect(admitted.content.kind).toBe("delta");
 		if (admitted.content.kind !== "delta") throw new Error("Expected delta");
 		expect(published.ops).toBe(admitted.content.ops);
-		const set = published.ops.find((op) => op[0] === "s");
+		const set = published.ops.find(op => op[0] === "s");
 		expect(set).toEqual(["s", ["other"], { label: "y" }]);
 		// Trusted immutability: the Session makes no second copy of operation payloads.
 		expect(set![2]).toBe(snapshot.other);
@@ -170,7 +170,7 @@ describe("Session document transactions", () => {
 	it("copies assigned values per placement", async () => {
 		const { session, conversationId } = await setupLive();
 		const value = { label: "shared" };
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.other = value;
 			(live as Draft<Live> & { copy?: { label: string } }).copy = value;
@@ -188,7 +188,7 @@ describe("Session document transactions", () => {
 		await flush();
 		const commits = storage.commits.length;
 		const published = publications.length;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.nested.count = 0;
 			live.items.push("z");
@@ -202,7 +202,7 @@ describe("Session document transactions", () => {
 	it("writes and publishes replayable nonempty structural no-ops", async () => {
 		const { session, storage, publications, conversationId } = await setupLive();
 		const before = (await session.snapshot(LiveDoc, conversationId, context))!;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			const first = live.items.shift()!;
 			live.items.unshift(first);
@@ -220,7 +220,7 @@ describe("Session document transactions", () => {
 		const { session, conversationId } = await setupLive();
 		let escaped: Draft<Live> | undefined;
 		let items: Draft<string[]> | undefined;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			escaped = await tx.doc(LiveDoc, conversationId);
 			items = escaped.items;
 			escaped.message = "inside";
@@ -233,7 +233,7 @@ describe("Session document transactions", () => {
 		expect(() => items!.push("outside")).toThrow();
 		expect((await session.snapshot(LiveDoc, conversationId, context))!.message).toBe("inside");
 
-		const returned = await session.commit((tx) => tx.doc(LiveDoc, conversationId), context);
+		const returned = await session.commit(tx => tx.doc(LiveDoc, conversationId), context);
 		expect(() => returned.message).toThrow();
 	});
 
@@ -242,7 +242,7 @@ describe("Session document transactions", () => {
 		const before = (await session.snapshot(LiveDoc, conversationId, context))!;
 		const commits = storage.commits.length;
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				const live = await tx.doc(LiveDoc, conversationId);
 				const counter = await tx.doc(CounterDoc);
 				live.message = "lost";
@@ -253,7 +253,7 @@ describe("Session document transactions", () => {
 		expect(storage.commits.length).toBe(commits);
 		expect(await session.snapshot(LiveDoc, conversationId, context)).toBe(before);
 		expect(await session.snapshot(CounterDoc, context)).toBeUndefined();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "kept";
 		}, context);
 		expect((await session.snapshot(LiveDoc, conversationId, context))!.message).toBe("kept");
@@ -264,7 +264,7 @@ describe("Session document transactions", () => {
 		const conversationId = await createConversation(session);
 		const initCount = liveInitCount;
 		const mints = storage.mintCount;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const [first, second] = await Promise.all([tx.doc(LiveDoc, conversationId), tx.doc(LiveDoc, conversationId)]);
 			expect(first).toBe(second);
 			expect(await tx.doc(LiveDoc, conversationId)).toBe(first);
@@ -272,19 +272,19 @@ describe("Session document transactions", () => {
 		}, context);
 		expect(liveInitCount).toBe(initCount + 1);
 		expect(storage.mintCount).toBe(mints + 1);
-		expect(storage.commits.at(-1)!.filter((write) => write.type === "document.create")).toHaveLength(1);
+		expect(storage.commits.at(-1)!.filter(write => write.type === "document.create")).toHaveLength(1);
 	});
 
 	it("uses the first family seed and ignores seeds for existing members", async () => {
 		const { session } = openTestSession();
 		seeds.length = 0;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const first = await tx.doc(MemberDoc, "k", "first");
 			const second = await tx.doc(MemberDoc, "k", "second");
 			expect(second).toBe(first);
 			first.hits++;
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(MemberDoc, "k", "third")).hits++;
 			(await tx.doc(MemberDoc, "other", "fourth")).hits++;
 		}, context);
@@ -299,7 +299,7 @@ describe("Session document transactions", () => {
 		const gate = storage.holdFindDocument();
 		const commits = storage.commits.length;
 		let pending: Promise<unknown> | undefined;
-		const commit = session.commit((tx) => {
+		const commit = session.commit(tx => {
 			pending = tx.doc(LiveDoc, conversationId);
 		}, context);
 		await gate.entered;
@@ -314,7 +314,7 @@ describe("Session document transactions", () => {
 		await expect(commit).rejects.toThrow("pending Tx operations");
 		await expect(pending).rejects.toThrow("Transaction has settled");
 		expect(storage.commits.length).toBe(commits);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "after";
 		}, context);
 		expect((await session.snapshot(LiveDoc, conversationId, context))!.message).toBe("after");
@@ -336,7 +336,7 @@ describe("Session document transactions", () => {
 		const gate = storage.holdFindDocument();
 		const mints = storage.mintCount;
 		let pending: Promise<unknown> | undefined;
-		const commit = session.commit((tx) => {
+		const commit = session.commit(tx => {
 			pending = tx.doc(LateDoc);
 		}, context);
 		await gate.entered;
@@ -352,7 +352,7 @@ describe("Session document transactions", () => {
 		await session.unloadDocuments();
 		const gate = storage.holdFindDocument();
 		let pending: Promise<unknown> | undefined;
-		const commit = session.commit((tx) => {
+		const commit = session.commit(tx => {
 			pending = tx.doc(LiveDoc, conversationId);
 			throw new Error("callback failed");
 		}, context);
@@ -365,7 +365,7 @@ describe("Session document transactions", () => {
 	it("rejects Tx use after the callback settles", async () => {
 		const { session, conversationId } = await setupLive();
 		let captured: Parameters<Parameters<typeof session.commitWith>[0]>[0] | undefined;
-		await session.commitWith((tx) => {
+		await session.commitWith(tx => {
 			captured = tx;
 		}, context);
 		await expect(captured!.doc(LiveDoc, conversationId)).rejects.toThrow("Transaction has settled");
@@ -379,12 +379,12 @@ describe("Session document transactions", () => {
 			"does not match the supplied definition semantics",
 		);
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				await tx.doc(RewindableLiveDoc, conversationId);
 			}, context),
 		).rejects.toThrow("does not match the supplied definition semantics");
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				await tx.doc(LiveDocV2, conversationId);
 			}, context),
 		).rejects.toThrow("requires migration from version 1");
@@ -401,13 +401,13 @@ describe("Session document transactions", () => {
 			initial: () => ({ at: new Date() }) as unknown as JsonObject,
 		});
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				await tx.doc(DateDoc);
 			}, context),
 		).rejects.toThrow("strict JSON");
 		const commits = storage.commits.length;
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				const live = await tx.doc(LiveDoc, conversationId);
 				live.items.push(undefined as unknown as string);
 			}, context),
@@ -418,14 +418,14 @@ describe("Session document transactions", () => {
 
 	it("rolls back prepared documents when batch assembly fails", async () => {
 		const { session, storage, conversationId } = await setupLive();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(CounterDoc)).count = 1;
 		}, context);
 		const live = await session.snapshot(LiveDoc, conversationId, context);
 		const counter = await session.snapshot(CounterDoc, context);
 		const commits = storage.commits.length;
 		await expect(
-			session.commitWith(async (tx) => {
+			session.commitWith(async tx => {
 				(await tx.doc(LiveDoc, conversationId)).message = "lost";
 				(await tx.doc(CounterDoc)).count = 2;
 				// Replacing a missing task fails during assembly, after every change was prepared.
@@ -444,7 +444,7 @@ describe("Session document transactions", () => {
 		expect(storage.commits.length).toBe(commits);
 		expect(await session.snapshot(LiveDoc, conversationId, context)).toBe(live);
 		expect(await session.snapshot(CounterDoc, context)).toBe(counter);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "next";
 			(await tx.doc(CounterDoc)).count = 3;
 		}, context);
@@ -458,7 +458,7 @@ describe("Session document transactions", () => {
 		const published = publications.length;
 		storage.failNextCommit(new Error("disk vanished"));
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				(await tx.doc(LiveDoc, conversationId)).message = "uncertain";
 			}, context),
 		).rejects.toThrow("disk vanished");
@@ -475,7 +475,7 @@ describe("Session document transactions", () => {
 		const before = (await session.snapshot(LiveDoc, conversationId, context))!;
 		const copy = structuredClone(before);
 		const gate = storage.holdCommits();
-		const commit = session.commit(async (tx) => {
+		const commit = session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.items.push("c");
 			live.nested.count = 9;
@@ -495,7 +495,7 @@ describe("Session document transactions", () => {
 		await flush();
 		const oldId = documentChanges(publications.at(-1)!)[0]!.record.id;
 		let replacement: Draft<Live> | undefined;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			live.message = "final";
 			await tx.retireDoc(LiveDoc, conversationId);
@@ -522,13 +522,13 @@ describe("Session document transactions", () => {
 			created?.kind === "change" ? created.value : undefined,
 		);
 
-		await session.commit((tx) => tx.retireDoc(LiveDoc, conversationId), context);
+		await session.commit(tx => tx.retireDoc(LiveDoc, conversationId), context);
 		expect(await session.snapshot(LiveDoc, conversationId, context)).toBeUndefined();
 		await session.unloadDocuments();
 		expect(await session.snapshot(LiveDoc, conversationId, context)).toBeUndefined();
 		// Retiring an absent address is a no-op.
 		const commits = storage.commits.length;
-		await session.commit((tx) => tx.retireDoc(LiveDoc, conversationId), context);
+		await session.commit(tx => tx.retireDoc(LiveDoc, conversationId), context);
 		expect(storage.commits.length).toBe(commits);
 	});
 
@@ -537,7 +537,7 @@ describe("Session document transactions", () => {
 		await flush();
 		const oldId = documentChanges(publications.at(-1)!)[0]!.record.id;
 		await session.unloadDocuments();
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const retired = tx.retireDoc(LiveDoc, conversationId);
 			const replacement = tx.doc(LiveDoc, conversationId);
 			const [live] = await Promise.all([replacement, retired]);
@@ -550,15 +550,15 @@ describe("Session document transactions", () => {
 			expect.objectContaining({ type: "document.create", record: expect.objectContaining({ kind: "test.live" }) }),
 		);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const retired = tx.retireDoc(MemberDoc, "absent");
 			const replacement = tx.doc(MemberDoc, "absent", "seed");
 			const [member] = await Promise.all([replacement, retired]);
 			member.hits = 1;
 		}, context);
 		const absentWrites = storage.commits.at(-1)!;
-		expect(absentWrites.filter((write) => write.type === "document.retire")).toHaveLength(0);
-		expect(absentWrites.filter((write) => write.type === "document.create")).toHaveLength(1);
+		expect(absentWrites.filter(write => write.type === "document.retire")).toHaveLength(0);
+		expect(absentWrites.filter(write => write.type === "document.create")).toHaveLength(1);
 		expect(await session.snapshot(MemberDoc, "absent", context)).toEqual({ seed: "seed", hits: 1 });
 	});
 
@@ -566,7 +566,7 @@ describe("Session document transactions", () => {
 		const { session, storage, publications, conversationId } = await setupLive();
 		await flush();
 		const oldId = documentChanges(publications.at(-1)!)[0]!.record.id;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const acquired = tx.doc(LiveDoc, conversationId);
 			const retired = tx.retireDoc(LiveDoc, conversationId);
 			(await acquired).message = "final";
@@ -582,12 +582,12 @@ describe("Session document transactions", () => {
 		expect(firstWrites).toContainEqual({ type: "document.retire", id: oldId });
 		expect(await session.snapshot(LiveDoc, conversationId, context)).toBeUndefined();
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "second";
 		}, context);
 		await flush();
 		const secondId = documentChanges(publications.at(-1)!)[0]!.record.id;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const acquired = tx.doc(LiveDoc, conversationId);
 			const retired = tx.retireDoc(LiveDoc, conversationId);
 			const recreated = tx.doc(LiveDoc, conversationId);
@@ -611,7 +611,7 @@ describe("Session document transactions", () => {
 		const reloaded = (await session.snapshot(LiveDoc, conversationId, context))!;
 		expect(reloaded).not.toBe(loaded);
 		expect(reloaded).toEqual(loaded);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).items.push("c");
 		}, context);
 		await session.unloadDocuments();
@@ -628,7 +628,7 @@ describe("Session document transactions", () => {
 			},
 			end: () => {},
 		});
-		const result = await session.commit(async (tx) => {
+		const result = await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "m";
 			return "done";
 		}, context);
@@ -651,11 +651,11 @@ describe("Session document transactions", () => {
 	it("settles admitted commits before close and rejects later admission", async () => {
 		const { session, storage, conversationId } = await setupLive();
 		const gate = storage.holdCommits();
-		const commit = session.commit(async (tx) => {
+		const commit = session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "admitted";
 		}, context);
 		await gate.entered;
-		const queued = session.commit(async (tx) => {
+		const queued = session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).message = "queued";
 		}, context);
 		const admittedSnapshot = session.snapshot(MemberDoc, "absent", context);

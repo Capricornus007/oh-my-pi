@@ -57,7 +57,7 @@ async function listed(
 	const listing = getOrThrow(await env.listFiles(path, options, context));
 	const letter = { file: "f", directory: "d", symlink: "l" } as const;
 	return {
-		entries: listing.entries.map((entry) => `${letter[entry.kind]} ${entry.path}`),
+		entries: listing.entries.map(entry => `${letter[entry.kind]} ${entry.path}`),
 		truncated: listing.truncated,
 	};
 }
@@ -67,7 +67,7 @@ function covers(change: FileChange, path: string): boolean {
 	if (change.kind === "overflow") return true;
 	if (change.kind !== "paths") return false;
 	return change.paths.some(
-		(reported) => path === reported || path.startsWith(`${reported}/`) || path.startsWith(`${reported}\\`),
+		reported => path === reported || path.startsWith(`${reported}/`) || path.startsWith(`${reported}\\`),
 	);
 }
 
@@ -83,7 +83,7 @@ async function watching(
 	}) => Promise<void>,
 ): Promise<void> {
 	const changes: FileChange[] = [];
-	const watcher = getOrThrow(await env.watch(targets, (change) => changes.push(change), context));
+	const watcher = getOrThrow(await env.watch(targets, change => changes.push(change), context));
 	try {
 		const absolute = async (path: string) => getOrThrow(await env.absolutePath(path, context));
 		await run({
@@ -94,11 +94,11 @@ async function watching(
 				const from = changes.length;
 				await change();
 				const deadline = Date.now() + 3000;
-				while (!changes.slice(from).some((entry) => covers(entry, target))) {
+				while (!changes.slice(from).some(entry => covers(entry, target))) {
 					if (Date.now() > deadline) {
 						throw new Error(`No change reported ${target}; got ${JSON.stringify(changes.slice(from))}`);
 					}
-					await new Promise((resolve) => setTimeout(resolve, 20));
+					await new Promise(resolve => setTimeout(resolve, 20));
 				}
 			},
 		});
@@ -138,7 +138,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 	};
 
 	const cases: EnvConformanceCase[] = [
-		createCase("binary reader reads byte ranges of the opened file", async (env) => {
+		createCase("binary reader reads byte ranges of the opened file", async env => {
 			getOrThrow(await env.writeFile("data.txt", "hello world", context));
 			const reader = getOrThrow(await env.openBinaryReader("data.txt", undefined, context));
 			const info = getOrThrow(await reader.info(context));
@@ -157,7 +157,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(errorCode(await reader.info(context)), "invalid");
 		}),
 
-		createCase("binary reader scans lines like decoding the whole file", async (env) => {
+		createCase("binary reader scans lines like decoding the whole file", async env => {
 			// A byte-order mark, an invalid sequence before a newline, an empty line, a later U+FEFF, and no final newline.
 			const bytes = Uint8Array.from([
 				0xef, 0xbb, 0xbf, 0x61, 0x0a, 0xe2, 0x82, 0x0a, 0x0a, 0xef, 0xbb, 0xbf, 0x62, 0x0a, 0xc3, 0xa9,
@@ -198,7 +198,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			}
 		}),
 
-		createCase("binary reader keeps reading the file it opened after a rename", async (env) => {
+		createCase("binary reader keeps reading the file it opened after a rename", async env => {
 			getOrThrow(await env.writeFile("a.txt", "one", context));
 			const reader = getOrThrow(await env.openBinaryReader("a.txt", undefined, context));
 			try {
@@ -210,7 +210,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			}
 		}),
 
-		createCase("binary reader refuses directories, missing files and aborted opens", async (env) => {
+		createCase("binary reader refuses directories, missing files and aborted opens", async env => {
 			getOrThrow(await env.createDir("dir", undefined, context));
 			getOrThrow(await env.writeFile("file.txt", "x", context));
 			assert.strictEqual(errorCode(await env.openBinaryReader("dir", undefined, context)), "is_directory");
@@ -218,7 +218,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(errorCode(await env.openBinaryReader("file.txt", undefined, abortedContext())), "aborted");
 		}),
 
-		createCase("directory reader pages every entry exactly once", async (env) => {
+		createCase("directory reader pages every entry exactly once", async env => {
 			const names = ["a.txt", "b.txt", "c.txt", "d.txt", "e.txt"];
 			for (const name of names) getOrThrow(await env.writeFile(name, name, context));
 			getOrThrow(await env.createDir("sub", undefined, context));
@@ -226,15 +226,15 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.ok(done, "directory reader reached the end");
 			for (const page of pages) assert.ok(page.length <= 2, "page within maxEntries");
 			const entries = pages.flat();
-			assert.deepEqual(entries.map((entry) => entry.name).sort(), [...names, "sub"].sort());
-			assert.strictEqual(entries.find((entry) => entry.name === "sub")?.kind, "directory");
+			assert.deepEqual(entries.map(entry => entry.name).sort(), [...names, "sub"].sort());
+			assert.strictEqual(entries.find(entry => entry.name === "sub")?.kind, "directory");
 			assert.partialDeepEqual(
-				entries.find((entry) => entry.name === "a.txt"),
+				entries.find(entry => entry.name === "a.txt"),
 				{ kind: "file", size: 5 },
 			);
 		}),
 
-		createCase("directory reader reports the end and refuses use after close", async (env) => {
+		createCase("directory reader reports the end and refuses use after close", async env => {
 			getOrThrow(await env.createDir("empty", undefined, context));
 			const reader = getOrThrow(await env.openDirReader("empty", context));
 			assert.deepEqual(getOrThrow(await reader.next(10, context)), { entries: [], done: true });
@@ -246,7 +246,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(errorCode(await reader.next(1, context)), "invalid");
 		}),
 
-		createCase("directory reader refuses missing paths and files", async (env) => {
+		createCase("directory reader refuses missing paths and files", async env => {
 			getOrThrow(await env.writeFile("file.txt", "x", context));
 			assert.strictEqual(errorCode(await env.openDirReader("missing", context)), "not_found");
 			const file = await env.openDirReader("file.txt", context);
@@ -254,7 +254,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(errorCode(await env.openDirReader(".", abortedContext())), "aborted");
 		}),
 
-		createCase("directory reader skips entries removed during enumeration", async (env) => {
+		createCase("directory reader skips entries removed during enumeration", async env => {
 			getOrThrow(await env.createDir("dir", undefined, context));
 			for (const name of ["x", "y", "z"]) getOrThrow(await env.writeFile(`dir/${name}`, name, context));
 			const reader = getOrThrow(await env.openDirReader("dir", context));
@@ -272,7 +272,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			}
 		}),
 
-		watchCase("watch reports a missing file's creation, changes, replacement and removal", async (env) => {
+		watchCase("watch reports a missing file's creation, changes, replacement and removal", async env => {
 			await watching(env, [{ path: "AGENTS.md" }], async ({ expectChange }) => {
 				await expectChange("AGENTS.md", async () => {
 					getOrThrow(await env.writeFile("AGENTS.md", "one", context));
@@ -294,7 +294,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch reports a missing target whose ancestors are created", async (env) => {
+		watchCase("watch reports a missing target whose ancestors are created", async env => {
 			await watching(env, [{ path: "a/b/c/AGENTS.md" }], async ({ expectChange }) => {
 				await expectChange("a/b/c/AGENTS.md", async () => {
 					getOrThrow(await env.writeFile("a/b/c/AGENTS.md", "x", context));
@@ -302,7 +302,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch follows directories created together with their contents", async (env) => {
+		watchCase("watch follows directories created together with their contents", async env => {
 			getOrThrow(await env.createDir("skills", undefined, context));
 			await watching(env, [{ path: "skills", recursive: true }], async ({ expectChange }) => {
 				// Written before any watcher on the new directories can exist.
@@ -318,7 +318,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch keeps watching a path whose parent is renamed and recreated", async (env) => {
+		watchCase("watch keeps watching a path whose parent is renamed and recreated", async env => {
 			getOrThrow(await env.writeFile("proj/.pi/skills/x.md", "x", context));
 			await watching(env, [{ path: "proj/.pi/skills", recursive: true }], async ({ expectChange }) => {
 				await expectChange("proj/.pi/skills", async () => {
@@ -333,7 +333,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch skips excluded entries and reports a rename out of them", async (env) => {
+		watchCase("watch skips excluded entries and reports a rename out of them", async env => {
 			getOrThrow(await env.createDir("skills", undefined, context));
 			const targets: WatchTarget[] = [
 				{ path: "skills", recursive: true, exclude: { hidden: true, names: ["node_modules"] } },
@@ -349,7 +349,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 					if (change.kind !== "paths") continue;
 					for (const path of change.paths) {
 						assert.ok(
-							!hidden.some((excluded) => path === excluded || path.startsWith(excluded)),
+							!hidden.some(excluded => path === excluded || path.startsWith(excluded)),
 							`excluded ${path}`,
 						);
 					}
@@ -357,7 +357,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch keeps recursive coverage where a non-recursive target overlaps", async (env) => {
+		watchCase("watch keeps recursive coverage where a non-recursive target overlaps", async env => {
 			getOrThrow(await env.writeFile("skills/a/one.md", "one", context));
 			const targets: WatchTarget[] = [{ path: "skills" }, { path: "skills", recursive: true }];
 			await watching(env, targets, async ({ expectChange }) => {
@@ -367,7 +367,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch follows a directory replaced at the same path", async (env) => {
+		watchCase("watch follows a directory replaced at the same path", async env => {
 			getOrThrow(await env.writeFile("skills/a/x.md", "x", context));
 			await watching(env, [{ path: "skills", recursive: true }], async ({ expectChange }) => {
 				await expectChange("skills/a", async () => {
@@ -383,18 +383,18 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			});
 		}),
 
-		watchCase("watch stops reporting once stopped", async (env) => {
+		watchCase("watch stops reporting once stopped", async env => {
 			const changes: FileChange[] = [];
-			const watcher = getOrThrow(await env.watch([{ path: "file.txt" }], (change) => changes.push(change), context));
+			const watcher = getOrThrow(await env.watch([{ path: "file.txt" }], change => changes.push(change), context));
 			assert.ok(watcher.mode === "native" || watcher.mode === "polling", "watcher reports its mode");
 			await watcher.stop(context);
 			await watcher.stop(context);
 			getOrThrow(await env.writeFile("file.txt", "x", context));
-			await new Promise((resolve) => setTimeout(resolve, 300));
+			await new Promise(resolve => setTimeout(resolve, 300));
 			assert.deepEqual(changes, []);
 		}),
 
-		createCase("argv exec passes arguments to the program without shell parsing", async (env) => {
+		createCase("argv exec passes arguments to the program without shell parsing", async env => {
 			const hostile = "it's $(touch pwned) `touch pwned` *; touch pwned";
 			const { result, stdout } = await execCollect(env, [
 				...shell,
@@ -408,7 +408,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(getOrThrow(await env.exists("pwned", context)), false);
 		}),
 
-		createCase("exec reports the stream of every chunk in both forms", async (env) => {
+		createCase("exec reports the stream of every chunk in both forms", async env => {
 			const script = "printf out; printf err >&2; printf more";
 			const argv = await execCollect(env, [...shell, script]);
 			assert.strictEqual(getOrThrow(argv.result).exitCode, 0);
@@ -420,14 +420,14 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(string.stderr, "err");
 		}),
 
-		createCase("argv exec honors cwd and exit codes", async (env) => {
+		createCase("argv exec honors cwd and exit codes", async env => {
 			getOrThrow(await env.createDir("sub", undefined, context));
 			const made = await execCollect(env, [...shell, "printf x > made.txt; exit 3"], "sub");
 			assert.strictEqual(getOrThrow(made.result).exitCode, 3);
 			assert.strictEqual(getOrThrow(await env.readTextFile("sub/made.txt", context)), "x");
 		}),
 
-		createCase("argv exec reports missing programs and empty argv as spawn errors", async (env) => {
+		createCase("argv exec reports missing programs and empty argv as spawn errors", async env => {
 			assert.strictEqual(
 				errorCode(await env.exec(["pi-durable-conformance-missing-program"], undefined, context)),
 				"spawn_error",
@@ -435,7 +435,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.strictEqual(errorCode(await env.exec([], undefined, context)), "spawn_error");
 		}),
 
-		createCase("windowed exec keeps the exact tail and counts what it skips", async (env) => {
+		createCase("windowed exec keeps the exact tail and counts what it skips", async env => {
 			const lines = 2000;
 			const window = { maxBytes: 200, maxLines: 5, minIntervalMs: 0, bytesPerSecond: 1_000_000_000 };
 			let bytes = 0;
@@ -471,7 +471,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			assert.ok(tail.endsWith(expected.slice(-window.maxLines).join("")), "the delivered output ends with the tail");
 		}),
 
-		createCase("argv exec distinguishes timeout from abort", async (env) => {
+		createCase("argv exec distinguishes timeout from abort", async env => {
 			const timedOut = await env.exec([...shell, "sleep 2"], { timeout: 0.1 }, context);
 			assert.strictEqual(errorCode(timedOut), "timeout");
 			const controller = new AbortController();
@@ -486,7 +486,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 			for (const file of files) getOrThrow(await env.writeFile(file, "", context));
 		};
 		cases.push(
-			createCase("listFiles lists files and directories depth first in name order", async (env) => {
+			createCase("listFiles lists files and directories depth first in name order", async env => {
 				await writeAll(env, ["b.txt", "a/z.txt", "a/b/c.txt", ".hidden/x", "A.txt"]);
 				getOrThrow(await env.createDir("empty", undefined, context));
 				assert.deepEqual(await listed(env, "."), {
@@ -518,7 +518,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 				assert.deepEqual(await listed(env, "empty"), { entries: [], truncated: false });
 			}),
 
-			createCase("listFiles skips what git ignores in work trees, .git, and excluded names", async (env) => {
+			createCase("listFiles skips what git ignores in work trees, .git, and excluded names", async env => {
 				await writeAll(env, ["keep.txt", "out/x.js", "sub/keep.txt", "sub/drop.log", "node_modules/m/i.js"]);
 				getOrThrow(await env.writeFile(".gitignore", "out/\n*.log\n", context));
 				getOrThrow(await env.writeFile("sub/.gitignore", "!keep.txt\n", context));
@@ -538,10 +538,10 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 				assert.ok(
 					all.includes("f out/x.js") && all.includes("f node_modules/m/i.js") && all.includes("f keep.txt"),
 				);
-				assert.ok(!all.some((entry) => entry.includes(".git/") || entry === "d .git"));
+				assert.ok(!all.some(entry => entry.includes(".git/") || entry === "d .git"));
 			}),
 
-			createCase("listFiles stops at its bounds and reports truncated", async (env) => {
+			createCase("listFiles stops at its bounds and reports truncated", async env => {
 				await writeAll(env, ["a", "b", "c"]);
 				assert.deepEqual(await listed(env, ".", { maxEntries: 2 }), { entries: ["f a", "f b"], truncated: true });
 				assert.deepEqual(await listed(env, ".", { maxEntries: 3 }), {
@@ -555,7 +555,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 				assert.strictEqual(errorCode(await env.listFiles!(".", { timeoutMs: 1.5 }, context)), "invalid");
 			}),
 
-			createCase("listFiles fails on missing directories, files, and aborts", async (env) => {
+			createCase("listFiles fails on missing directories, files, and aborts", async env => {
 				getOrThrow(await env.writeFile("file.txt", "", context));
 				assert.strictEqual(errorCode(await env.listFiles!("missing", undefined, context)), "not_found");
 				assert.strictEqual(errorCode(await env.listFiles!("file.txt", undefined, context)), "not_directory");
@@ -566,7 +566,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 
 	if (symlinks && options.listFiles) {
 		cases.push(
-			createCase("listFiles lists symbolic links without following them", async (env) => {
+			createCase("listFiles lists symbolic links without following them", async env => {
 				getOrThrow(await env.writeFile("dir/inner.txt", "", context));
 				const linked = await env.exec(
 					[...shell, "ln -s dir link && ln -s missing dangling && ln -s .. dir/loop"],
@@ -589,7 +589,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 
 	if (symlinks) {
 		cases.push(
-			createCase("binary reader follows symlinks unless noFollow refuses the final one", async (env) => {
+			createCase("binary reader follows symlinks unless noFollow refuses the final one", async env => {
 				getOrThrow(await env.writeFile("target.txt", "target", context));
 				getOrThrow(await env.createDir("sub", undefined, context));
 				getOrThrow(await env.writeFile("sub/inner.txt", "inner", context));
@@ -615,7 +615,7 @@ export function createEnvConformance(options: EnvConformanceOptions): readonly E
 				await inner.close(context);
 			}),
 
-			watchCase("watch reports changes to the file a watched symbolic link points to", async (env) => {
+			watchCase("watch reports changes to the file a watched symbolic link points to", async env => {
 				getOrThrow(await env.writeFile("data/real.md", "one", context));
 				getOrThrow(await env.createDir("config", undefined, context));
 				const linked = await env.exec([...shell, "ln -s ../data/real.md config/AGENTS.md"], undefined, context);

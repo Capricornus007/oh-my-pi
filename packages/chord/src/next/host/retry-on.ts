@@ -35,7 +35,7 @@ export class RetryWakes {
 	replace(sources: readonly RetrySource[], wake: () => void): void {
 		this.stop();
 		const observer: NativeObserver<unknown> = {
-			advance: (call) => {
+			advance: call => {
 				if (call.kind === "value") wake();
 			},
 			end: () => {},

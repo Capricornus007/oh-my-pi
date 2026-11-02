@@ -15,7 +15,7 @@ describe("in-memory store snapshots", () => {
 		const clock = vi.spyOn(performance, "now").mockReturnValue(100);
 		const telemetry = new InMemoryTelemetryContext();
 		let id = "";
-		await telemetry.startSpan({ name: "timed" }, (span) => {
+		await telemetry.startSpan({ name: "timed" }, span => {
 			const carrier = telemetry.inject(span)!;
 			id = `${carrier["pi-memory-scope"]}:${carrier["pi-memory-span"]}`;
 			clock.mockReturnValue(110);
@@ -47,12 +47,12 @@ describe("in-memory store snapshots", () => {
 		const telemetry = new InMemoryTelemetryContext();
 		telemetry.counter("calls").add(2);
 		telemetry.counter("calls").add(3);
-		expect(
-			(await telemetry.findMetrics({ name: "calls" })).map((row) => [row.intervalMs, row.count, row.sum]),
-		).toEqual([
-			[20_000, 1, 2],
-			[20_000, 1, 3],
-		]);
+		expect((await telemetry.findMetrics({ name: "calls" })).map(row => [row.intervalMs, row.count, row.sum])).toEqual(
+			[
+				[20_000, 1, 2],
+				[20_000, 1, 3],
+			],
+		);
 		expect(telemetry.getMetrics()).toEqual([
 			{ kind: "counter", name: "calls", value: 2, attributes: {}, context: null },
 			{ kind: "counter", name: "calls", value: 3, attributes: {}, context: null },
@@ -62,12 +62,12 @@ describe("in-memory store snapshots", () => {
 	it("detaches link attributes and error details", async () => {
 		const telemetry = new InMemoryTelemetryContext();
 		let target!: TelemetrySpan;
-		await telemetry.startSpan({ name: "target" }, (span) => {
+		await telemetry.startSpan({ name: "target" }, span => {
 			target = span;
 		});
 		await telemetry.startSpan(
 			{ name: "source", links: [{ context: target, attributes: { tags: ["original"] } }] },
-			(span) => {
+			span => {
 				span.setStatus({ status: "error", error: { name: "Expected", message: "original" } });
 			},
 		);

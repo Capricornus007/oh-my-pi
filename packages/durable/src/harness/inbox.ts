@@ -25,7 +25,7 @@ export const InboxDoc = defineDoc<InboxState>({
 	history: "latest",
 	fork: "initial",
 	initial: () => ({ items: [] }),
-	checkpointWhen: (value) => value.items.length === 0,
+	checkpointWhen: value => value.items.length === 0,
 });
 
 /** The settings a boundary reads, on the Session line. */
@@ -148,7 +148,7 @@ export function isDisplayOnly(entry: EntryDraft): boolean {
 
 /** Whether a reset (`head: "self"` write) is queued; entries appended before it leave the active range when it lands. */
 export function hasQueuedReset(items: readonly InboxItem[]): boolean {
-	return items.some((item) => item.mode === "write" && item.entry.head === "self");
+	return items.some(item => item.mode === "write" && item.entry.head === "self");
 }
 
 /** Whether a head write targets an entry before the active range, so placing it would bring back cut history. */
@@ -159,7 +159,7 @@ export function isStale(boundary: Boundary, entry: EntryDraft): boolean {
 /** Remove a withdrawn submission's item; the caller settles the submission. */
 export async function removeInboxItem(tx: Tx, conversationId: ConversationId, id: SubmissionId): Promise<void> {
 	const items = (await tx.doc(InboxDoc, conversationId)).items;
-	const index = items.findIndex((item) => item.id === id);
+	const index = items.findIndex(item => item.id === id);
 	if (index >= 0) items.splice(index, 1);
 }
 

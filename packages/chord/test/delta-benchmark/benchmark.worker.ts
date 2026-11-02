@@ -88,7 +88,7 @@ function fixture(count: number): Document {
 
 function cloneTrusted<T>(value: T): T {
 	if (value === null || typeof value !== "object") return value;
-	if (Array.isArray(value)) return value.map((child) => cloneTrusted(child)) as T;
+	if (Array.isArray(value)) return value.map(child => cloneTrusted(child)) as T;
 	const result = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>;
 	for (const key of Object.keys(value)) {
 		Object.defineProperty(result, key, {
@@ -249,7 +249,7 @@ const drainWatchQueues = (measure: boolean): void => {
 const drainWatchQueuesCoalesced = (): void => {
 	const start = performance.now();
 	for (const watcher of watchers) {
-		const operations = watcher.queue.flatMap((frame) => frame.ops);
+		const operations = watcher.queue.flatMap(frame => frame.ops);
 		watcher.value = applyImmutable(watcher.value, operations);
 		watcher.sequence = watcher.queue.at(-1)?.sequence ?? watcher.sequence;
 		watcher.queue.length = 0;

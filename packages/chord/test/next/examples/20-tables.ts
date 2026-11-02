@@ -39,38 +39,38 @@ const History = local("example.history", {
 	},
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	// Tables need a stable identity: a local type with empty params (one object per host).
 	host.serve(History, (_, self) => {
 		const edits = self.table(Edits);
 		// A query of the table: a condition and an order (the key is the tie-break); immutable, built once.
 		const open = query(Edits)
-			.where((e) => eq(e.done, false))
-			.orderBy((e) => e.at, "desc");
+			.where(e => eq(e.done, false))
+			.orderBy(e => e.at, "desc");
 		return {
 			record: async (row, ctx) => {
 				// Writes are staged synchronously (a bad row throws here) and commit together in one step.
-				await self.tx(async (tx) => tx.put(edits, row), ctx);
+				await self.tx(async tx => tx.put(edits, row), ctx);
 				return null;
 			},
 			hit: async (id, ctx) => {
 				// A set is values or an expression over the row's columns, computed by the store.
-				await self.tx(async (tx) => tx.update(edits, { id }, (e) => ({ hits: add(e.hits, 1) })), ctx);
+				await self.tx(async tx => tx.update(edits, { id }, e => ({ hits: add(e.hits, 1) })), ctx);
 				return null;
 			},
 			finish: async (path, ctx) => {
 				// One statement for every matching row; its count is recorded with the write.
-				await self.tx(async (tx) => tx.updateWhere(edits, (e) => prefix(e.path, path), { done: true }), ctx);
+				await self.tx(async tx => tx.updateWhere(edits, e => prefix(e.path, path), { done: true }), ctx);
 				return null;
 			},
 			hits: async (id, ctx) => (await edits.get({ id }, ctx))?.hits ?? 0,
 			open: async ({ after }, ctx) => {
 				const page = await edits.page(open, 1, ctx, after === undefined ? {} : { after });
-				return { ids: page.items.map((row) => row.id), ...(page.next === undefined ? {} : { next: page.next }) };
+				return { ids: page.items.map(row => row.id), ...(page.next === undefined ? {} : { next: page.next }) };
 			},
 			finished: async (_, ctx) =>
 				edits.count(
-					query(Edits).where((e) => eq(e.done, true)),
+					query(Edits).where(e => eq(e.done, true)),
 					ctx,
 				),
 		};
@@ -79,7 +79,7 @@ const facet = defineFacet((host) => {
 
 // A store over SQLite (`:memory:` here, a file in an app): the app opens it, gives it to one host, and closes it.
 const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(":memory:")), context);
-const host = createHost({ store, onError: (error) => console.error("background error:", error) });
+const host = createHost({ store, onError: error => console.error("background error:", error) });
 await host.load([{ name: "@example/history", facet }], context);
 const history = await host.get(History, {}, context);
 

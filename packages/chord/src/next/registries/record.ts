@@ -129,7 +129,7 @@ export class RegistryRecord {
 
 	/** Adds a live contributor's contribution, inside a batch: the table changes. */
 	add(contribution: RegistryContribution): void {
-		const at = this.#contributions.findIndex((other) => compareContributors(contribution, other) < 0);
+		const at = this.#contributions.findIndex(other => compareContributors(contribution, other) < 0);
 		// A new list per change (contributors come and go rarely): a composition keeps the one it was built from.
 		this.#contributions = this.#contributions.toSpliced(at < 0 ? this.#contributions.length : at, 0, contribution);
 		contribution.follow();
@@ -182,7 +182,7 @@ export class RegistryRecord {
 	 */
 	inTable(from: readonly RegistryContribution[]): boolean {
 		const current = this.#contributions;
-		return from === current || from.every((each) => current.includes(each));
+		return from === current || from.every(each => current.includes(each));
 	}
 
 	/** The adapter mapping the composed value back for readers of `version`; `undefined` when there is none. */
@@ -247,8 +247,7 @@ export class RegistryRecord {
 			this.#table = table;
 			const conflicts = new Map<string, RegistryConflict>();
 			const context: ComposeContext = {
-				report: (conflict) =>
-					conflicts.set(`${conflict.message}\u0000${conflict.plugins.join("\u0000")}`, conflict),
+				report: conflict => conflicts.set(`${conflict.message}\u0000${conflict.plugins.join("\u0000")}`, conflict),
 			};
 			let value: unknown;
 			try {

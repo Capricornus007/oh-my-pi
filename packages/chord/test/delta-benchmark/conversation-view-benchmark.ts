@@ -199,7 +199,7 @@ const numericMetrics: readonly NumericResultKey[] = [
 
 function optionNumber(name: string, fallback: number): number {
 	const prefix = `--${name}=`;
-	const raw = process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length);
+	const raw = process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length);
 	if (raw === undefined) return fallback;
 	const value = Number(raw);
 	if (!Number.isSafeInteger(value) || value < 1) throw new RangeError(`Invalid --${name}`);
@@ -221,9 +221,7 @@ function summarize(values: readonly number[]): SummaryValue {
 }
 
 const quick = process.argv.includes("--quick");
-const selectedScenario = process.argv
-	.find((argument) => argument.startsWith("--scenario="))
-	?.slice("--scenario=".length);
+const selectedScenario = process.argv.find(argument => argument.startsWith("--scenario="))?.slice("--scenario=".length);
 if (selectedScenario !== undefined && !(scenarios as readonly string[]).includes(selectedScenario)) {
 	throw new Error(`Unknown scenario ${selectedScenario}`);
 }
@@ -270,21 +268,21 @@ for (let trial = 0; trial < trials; trial++) {
 	}
 }
 
-const summary = selectedScenarios.flatMap((scenario) =>
-	modes.map((mode) => {
-		const selected = results.filter((result) => result.scenario === scenario && result.mode === mode);
+const summary = selectedScenarios.flatMap(scenario =>
+	modes.map(mode => {
+		const selected = results.filter(result => result.scenario === scenario && result.mode === mode);
 		const metrics: Record<string, SummaryValue> = {};
-		for (const metric of numericMetrics) metrics[metric] = summarize(selected.map((result) => result[metric]));
+		for (const metric of numericMetrics) metrics[metric] = summarize(selected.map(result => result[metric]));
 		const phases: Record<
 			string,
 			{ medianMs: SummaryValue; p95Ms: SummaryValue; p99Ms: SummaryValue; totalMs: SummaryValue }
 		> = {};
 		for (const phase of phaseNames) {
 			phases[phase] = {
-				medianMs: summarize(selected.map((result) => result.phaseDistributions[phase].medianMs)),
-				p95Ms: summarize(selected.map((result) => result.phaseDistributions[phase].p95Ms)),
-				p99Ms: summarize(selected.map((result) => result.phaseDistributions[phase].p99Ms)),
-				totalMs: summarize(selected.map((result) => result.phaseDistributions[phase].totalMs)),
+				medianMs: summarize(selected.map(result => result.phaseDistributions[phase].medianMs)),
+				p95Ms: summarize(selected.map(result => result.phaseDistributions[phase].p95Ms)),
+				p99Ms: summarize(selected.map(result => result.phaseDistributions[phase].p99Ms)),
+				totalMs: summarize(selected.map(result => result.phaseDistributions[phase].totalMs)),
 			};
 		}
 		return {

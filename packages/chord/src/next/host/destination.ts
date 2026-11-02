@@ -112,5 +112,5 @@ function sameAddress(own: Address, address: WireAddress): boolean {
 	if (own.kind !== address.kind || typeof address.params !== "object" || address.params === null) return false;
 	const values = address.params as { readonly [field: string]: unknown };
 	const fields = Object.keys(own.params);
-	return Object.keys(values).length === fields.length && fields.every((field) => values[field] === own.params[field]);
+	return Object.keys(values).length === fields.length && fields.every(field => values[field] === own.params[field]);
 }

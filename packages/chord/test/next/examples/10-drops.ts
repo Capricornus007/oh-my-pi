@@ -29,7 +29,7 @@ const Notes = remote("example.notes", {
 
 const NotesDoc = defineState("notes", { schema: obj({ list: arr(str()) }), version: 1, initial: () => ({ list: [] }) });
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	// Lingers for a minute after its last reference: a client that reconnects within it finds its notes again.
 	host.serve(
 		Notes,
@@ -40,10 +40,10 @@ const facet = defineFacet<P>((host) => {
 				members: {
 					notes: self.derive([doc], ([d]) => d.list),
 					add: async ({ text }, ctx) => {
-						await doc.change((draft) => void draft.list.push(text), ctx);
+						await doc.change(draft => void draft.list.push(text), ctx);
 						return doc.value.list.length;
 					},
-					slow: (ctx) => new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", () => resolve(null))),
+					slow: ctx => new Promise(resolve => ctx.abortSignal?.addEventListener("abort", () => resolve(null))),
 				},
 			};
 		},
@@ -54,10 +54,10 @@ const facet = defineFacet<P>((host) => {
 const server = createHost<P>({
 	address: Server(),
 	principal: { kind: "server" },
-	onError: (error) => console.error("server:", error),
+	onError: error => console.error("server:", error),
 });
 await server.load([{ name: "@example/notes", facet }], context);
-const client = createHost<P>({ onError: (error) => console.error("client:", error) });
+const client = createHost<P>({ onError: error => console.error("client:", error) });
 await client.load([], context);
 
 /** A new link between the hosts: the server stamps the client as its owner. Returns the server's end. */
@@ -68,13 +68,13 @@ function connect(server: Host<P>, client: Host<P>, context: Context): Link {
 	return up;
 }
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+const settle = () => new Promise(resolve => setTimeout(resolve, 10));
 
 // 1. A hold before any link: a reference at once, `loading`, its variant unknown. Calls on it park.
 const notes = client.hold(Notes, { session: "S1" }, context);
 console.log("held without a link:", notes.state.value, "variant:", notes.variant);
 const watch = await notes.state.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("  ref.state →", call.value.kind);
 });
 const parked = notes.add({ text: "written while loading" }, context);
@@ -100,7 +100,7 @@ const second = notes.add({ text: "second while down" }, context);
 // 5. The app connects again (its link adapter would): every reference is held again with fresh ids, its members get
 // the new snapshot as one frame `[["r", value]]`, then the parked calls are sent in the order they were made.
 const frames = await notes.notes.watch(context);
-frames.start(async (call) => {
+frames.start(async call => {
 	if (call.kind === "value") console.log("  notes frame:", JSON.stringify(call.ops));
 });
 link = connect(server, client, context);

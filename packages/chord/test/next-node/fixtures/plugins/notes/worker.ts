@@ -6,7 +6,7 @@ import { label } from "./label.ts";
 
 const Count = defineState("count", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 0 }) });
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Notes, (_params, _principal, self) => {
 		const doc = self.state(Count);
 		return {
@@ -14,8 +14,8 @@ export default defineFacet((host) =>
 			members: {
 				label: constant(label),
 				count: self.derive([doc], ([value]) => value.n),
-				add: async (ctx) => {
-					await doc.change((draft) => {
+				add: async ctx => {
+					await doc.change(draft => {
 						draft.n += 1;
 					}, ctx);
 					return doc.value.n;

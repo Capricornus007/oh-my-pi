@@ -72,13 +72,13 @@ export class RowCodec {
 
 	constructor(columns: readonly Column[], key: readonly string[], table: string) {
 		this.#columns = columns;
-		this.#key = key.map((name) => columns.find((column) => column.name === name)!);
+		this.#key = key.map(name => columns.find(column => column.name === name)!);
 		this.#json = columns.filter(
 			(column): column is Extract<Column, { readonly type: "json" }> => column.type === "json",
 		);
 		this.#names = new Set(columns.map(({ name }) => name));
 		this.#keyNames = new Set(key);
-		this.#keyPositions = key.map((name) => columns.findIndex((column) => column.name === name));
+		this.#keyPositions = key.map(name => columns.findIndex(column => column.name === name));
 		this.#table = table;
 		this.physical = physicalColumns(columns);
 	}
@@ -111,7 +111,7 @@ export class RowCodec {
 			params.push(present ? column.json.version : null);
 		}
 		params.push(version);
-		const id = JSON.stringify(this.#keyPositions.map((position) => params[position]));
+		const id = JSON.stringify(this.#keyPositions.map(position => params[position]));
 		return { params, row: stored, columns: versions, id };
 	}
 

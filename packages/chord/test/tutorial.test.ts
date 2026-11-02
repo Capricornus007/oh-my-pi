@@ -34,15 +34,15 @@ const printed = [...tutorial.matchAll(/<!-- example:([\w-]+) -->\n```ts\n([\s\S]
 function normalize(text: string): string {
 	return text
 		.split("\n")
-		.map((line) => line.trim())
+		.map(line => line.trim())
 		.join("\n")
 		.trim();
 }
 function checkExamples(section: string): void {
 	assert.equal(printed.length, examples.length, "every tutorial example must have runnable source");
 	assert.equal((tutorial.match(/```ts\n/g) ?? []).length, printed.length, "no untracked TypeScript examples");
-	for (const match of examples.filter((entry) => entry[1] === "imports" || entry[1]?.startsWith(section))) {
-		const copies = printed.filter((entry) => entry[1] === match[1]);
+	for (const match of examples.filter(entry => entry[1] === "imports" || entry[1]?.startsWith(section))) {
+		const copies = printed.filter(entry => entry[1] === match[1]);
 		assert.equal(copies.length, 1, `one printed copy of ${match[1]}`);
 		assert.equal(normalize(copies[0]![2]!), normalize(match[2]!), `tutorial drift: ${match[1]}`);
 	}
@@ -79,18 +79,18 @@ const todoStore =
 	(options?: StateOptions<Static<typeof Rows>>): Factory<typeof TodoStore> =>
 	({ list }, _principal, self) => {
 		const rows = self.state("rows", Rows, [], options);
-		const openCount = self.derive([rows], (todos) => todos.filter((todo) => !todo.done).length);
+		const openCount = self.derive([rows], todos => todos.filter(todo => !todo.done).length);
 		return {
 			label: () => `Todos for ${list}`,
 			rows,
 			openCount,
 			add: ({ text }, ctx) => {
-				rows.change(ctx, (draft) => {
+				rows.change(ctx, draft => {
 					draft.push({ text, done: false });
 				});
 			},
 			finish: ({ index }, ctx) => {
-				rows.change(ctx, (draft) => {
+				rows.change(ctx, draft => {
 					const todo = draft[index];
 					if (!todo) throw invalid("args", "No such todo");
 					todo.done = true;
@@ -155,7 +155,7 @@ it("02: first contract, factory, reference and root", { timeout: 5000 }, async (
 	// example:02-call
 	const host = createHost({ self: "server" });
 	host.serve(TodoLabel, ({ list }) => ({ label: () => `Todos for ${list}` }));
-	const result = await host.root(async (ctx) => {
+	const result = await host.root(async ctx => {
 		const todos = await ctx.get(TodoLabel, { list: "family" });
 		return todos.label(ctx);
 	});
@@ -171,8 +171,8 @@ it("03: cells publish values and derivations", { timeout: 5000 }, async () => {
 	host.serve(TodoStore, todoFactory);
 	const todos = await host.get(TodoStore, { list: "family" });
 	const counts: (number | undefined)[] = [];
-	const stop = todos.openCount.subscribe((value) => counts.push(value));
-	await host.root(async (ctx) => {
+	const stop = todos.openCount.subscribe(value => counts.push(value));
+	await host.root(async ctx => {
 		await todos.add({ text: "Buy milk" }, ctx);
 		await todos.finish({ index: 0 }, ctx);
 		await todos.reset([], ctx);
@@ -233,11 +233,11 @@ it("04: holds, asynchronous resources and release", { timeout: 5000 }, async () 
 	// example:04-call
 	const saved = await host.get(SavedTodos, { list: "family" });
 	const database = await host.get(Database, {});
-	await host.root((ctx) => saved.add({ text: "Buy milk" }, ctx));
+	await host.root(ctx => saved.add({ text: "Buy milk" }, ctx));
 	assert.deepEqual(database.db!.saved, ["Buy milk"]);
 	assert.equal(opens, 1);
 	const statuses: string[] = [];
-	saved.onStatus((status) => statuses.push(status));
+	saved.onStatus(status => statuses.push(status));
 	database.release();
 	saved.release();
 	await closed.promise;
@@ -250,18 +250,18 @@ it("05: principals select views of one shared store", { timeout: 5000 }, async (
 	checkExamples("05");
 	onTestFinished(() => host.close());
 	// example:05-call
-	const host = createHost<Principal>({ name: "server", self: "server", principalKey: (principal) => principal });
+	const host = createHost<Principal>({ name: "server", self: "server", principalKey: principal => principal });
 	host.serve(TodoStore, todoFactory);
 	serveViews(host);
 	const owner = await host.get(Todos, { list: "family" }, { principal: "owner" });
 	const guest = await host.get(Todos, { list: "family" }, { principal: "guest" });
 	assert.ok(owner.variant === "editor"); // narrows the reference to the editor variant
 	assert.equal(guest.variant, "viewer");
-	await host.root((ctx) => owner.add({ text: "Buy milk" }, ctx), { principal: "owner" });
+	await host.root(ctx => owner.add({ text: "Buy milk" }, ctx), { principal: "owner" });
 	assert.deepEqual(guest.rows.value, [{ text: "Buy milk", done: false }]);
 	// @ts-expect-error A viewer has no add: TypeScript refuses it, and so does the provider.
-	await assert.rejects(guest.add({ text: "Not allowed" }), (error) => isChordError(error, "not_in_variant"));
-	await assert.rejects(owner.add({ text: " " }), (error) => isChordError(error, "invalid"));
+	await assert.rejects(guest.add({ text: "Not allowed" }), error => isChordError(error, "not_in_variant"));
+	await assert.rejects(owner.add({ text: " " }), error => isChordError(error, "invalid"));
 	// end-example:05-call
 });
 
@@ -285,14 +285,14 @@ it("06: remote methods and live state over a memory link", { timeout: 5000 }, as
 	assert.ok(todos.variant === "editor");
 	assert.deepEqual(todos.rows.value, []);
 	const updated = Promise.withResolvers<void>();
-	const stop = todos.rows.subscribe((rows) => {
+	const stop = todos.rows.subscribe(rows => {
 		if (rows.length === 1) updated.resolve();
 	});
-	await browser.root((ctx) => todos.add({ text: "Buy milk" }, ctx));
+	await browser.root(ctx => todos.add({ text: "Buy milk" }, ctx));
 	await updated.promise;
 	assert.deepEqual(todos.rows.value, [{ text: "Buy milk", done: false }]);
 	// Deliberately bypass TypeScript to simulate a malformed caller.
-	await assert.rejects(todos.add({ text: 123 } as never), (error) => isChordError(error, "invalid"));
+	await assert.rejects(todos.add({ text: 123 } as never), error => isChordError(error, "invalid"));
 	stop();
 	// A held reference keeps its state without listeners.
 	assert.deepEqual(todos.rows.value, [{ text: "Buy milk", done: false }]);
@@ -321,10 +321,10 @@ it("07: listeners react and tasks start fresh calls", { timeout: 5000 }, async (
 			seen.replace(ctx, rows?.length ?? 0);
 			if (rows?.length === 1) observed.resolve();
 		});
-		self.task(async (ctx) => {
+		self.task(async ctx => {
 			await todos.add({ text: "Review the list" }, ctx);
 			seeded.resolve();
-			await new Promise<void>((resolve) => {
+			await new Promise<void>(resolve => {
 				if (ctx.signal.aborted) resolve();
 				else ctx.signal.addEventListener("abort", () => resolve(), { once: true });
 			});
@@ -349,18 +349,18 @@ it("08: plugins contribute registry entries and expose callbacks", { timeout: 50
 	let click: (() => Promise<number>) | undefined;
 	const storeFacet: Facet = {
 		name: "todo-store",
-		...defineFacet((api) => api.serve(TodoStore, todoFactory)),
+		...defineFacet(api => api.serve(TodoStore, todoFactory)),
 	};
 	const menuFacet: Facet = {
 		name: "todo-menu",
 		...defineFacet(
-			(api) => {
+			api => {
 				api.serve(
 					Menu,
 					(_input, _principal, self) => {
 						const todos = self.get(TodoStore, { list: "family" });
 						self.register(Actions, {
-							addSample: async (ctx) => {
+							addSample: async ctx => {
 								await todos.add({ text: "Try plugins" }, ctx);
 								return todos.openCount.value;
 							},
@@ -369,7 +369,7 @@ it("08: plugins contribute registry entries and expose callbacks", { timeout: 50
 					},
 					{ lifetime: "host" },
 				);
-				click = () => api.root((ctx) => api.registry(Actions).get("addSample", ctx)!(ctx));
+				click = () => api.root(ctx => api.registry(Actions).get("addSample", ctx)!(ctx));
 			},
 			{ uses: [TodoStore] },
 		),
@@ -389,7 +389,7 @@ it("09: compatible reload, migration and an old-contract adapter", { timeout: 50
 	const host = createHost({ self: "server" });
 	const facet = (label: string): Facet => ({
 		name: "todos",
-		setup: (api) =>
+		setup: api =>
 			api.serve(TodoStore, (input, principal, self) => ({
 				...todoFactory(input, principal, self),
 				label: () => label,
@@ -400,7 +400,7 @@ it("09: compatible reload, migration and an old-contract adapter", { timeout: 50
 	await todos.add({ text: "Buy milk" });
 	const entered = Promise.withResolvers<void>();
 	const resume = Promise.withResolvers<void>();
-	const oldRoot = host.root(async (ctx) => {
+	const oldRoot = host.root(async ctx => {
 		const first = await todos.label(ctx);
 		entered.resolve();
 		await resume.promise; // Test-only pause: pin an old caller during reload.
@@ -416,18 +416,18 @@ it("09: compatible reload, migration and an old-contract adapter", { timeout: 50
 	// end-example:09-compatible
 	// example:09-migrate
 	const events: string[] = [];
-	const stopEvents = todos.rows.events((event) => events.push(event.type));
+	const stopEvents = todos.rows.events(event => events.push(event.type));
 	const migrated = await host.reload([
 		{
 			name: "todos",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					TodoStore,
 					todoStore({
 						version: 2,
 						migrate: (old, from) => {
 							assert.equal(from, 1);
-							return (old as Static<typeof Rows>).map((todo) => ({ ...todo, text: todo.text.toUpperCase() }));
+							return (old as Static<typeof Rows>).map(todo => ({ ...todo, text: todo.text.toUpperCase() }));
 						},
 					}),
 				),
@@ -449,7 +449,7 @@ it("09: compatible reload, migration and an old-contract adapter", { timeout: 50
 	await host.reload([
 		{
 			name: "todos",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					RenamedStore,
 					(input, principal, self) => {
@@ -458,7 +458,7 @@ it("09: compatible reload, migration and an old-contract adapter", { timeout: 50
 					},
 					{
 						accepts: {
-							1: (current) => ({ ...current, label: current.heading }),
+							1: current => ({ ...current, label: current.heading }),
 						},
 					},
 				),
@@ -494,9 +494,9 @@ it("10: stub a provider with a fake facet and check error codes", { timeout: 500
 	assert.ok(owner.variant === "editor");
 	await owner.add({ text: "Test delegation" });
 	assert.deepEqual(received, ["Test delegation"]);
-	await assert.rejects(owner.add({ text: "" }), (error) => isChordError(error, "invalid"));
+	await assert.rejects(owner.add({ text: "" }), error => isChordError(error, "invalid"));
 	owner.release();
-	await assert.rejects(owner.add({ text: "Too late" }), (error) => isChordError(error, "released"));
+	await assert.rejects(owner.add({ text: "Too late" }), error => isChordError(error, "released"));
 	// end-example:10
 });
 
@@ -507,7 +507,7 @@ it("11: short roots release temporary holds", { timeout: 5000 }, async () => {
 	const host = createHost({ self: "server" });
 	host.serve(TodoStore, todoFactory);
 	const screen = await host.get(TodoStore, { list: "family" });
-	await host.root(async (ctx) => {
+	await host.root(async ctx => {
 		const temporary = await ctx.get(TodoStore, { list: "family" });
 		await temporary.add({ text: "Keep roots short" }, ctx);
 	}); // The temporary reference is released here; screen still holds the store.

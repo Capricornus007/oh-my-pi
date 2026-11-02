@@ -33,7 +33,7 @@ const NotesV1 = local("app.notes", {
 });
 
 /** v2: items carry a tag, `add` takes one and returns an object, `clear` is gone, notes have a body. */
-const NotesV2 = evolve(NotesV1, (e) =>
+const NotesV2 = evolve(NotesV1, e =>
 	e
 		.state("items", arr(obj({ text: str(), tag: str() })))
 		.method("add", obj({ text: str(), tag: str() }), obj({ count: int() }))
@@ -66,10 +66,10 @@ function serveV2(h: FacetHost, refuse = false): void {
 				items: self.derive([items], ([value]) => value.items),
 				notes,
 				add: async ({ text, tag }: { text: string; tag: string }, ctx: Context) => {
-					await items.change((draft) => void draft.items.push({ text, tag }), ctx);
+					await items.change(draft => void draft.items.push({ text, tag }), ctx);
 					await notes.change(
 						text,
-						(draft) => {
+						draft => {
 							draft.title = text;
 							draft.body = tag;
 						},
@@ -82,9 +82,9 @@ function serveV2(h: FacetHost, refuse = false): void {
 		{
 			accepts: {
 				1: {
-					state: { items: (current) => current.map(({ text }) => text) },
+					state: { items: current => current.map(({ text }) => text) },
 					methods: {
-						add: { args: (old) => ({ text: old.text, tag: "v1" }), result: (current) => current.count },
+						add: { args: old => ({ text: old.text, tag: "v1" }), result: current => current.count },
 						clear: refuse
 							? "refuse"
 							: {
@@ -94,7 +94,7 @@ function serveV2(h: FacetHost, refuse = false): void {
 									},
 								},
 					},
-					keyed: { notes: refuse ? "refuse" : (current) => ({ title: current.title }) },
+					keyed: { notes: refuse ? "refuse" : current => ({ title: current.title }) },
 				},
 			},
 		},
@@ -105,7 +105,7 @@ describe("an older consumer of a provider's accepted version", () => {
 	it("reads state mapped, with diffs per commit; its calls are mapped forwards and their results back", async () => {
 		const { telemetry, counts } = await metered();
 		const host = createHost({ telemetry, onError: () => {} });
-		await host.load([{ name: "@test/app", facet: defineFacet((h) => serveV2(h)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet(h => serveV2(h)) }], context);
 		const old = await host.get(NotesV1, {}, context);
 		const items = changesOf(await old.items.watch(context));
 		expect(await old.add({ text: "a" }, context)).toBe(1);
@@ -124,7 +124,7 @@ describe("an older consumer of a provider's accepted version", () => {
 
 	it("calls the provider's replacement of a removed method; a refused one fails contract_mismatch", async () => {
 		const host = createHost({ onError: () => {} });
-		await host.load([{ name: "@test/app", facet: defineFacet((h) => serveV2(h)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet(h => serveV2(h)) }], context);
 		const old = await host.get(NotesV1, {}, context);
 		expect(await old.clear(context)).toBeNull();
 		await host.close(context);
@@ -132,7 +132,7 @@ describe("an older consumer of a provider's accepted version", () => {
 
 	it("is refused a binding whose member the provider refuses: it waits contract_mismatch", async () => {
 		const host = createHost({ onError: () => {} });
-		await host.load([{ name: "@test/app", facet: defineFacet((h) => serveV2(h, true)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet(h => serveV2(h, true)) }], context);
 		const old = host.hold(NotesV1, {}, context);
 		await flushed();
 		expect(old.state.value).toMatchObject({
@@ -148,10 +148,10 @@ describe("an older consumer of a provider's accepted version", () => {
 		const host = createHost({ onError: () => {} });
 		await host.load(
 			[
-				{ name: "@test/app", facet: defineFacet((h) => serveV2(h)) },
+				{ name: "@test/app", facet: defineFacet(h => serveV2(h)) },
 				{
 					name: "@test/view",
-					facet: defineFacet((h) =>
+					facet: defineFacet(h =>
 						h.serve(View, ({ key }, self) => {
 							const note = self.get(NotesV1, {}).notes.at(key);
 							return { title: self.derive([note], ([value]) => value.title) };
@@ -175,14 +175,14 @@ describe("an older consumer of a provider's accepted version", () => {
 describe("reload: adapted members follow the provider's topology (fix round 1)", () => {
 	it("rebuilds a changed-member adapter as a whole-state adapter when a later version removes it", async () => {
 		const V1 = local("astra.adapt", { version: 1, params: {}, members: { n: int() } });
-		const V2 = evolve(V1, (e) => e.state("n", obj({ value: int() })));
-		const V3 = evolve(V2, (e) => e.removeState("n").addState("m", int()));
+		const V2 = evolve(V1, e => e.state("n", obj({ value: int() })));
+		const V3 = evolve(V2, e => e.removeState("n").addState("m", int()));
 		const host = createHost({ onError: () => {} });
-		const first = defineFacet((h) =>
-			h.serve(V2, () => ({ n: constant({ value: 5 }) }), { accepts: { 1: { state: { n: (n) => n.value } } } }),
+		const first = defineFacet(h =>
+			h.serve(V2, () => ({ n: constant({ value: 5 }) }), { accepts: { 1: { state: { n: n => n.value } } } }),
 		);
-		const second = defineFacet((h) =>
-			h.serve(V3, () => ({ m: constant(9) }), { accepts: { 1: { state: { n: (s) => s.m } } } }),
+		const second = defineFacet(h =>
+			h.serve(V3, () => ({ m: constant(9) }), { accepts: { 1: { state: { n: s => s.m } } } }),
 		);
 		await host.load([{ name: "@astra/adapt", facet: first }], context);
 		const old = await host.get(V1, {}, context);
@@ -202,11 +202,11 @@ describe("reload: adapted members follow the provider's topology (fix round 1)",
 
 	it("maps existing local watches when the consumer's current version becomes an accepted older one", async () => {
 		const V1 = local("sol.state", { version: 1, params: {}, members: { x: int() } });
-		const V2 = evolve(V1, (e) => e.state("x", obj({ n: int() })));
+		const V2 = evolve(V1, e => e.state("x", obj({ n: int() })));
 		const host = createHost({ onError: () => {} });
 		try {
 			await host.load(
-				[{ name: "@sol/state", facet: defineFacet((h) => h.serve(V1, () => ({ x: constant(1) }))) }],
+				[{ name: "@sol/state", facet: defineFacet(h => h.serve(V1, () => ({ x: constant(1) }))) }],
 				context,
 			);
 			const old = await host.get(V1, {}, context);
@@ -215,9 +215,9 @@ describe("reload: adapted members follow the provider's topology (fix round 1)",
 				[
 					{
 						name: "@sol/state",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(V2, () => ({ x: constant({ n: 7 }) }), {
-								accepts: { 1: { state: { x: (value) => value.n } } },
+								accepts: { 1: { state: { x: value => value.n } } },
 							}),
 						),
 					},
@@ -234,17 +234,17 @@ describe("reload: adapted members follow the provider's topology (fix round 1)",
 
 	it("rebuilds an existing adapted member's dependencies when a later provider removes that member", async () => {
 		const V1 = local("sol.removed-member", { version: 1, params: {}, members: { x: int() } });
-		const V2 = evolve(V1, (e) => e.state("x", obj({ n: int() })));
-		const V3 = evolve(V2, (e) => e.removeState("x").addState("y", int()));
+		const V2 = evolve(V1, e => e.state("x", obj({ n: int() })));
+		const V3 = evolve(V2, e => e.removeState("x").addState("y", int()));
 		const host = createHost({ onError: () => {} });
 		try {
 			await host.load(
 				[
 					{
 						name: "@sol/state",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(V2, () => ({ x: constant({ n: 2 }) }), {
-								accepts: { 1: { state: { x: (value) => value.n } } },
+								accepts: { 1: { state: { x: value => value.n } } },
 							}),
 						),
 					},
@@ -257,11 +257,11 @@ describe("reload: adapted members follow the provider's topology (fix round 1)",
 				[
 					{
 						name: "@sol/state",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(V3, () => ({ y: constant(7) }), {
 								accepts: {
-									1: { state: { x: (state) => state.y } },
-									2: { state: { x: (state) => ({ n: state.y }) } },
+									1: { state: { x: state => state.y } },
+									2: { state: { x: state => ({ n: state.y }) } },
 								},
 							}),
 						),
@@ -281,10 +281,10 @@ describe("reload: adapted members follow the provider's topology (fix round 1)",
 describe("reload: adapted members publish one coherent frame (fix round 1)", () => {
 	it("does not publish the new mapping applied to the old attempt's state", async () => {
 		const V1 = local("astra.atomic", { version: 1, params: {}, members: { n: int() } });
-		const V2 = evolve(V1, (e) => e.state("n", int()));
+		const V2 = evolve(V1, e => e.state("n", int()));
 		const facet = (n: number, factor: number) =>
-			defineFacet((h) =>
-				h.serve(V2, () => ({ n: constant(n) }), { accepts: { 1: { state: { n: (v) => v * factor } } } }),
+			defineFacet(h =>
+				h.serve(V2, () => ({ n: constant(n) }), { accepts: { 1: { state: { n: v => v * factor } } } }),
 			);
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@astra/atomic", facet: facet(2, 2) }], context);
@@ -296,7 +296,7 @@ describe("reload: adapted members publish one coherent frame (fix round 1)", () 
 		await host.reload([{ name: "@astra/atomic", facet: facet(3, 3) }], context);
 		await flushed();
 		await delivered();
-		const values = changes.map((call) => (call.kind === "value" ? call.value : "failed"));
+		const values = changes.map(call => (call.kind === "value" ? call.value : "failed"));
 		await watch.stop();
 		old.release();
 		await host.close(context);
@@ -305,17 +305,17 @@ describe("reload: adapted members publish one coherent frame (fix round 1)", () 
 
 	it("never computes a new accepted-version mapping over the old provider shape", async () => {
 		const V1 = local("sol.mapping-publication", { version: 1, params: {}, members: { x: int() } });
-		const V2 = evolve(V1, (e) => e.state("x", obj({ n: int() })));
-		const V3 = evolve(V2, (e) => e.state("x", obj({ wrapped: obj({ n: int() }) })));
+		const V2 = evolve(V1, e => e.state("x", obj({ n: int() })));
+		const V3 = evolve(V2, e => e.state("x", obj({ wrapped: obj({ n: int() }) })));
 		const host = createHost({ onError: () => {} });
 		try {
 			await host.load(
 				[
 					{
 						name: "@sol/state",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(V2, () => ({ x: constant({ n: 2 }) }), {
-								accepts: { 1: { state: { x: (value) => value.n } } },
+								accepts: { 1: { state: { x: value => value.n } } },
 							}),
 						),
 					},
@@ -328,11 +328,11 @@ describe("reload: adapted members publish one coherent frame (fix round 1)", () 
 				[
 					{
 						name: "@sol/state",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(V3, () => ({ x: constant({ wrapped: { n: 7 } }) }), {
 								accepts: {
-									1: { state: { x: (value) => value.wrapped.n } },
-									2: { state: { x: (value) => value.wrapped } },
+									1: { state: { x: value => value.wrapped.n } },
+									2: { state: { x: value => value.wrapped } },
 								},
 							}),
 						),
@@ -352,10 +352,10 @@ describe("reload: adapted members publish one coherent frame (fix round 1)", () 
 describe("reload: an older consumer across a removal (fix round 1)", () => {
 	it("keeps an older watch open and heals it after the type is served again", async () => {
 		const V1 = local("sol.older-removal", { version: 1, params: {}, members: { x: int() } });
-		const V2 = evolve(V1, (e) => e.state("x", obj({ n: int() })));
+		const V2 = evolve(V1, e => e.state("x", obj({ n: int() })));
 		const facet = (n: number) =>
-			defineFacet((h) =>
-				h.serve(V2, () => ({ x: constant({ n }) }), { accepts: { 1: { state: { x: (value) => value.n } } } }),
+			defineFacet(h =>
+				h.serve(V2, () => ({ x: constant({ n }) }), { accepts: { 1: { state: { x: value => value.n } } } }),
 			);
 		const host = createHost({ onError: () => {} });
 		try {
@@ -378,7 +378,7 @@ describe("reload: an older consumer across a removal (fix round 1)", () => {
 describe("reload: keyed members of an older version follow the provider (fix round 1)", () => {
 	it("updates an open old-version watch when only its mapping changes", async () => {
 		const V1 = local("astra.keyed", { version: 1, params: {}, members: { rows: keyed(int()), set: method(int()) } });
-		const V2 = evolve(V1, (e) => e.keyed("rows", obj({ n: int() })));
+		const V2 = evolve(V1, e => e.keyed("rows", obj({ n: int() })));
 		const Rows = defineState("rows", {
 			version: 1,
 			schema: obj({ n: int() }),
@@ -386,7 +386,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 			keyed: true,
 		});
 		const facet = (factor: number) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(
 					V2,
 					(_, self) => {
@@ -396,7 +396,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 							set: async (n, ctx) => {
 								await rows.change(
 									"a",
-									(draft) => {
+									draft => {
 										draft.n = n;
 									},
 									ctx,
@@ -405,7 +405,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 							},
 						};
 					},
-					{ accepts: { 1: { keyed: { rows: (current) => current.n * factor } } } },
+					{ accepts: { 1: { keyed: { rows: current => current.n * factor } } } },
 				),
 			);
 		const host = createHost({ onError: () => {} });
@@ -433,8 +433,8 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 			params: {},
 			members: { entries: keyed(obj({ old: int() })), set: method(int()) },
 		});
-		const V2 = evolve(V1, (e) => e.keyed("entries", obj({ n: int() })));
-		const V3 = evolve(V2, (e) => e.keyed("entries", obj({ n: int() })));
+		const V2 = evolve(V1, e => e.keyed("entries", obj({ n: int() })));
+		const V3 = evolve(V2, e => e.keyed("entries", obj({ n: int() })));
 		const Doc = defineState("entries", {
 			version: 1,
 			schema: obj({ n: int() }),
@@ -442,7 +442,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 			initial: () => ({ n: 0 }),
 		});
 		const View = local("sol.keyed.view", { version: 1, params: {}, members: { old: int() } });
-		const view = defineFacet((h) =>
+		const view = defineFacet(h =>
 			h.serve(View, (_, self) => {
 				const pin = self.get(V1, {}).entries.at("k");
 				return { old: self.derive([pin], ([value]) => value.old) };
@@ -454,7 +454,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 				[
 					{
 						name: "@sol/keyed",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(
 								V2,
 								(_, self) => {
@@ -464,7 +464,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 										set: async (n: number, ctx: Context) => {
 											await entries.change(
 												"k",
-												(draft) => {
+												draft => {
 													draft.n = n;
 												},
 												ctx,
@@ -473,7 +473,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 										},
 									};
 								},
-								{ accepts: { 1: { keyed: { entries: (value) => ({ old: value.n }) } } } },
+								{ accepts: { 1: { keyed: { entries: value => ({ old: value.n }) } } } },
 							),
 						),
 					},
@@ -490,7 +490,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 				[
 					{
 						name: "@sol/keyed",
-						facet: defineFacet((h) =>
+						facet: defineFacet(h =>
 							h.serve(
 								V3,
 								(_, self) => {
@@ -500,7 +500,7 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 										set: async (n: number, ctx: Context) => {
 											await entries.change(
 												"k",
-												(draft) => {
+												draft => {
 													draft.n = n;
 												},
 												ctx,
@@ -511,8 +511,8 @@ describe("reload: keyed members of an older version follow the provider (fix rou
 								},
 								{
 									accepts: {
-										1: { keyed: { entries: (value) => ({ old: value.n * 10 }) } },
-										2: { keyed: { entries: (value) => value } },
+										1: { keyed: { entries: value => ({ old: value.n * 10 }) } },
+										2: { keyed: { entries: value => value } },
 									},
 								},
 							),
@@ -538,14 +538,14 @@ describe("adapted members' lifetime (fix round 1)", () => {
 
 	it("drops an older version's adapted members when its last consumer leaves, while the object lives on", async () => {
 		const host = createHost({ onError: () => {} });
-		await host.load([{ name: "@test/app", facet: defineFacet((h) => serveV2(h)) }], context);
+		await host.load([{ name: "@test/app", facet: defineFacet(h => serveV2(h)) }], context);
 		const current = await host.get(NotesV2, {}, context);
 		const from = adapted.length;
 		const old = await host.get(NotesV1, {}, context);
 		expect(old.items.value).toEqual([]);
 		expect(adapted.length).toBeGreaterThan(from);
 		// The older version's: those of the version shown stay while the object lives (the mappings read them).
-		const older = adapted.slice(from).filter((ref) => ref.deref()?.version === 1);
+		const older = adapted.slice(from).filter(ref => ref.deref()?.version === 1);
 		expect(older.length).toBeGreaterThan(0);
 		old.release();
 		await flushed();
@@ -562,16 +562,16 @@ describe("reload: keyed members unchanged at a consumer's version follow a later
 		members: { rows: keyed(obj({ n: int() })), set: method(int()) },
 	});
 	/** v2 adds a member: `rows` is unchanged for v1 consumers. */
-	const RowsV2 = evolve(RowsV1, (e) => e.addState("extra", int()));
+	const RowsV2 = evolve(RowsV1, e => e.addState("extra", int()));
 	/** v3 changes `rows` (same shape): v1 and v2 consumers read it mapped. */
-	const RowsV3 = evolve(RowsV2, (e) => e.keyed("rows", obj({ n: int() })));
+	const RowsV3 = evolve(RowsV2, e => e.keyed("rows", obj({ n: int() })));
 	const Rows = defineState("rows", { version: 1, schema: obj({ n: int() }), initial: () => ({ n: 0 }), keyed: true });
 	const View = local("app.rows.view", { version: 1, params: {}, members: { n: int() } });
 	const ten = (value: { readonly n: number }) => ({ n: value.n * 10 });
 
 	/** Serves `contract` with its keyed rows, `set` writing row "k", and `accepts`. */
 	function rows(contract: typeof RowsV1 | typeof RowsV2 | typeof RowsV3, accepts: object) {
-		return defineFacet((h) =>
+		return defineFacet(h =>
 			h.serve(
 				contract as typeof RowsV3,
 				(_, self) => {
@@ -579,7 +579,7 @@ describe("reload: keyed members unchanged at a consumer's version follow a later
 					const set = async (n: number, ctx: Context) => {
 						await docs.change(
 							"k",
-							(draft) => {
+							draft => {
 								draft.n = n;
 							},
 							ctx,
@@ -594,7 +594,7 @@ describe("reload: keyed members unchanged at a consumer's version follow a later
 	}
 
 	/** A v1 consumer's factory pin of row "k". */
-	const view = defineFacet((h) =>
+	const view = defineFacet(h =>
 		h.serve(View, (_, self) => {
 			const pin = self.get(RowsV1, {}).rows.at("k");
 			return { n: self.derive([pin], ([value]) => value.n) };
@@ -657,14 +657,14 @@ describe("reload: keyed sources of an older version through a removal (fix round
 		params: {},
 		members: { rows: keyed(int()), set: method(int()) },
 	});
-	const V2 = evolve(V1, (e) => e.keyed("rows", obj({ n: int() })));
+	const V2 = evolve(V1, e => e.keyed("rows", obj({ n: int() })));
 	const Rows = defineState("rows", { version: 1, schema: obj({ n: int() }), initial: () => ({ n: 0 }), keyed: true });
 	const View = local("app.keyed.removal.view", { version: 1, params: {}, members: { n: int() } });
 	const keyMappings = instancesOf(AdaptedMembers, "key");
 
 	/** Serves `V2`, mapping its rows to v1 times `factor`; `set` writes row "a". */
 	const rows = (factor: number) =>
-		defineFacet((h) =>
+		defineFacet(h =>
 			h.serve(
 				V2,
 				(_, self) => {
@@ -672,7 +672,7 @@ describe("reload: keyed sources of an older version through a removal (fix round
 					const set = async (n: number, ctx: Context) => {
 						await docs.change(
 							"a",
-							(draft) => {
+							draft => {
 								draft.n = n;
 							},
 							ctx,
@@ -681,12 +681,12 @@ describe("reload: keyed sources of an older version through a removal (fix round
 					};
 					return { rows: docs, set };
 				},
-				{ accepts: { 1: { keyed: { rows: (current) => current.n * factor } } } },
+				{ accepts: { 1: { keyed: { rows: current => current.n * factor } } } },
 			),
 		);
 
 	/** A v1 consumer's factory pin of row "a". */
-	const view = defineFacet((h) =>
+	const view = defineFacet(h =>
 		h.serve(View, (_, self) => {
 			const pin = self.get(V1, {}).rows.at("a");
 			return { n: self.derive([pin], ([value]) => value) };
@@ -760,12 +760,12 @@ describe("reload: keyed sources of an older version through a removal (fix round
 
 describe("reload: a version refusal keeps the waiting reference's last values (fix round 2)", () => {
 	const V1 = local("app.version.return", { version: 1, params: {}, members: { n: int() } });
-	const V2 = evolve(V1, (e) => e.state("n", obj({ value: int() })));
+	const V2 = evolve(V1, e => e.state("n", obj({ value: int() })));
 	const accepted = (value: number) =>
-		defineFacet((h) =>
-			h.serve(V2, () => ({ n: constant({ value }) }), { accepts: { 1: { state: { n: (v) => v.value } } } }),
+		defineFacet(h =>
+			h.serve(V2, () => ({ n: constant({ value }) }), { accepts: { 1: { state: { n: v => v.value } } } }),
 		);
-	const refused = defineFacet((h) => h.serve(V2, () => ({ n: constant({ value: 2 }) })));
+	const refused = defineFacet(h => h.serve(V2, () => ({ n: constant({ value: 2 }) })));
 
 	it("keeps an older watch open while its version is refused and heals it when it is accepted again (Astra)", async () => {
 		const host = createHost({ onError: () => {} });
@@ -797,7 +797,7 @@ describe("reload: a version refusal keeps the waiting reference's last values (f
 	it("heals a watch of the previous current version once a later provider accepts it (Sol)", async () => {
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/version", facet: defineFacet((h) => h.serve(V1, () => ({ n: constant(1) }))) }],
+			[{ name: "@app/version", facet: defineFacet(h => h.serve(V1, () => ({ n: constant(1) }))) }],
 			context,
 		);
 		const old = await host.get(V1, {}, context);
@@ -818,11 +818,11 @@ describe("reload: a version refusal keeps the waiting reference's last values (f
 describe("reload: watches of one version across a rollback (fix round 2)", () => {
 	it("keeps both generations of v1 watches after v1 to v2 to v1 to v2 (Sol)", async () => {
 		const V1 = local("app.rollback", { version: 1, params: {}, members: { x: int() } });
-		const V2 = evolve(V1, (e) => e.state("x", obj({ n: int() })));
-		const v1 = (n: number) => defineFacet((h) => h.serve(V1, () => ({ x: constant(n) })));
+		const V2 = evolve(V1, e => e.state("x", obj({ n: int() })));
+		const v1 = (n: number) => defineFacet(h => h.serve(V1, () => ({ x: constant(n) })));
 		const v2 = (n: number) =>
-			defineFacet((h) =>
-				h.serve(V2, () => ({ x: constant({ n }) }), { accepts: { 1: { state: { x: (value) => value.n } } } }),
+			defineFacet(h =>
+				h.serve(V2, () => ({ x: constant({ n }) }), { accepts: { 1: { state: { x: value => value.n } } } }),
 			);
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@app/rollback", facet: v1(1) }], context);
@@ -847,10 +847,10 @@ describe("reload: watches of one version across a rollback (fix round 2)", () =>
 
 describe("reload: an older consumer's reads while its type is removed (fix round 2)", () => {
 	const V1 = local("app.removed.value", { version: 1, params: {}, members: { n: int(), gone: int() } });
-	const V2 = evolve(V1, (e) => e.state("n", obj({ value: int() })).removeState("gone"));
-	const facet = defineFacet((h) =>
+	const V2 = evolve(V1, e => e.state("n", obj({ value: int() })).removeState("gone"));
+	const facet = defineFacet(h =>
 		h.serve(V2, () => ({ n: constant({ value: 5 }) }), {
-			accepts: { 1: { state: { n: (v) => v.value, gone: (state) => state.n.value + 1 } } },
+			accepts: { 1: { state: { n: v => v.value, gone: state => state.n.value + 1 } } },
 		}),
 	);
 
@@ -870,23 +870,23 @@ describe("reload: an older consumer's reads while its type is removed (fix round
 describe("reload: an older consumer's first read during a parked swap (fix round 2)", () => {
 	it("maps with the provider whose attempt is shown until the new one goes live (Sol)", async () => {
 		const V1 = local("app.lazy", { version: 1, params: {}, members: { x: int() } });
-		const V2 = evolve(V1, (e) => e.state("x", obj({ n: int() })));
+		const V2 = evolve(V1, e => e.state("x", obj({ n: int() })));
 		const Missing = local("app.lazy.missing", { version: 1, params: {}, members: {} });
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/lazy", facet: defineFacet((h) => h.serve(V1, () => ({ x: constant(1) }))) }],
+			[{ name: "@app/lazy", facet: defineFacet(h => h.serve(V1, () => ({ x: constant(1) }))) }],
 			context,
 		);
 		const old = await host.get(V1, {}, context);
 		// Nothing read before the swap: the first read comes while the new attempt parks on a missing dependency.
-		const v2 = defineFacet((h) =>
+		const v2 = defineFacet(h =>
 			h.serve(
 				V2,
 				(_, self) => {
 					self.get(Missing, {});
 					return { x: constant({ n: 7 }) };
 				},
-				{ accepts: { 1: { state: { x: (value) => value.n } } } },
+				{ accepts: { 1: { state: { x: value => value.n } } } },
 			),
 		);
 		await host.reload([{ name: "@app/lazy", facet: v2 }], context);
@@ -897,7 +897,7 @@ describe("reload: an older consumer's first read during a parked swap (fix round
 		await host.reload(
 			[
 				{ name: "@app/lazy", facet: v2 },
-				{ name: "@app/missing", facet: defineFacet((h) => h.serve(Missing, () => ({}))) },
+				{ name: "@app/missing", facet: defineFacet(h => h.serve(Missing, () => ({}))) },
 			],
 			context,
 		);
@@ -915,13 +915,13 @@ describe("reload: references keep their last values through a removal, a refusal
 		params: { id: int() },
 		members: { rows: keyed(int()), set: method(int()) },
 	});
-	const V2 = evolve(V1, (e) => e.keyed("rows", obj({ n: int() })));
+	const V2 = evolve(V1, e => e.keyed("rows", obj({ n: int() })));
 	const Rows = defineState("rows", { version: 1, schema: obj({ n: int() }), initial: () => ({ n: 0 }), keyed: true });
 	const keyMappings = instancesOf(AdaptedMembers, "key");
 
 	/** Serves `V2`, `set` writing row "a"; mapping v1's rows times `factor`, or refusing v1 without one. */
 	const rows = (factor?: number) =>
-		defineFacet((h) =>
+		defineFacet(h =>
 			h.serve(
 				V2,
 				(_, self) => {
@@ -929,7 +929,7 @@ describe("reload: references keep their last values through a removal, a refusal
 					const set = async (n: number, ctx: Context) => {
 						await docs.change(
 							"a",
-							(draft) => {
+							draft => {
 								draft.n = n;
 							},
 							ctx,
@@ -938,7 +938,7 @@ describe("reload: references keep their last values through a removal, a refusal
 					};
 					return { rows: docs, set };
 				},
-				factor === undefined ? {} : { accepts: { 1: { keyed: { rows: (current) => current.n * factor } } } },
+				factor === undefined ? {} : { accepts: { 1: { keyed: { rows: current => current.n * factor } } } },
 			),
 		);
 
@@ -1014,13 +1014,13 @@ describe("reload: references keep their last values through a removal, a refusal
 
 	it("reads an older member never read before at its last mapped value after a refusal (Astra)", async () => {
 		const State1 = local("app.waiting.state", { version: 1, params: {}, members: { n: int() } });
-		const State2 = evolve(State1, (e) => e.state("n", obj({ value: int() })));
+		const State2 = evolve(State1, e => e.state("n", obj({ value: int() })));
 		const serve = (value: number, accepts: boolean) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(
 					State2,
 					() => ({ n: constant({ value }) }),
-					accepts ? { accepts: { 1: { state: { n: (v) => v.value } } } } : {},
+					accepts ? { accepts: { 1: { state: { n: v => v.value } } } } : {},
 				),
 			);
 		const host = createHost({ onError: () => {} });
@@ -1035,11 +1035,11 @@ describe("reload: references keep their last values through a removal, a refusal
 
 	it("follows a newer consumer through two rollbacks, its last value kept while refused (Sol)", async () => {
 		const X1 = local("app.waiting.rollback", { version: 1, params: {}, members: { x: int() } });
-		const X2 = evolve(X1, (e) => e.state("x", obj({ n: int() })));
-		const v1 = (n: number) => defineFacet((h) => h.serve(X1, () => ({ x: constant(n) })));
+		const X2 = evolve(X1, e => e.state("x", obj({ n: int() })));
+		const v1 = (n: number) => defineFacet(h => h.serve(X1, () => ({ x: constant(n) })));
 		const v2 = (n: number) =>
-			defineFacet((h) =>
-				h.serve(X2, () => ({ x: constant({ n }) }), { accepts: { 1: { state: { x: (value) => value.n } } } }),
+			defineFacet(h =>
+				h.serve(X2, () => ({ x: constant({ n }) }), { accepts: { 1: { state: { x: value => value.n } } } }),
 			);
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@app/rollback", facet: v2(1) }], context);
@@ -1072,10 +1072,10 @@ describe("reload: a released reference's last values go with it while another ve
 			params: { id: int() },
 			members: { n: obj({ mapped: int() }) },
 		});
-		const H2 = evolve(H1, (e) => e.state("n", obj({ raw: int() })));
-		const facet = defineFacet((h) =>
+		const H2 = evolve(H1, e => e.state("n", obj({ raw: int() })));
+		const facet = defineFacet(h =>
 			h.serve(H2, () => ({ n: constant({ raw: 7 }) }), {
-				accepts: { 1: { state: { n: (v) => ({ mapped: v.raw }) } } },
+				accepts: { 1: { state: { n: v => ({ mapped: v.raw }) } } },
 			}),
 		);
 		const host = createHost({ onError: () => {} });
@@ -1094,10 +1094,10 @@ describe("reload: a released reference's last values go with it while another ve
 
 	it("drops a refused version's snapshot when its last request leaves while an older one waits (Sol)", async () => {
 		const G1 = local("app.waiting.chain", { version: 1, params: {}, members: { x: obj({ n: int() }) } });
-		const G2 = evolve(G1, (e) => e.state("x", obj({ n: int() })));
-		const G3 = evolve(G2, (e) => e.state("x", obj({ n: int() })));
+		const G2 = evolve(G1, e => e.state("x", obj({ n: int() })));
+		const G3 = evolve(G2, e => e.state("x", obj({ n: int() })));
 		const serve = (contract: typeof G1 | typeof G2 | typeof G3, n: number) =>
-			defineFacet((h) => h.serve(contract as typeof G3, () => ({ x: constant({ n }) })));
+			defineFacet(h => h.serve(contract as typeof G3, () => ({ x: constant({ n }) })));
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@app/chain", facet: serve(G1, 1) }], context);
 		const first = await host.get(G1, {}, context);
@@ -1123,14 +1123,14 @@ describe("reload: stopping a keyed watch drops its pin and last value while its 
 			params: {},
 			members: { rows: keyed(obj({ n: int() })), extra: int(), set: method(int()) },
 		});
-		const K2 = evolve(K1, (e) => e.state("extra", int()));
+		const K2 = evolve(K1, e => e.state("extra", int()));
 		const Doc = defineState("rows", {
 			version: 1,
 			schema: obj({ n: int() }),
 			initial: () => ({ n: 1 }),
 			keyed: true,
 		});
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(
 				K2,
 				(_, self) => {
@@ -1138,7 +1138,7 @@ describe("reload: stopping a keyed watch drops its pin and last value while its 
 					const set = async (n: number, ctx: Context) => {
 						await rows.change(
 							"k",
-							(draft) => {
+							draft => {
 								draft.n = n;
 							},
 							ctx,
@@ -1147,7 +1147,7 @@ describe("reload: stopping a keyed watch drops its pin and last value while its 
 					};
 					return { rows, extra: constant(0), set };
 				},
-				{ accepts: { 1: { state: { extra: (value) => value } } } },
+				{ accepts: { 1: { state: { extra: value => value } } } },
 			),
 		);
 		const host = createHost({ onError: () => {} });
@@ -1175,21 +1175,21 @@ describe("reload: stopping a keyed watch drops its pin and last value while its 
 describe("reload: a reference that never had values reads none during a parked swap (fix round 4)", () => {
 	it("has a newer reference read nothing during a parked swap, its watch waiting, then the new instance's values (Sol)", async () => {
 		const N1 = local("app.unshown", { version: 1, params: {}, members: { x: int() } });
-		const N2 = evolve(N1, (e) => e.state("x", obj({ n: int() })));
+		const N2 = evolve(N1, e => e.state("x", obj({ n: int() })));
 		const Missing = local("app.unshown.missing", { version: 1, params: {}, members: {} });
-		const v2 = defineFacet((h) =>
+		const v2 = defineFacet(h =>
 			h.serve(
 				N2,
 				(_, self) => {
 					self.get(Missing, {});
 					return { x: constant({ n: 7 }) };
 				},
-				{ accepts: { 1: { state: { x: (value) => value.n } } } },
+				{ accepts: { 1: { state: { x: value => value.n } } } },
 			),
 		);
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/unshown", facet: defineFacet((h) => h.serve(N1, () => ({ x: constant(1) }))) }],
+			[{ name: "@app/unshown", facet: defineFacet(h => h.serve(N1, () => ({ x: constant(1) }))) }],
 			context,
 		);
 		const old = await host.get(N1, {}, context);
@@ -1205,7 +1205,7 @@ describe("reload: a reference that never had values reads none during a parked s
 		await host.reload(
 			[
 				{ name: "@app/unshown", facet: v2 },
-				{ name: "@app/missing", facet: defineFacet((h) => h.serve(Missing, () => ({}))) },
+				{ name: "@app/missing", facet: defineFacet(h => h.serve(Missing, () => ({}))) },
 			],
 			context,
 		);
@@ -1222,11 +1222,11 @@ describe("reload: a reference that never had values reads none during a parked s
 describe("reload: a reference reads its last value while its version's return parks (fix round 5)", () => {
 	it("reads the last value its surviving watch shows after v2 to v1 to a parked v2 (Sol)", async () => {
 		const R1 = local("app.return", { version: 1, params: {}, members: { x: int() } });
-		const R2 = evolve(R1, (e) => e.state("x", obj({ n: int() })));
+		const R2 = evolve(R1, e => e.state("x", obj({ n: int() })));
 		const Missing = local("app.return.missing", { version: 1, params: {}, members: {} });
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/return", facet: defineFacet((h) => h.serve(R2, () => ({ x: constant({ n: 7 }) }))) }],
+			[{ name: "@app/return", facet: defineFacet(h => h.serve(R2, () => ({ x: constant({ n: 7 }) }))) }],
 			context,
 		);
 		const ref = await host.get(R2, {}, context);
@@ -1234,12 +1234,12 @@ describe("reload: a reference reads its last value while its version's return pa
 		watch.start(async () => {});
 		// A v1 provider cannot serve v2: the reference waits with its last value.
 		await host.reload(
-			[{ name: "@app/return", facet: defineFacet((h) => h.serve(R1, () => ({ x: constant(1) }))) }],
+			[{ name: "@app/return", facet: defineFacet(h => h.serve(R1, () => ({ x: constant(1) }))) }],
 			context,
 		);
 		expect(ref.x.value).toEqual({ n: 7 });
 		// v2 is served again but its swap parks: the sources taken back are v2's own, shown before.
-		const parked = defineFacet((h) =>
+		const parked = defineFacet(h =>
 			h.serve(R2, (_, self) => {
 				self.get(Missing, {});
 				return { x: constant({ n: 9 }) };
@@ -1260,7 +1260,7 @@ describe("reload: one rule for reads and watches across a new object (fix round 
 	it("reads the last value its watch shows while the re-served object parks (Sol)", async () => {
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/successor", facet: defineFacet((h) => h.serve(Type, () => ({ x: constant(7) }))) }],
+			[{ name: "@app/successor", facet: defineFacet(h => h.serve(Type, () => ({ x: constant(7) }))) }],
 			context,
 		);
 		const ref = await host.get(Type, {}, context);
@@ -1269,7 +1269,7 @@ describe("reload: one rule for reads and watches across a new object (fix round 
 		await host.reload([], context);
 		expect(ref.x.value).toBe(7);
 		// Re-served: a new object, which parks before any instance of it went live: the reference keeps its last value.
-		const parked = defineFacet((h) =>
+		const parked = defineFacet(h =>
 			h.serve(Type, (_, self) => {
 				self.get(Missing, {});
 				return { x: constant(9) };
@@ -1287,12 +1287,12 @@ describe("reload: one rule for reads and watches across a new object (fix round 
 		const gate = Promise.withResolvers<number>();
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/successor", facet: defineFacet((h) => h.serve(Type, () => ({ x: constant(7) }))) }],
+			[{ name: "@app/successor", facet: defineFacet(h => h.serve(Type, () => ({ x: constant(7) }))) }],
 			context,
 		);
 		const ref = await host.get(Type, {}, context);
 		await host.reload([], context);
-		const opening = defineFacet((h) =>
+		const opening = defineFacet(h =>
 			h.serve(Type, (_, self) => {
 				self.open(
 					async () => gate.promise,
@@ -1320,18 +1320,18 @@ describe("reload: one rule for reads and watches across a new object (fix round 
 
 describe("reload: an older version only a pending provider maps has no values yet (fix round 7)", () => {
 	const A1 = local("app.pending.accept", { version: 1, params: {}, members: { x: int() } });
-	const A2 = evolve(A1, (e) => e.state("x", obj({ n: int() })));
-	const A3 = evolve(A2, (e) => e.state("x", obj({ wrapped: obj({ n: int() }) })));
+	const A2 = evolve(A1, e => e.state("x", obj({ n: int() })));
+	const A3 = evolve(A2, e => e.state("x", obj({ wrapped: obj({ n: int() }) })));
 
 	/** v2 shown (no accepts for v1), a reload to v3 (accepting v1 and v2) gated on a native; a new v1 hold, loading. */
 	async function pending() {
 		const gate = Promise.withResolvers<number>();
 		const host = createHost({ onError: () => {} });
 		await host.load(
-			[{ name: "@app/accept", facet: defineFacet((h) => h.serve(A2, () => ({ x: constant({ n: 2 }) }))) }],
+			[{ name: "@app/accept", facet: defineFacet(h => h.serve(A2, () => ({ x: constant({ n: 2 }) }))) }],
 			context,
 		);
-		const v3 = defineFacet((h) =>
+		const v3 = defineFacet(h =>
 			h.serve(
 				A3,
 				(_, self) => {
@@ -1343,8 +1343,8 @@ describe("reload: an older version only a pending provider maps has no values ye
 				},
 				{
 					accepts: {
-						1: { state: { x: (value) => value.wrapped.n } },
-						2: { state: { x: (value) => value.wrapped } },
+						1: { state: { x: value => value.wrapped.n } },
+						2: { state: { x: value => value.wrapped } },
 					},
 				},
 			),
@@ -1369,7 +1369,7 @@ describe("reload: an older version only a pending provider maps has no values ye
 	it("opens a watch once the accepting provider is live, not before (Sol)", async () => {
 		const { host, ref, gate, reloading } = await pending();
 		let opened = false;
-		const opening = ref.x.watch(context).then((watch) => {
+		const opening = ref.x.watch(context).then(watch => {
 			opened = true;
 			return watch;
 		});
@@ -1388,9 +1388,9 @@ describe('an older consumer keeps nothing of its instance\'s mapping (decision "
 
 	it("lets an ended instance's mapping derives go while the older reference waits with an open watch", async () => {
 		const M1 = local("app.mapped.gc", { version: 1, params: {}, members: { n: int() } });
-		const M2 = evolve(M1, (e) => e.state("n", obj({ value: int() })));
-		const facet = defineFacet((h) =>
-			h.serve(M2, () => ({ n: constant({ value: 4 }) }), { accepts: { 1: { state: { n: (v) => v.value } } } }),
+		const M2 = evolve(M1, e => e.state("n", obj({ value: int() })));
+		const facet = defineFacet(h =>
+			h.serve(M2, () => ({ n: constant({ value: 4 }) }), { accepts: { 1: { state: { n: v => v.value } } } }),
 		);
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@app/mapped", facet }], context);
@@ -1412,15 +1412,15 @@ describe('an older consumer keeps nothing of its instance\'s mapping (decision "
 describe("an instance's mapping detaches only what it made (final review)", () => {
 	it("keeps an unchanged member, the instance's own derive, when the last older reference leaves (Astra)", async () => {
 		const D1 = local("app.shared-derive", { version: 1, params: {}, members: { n: int(), set: method(int()) } });
-		const D2 = evolve(D1, (e) => e.addState("extra", int()));
+		const D2 = evolve(D1, e => e.addState("extra", int()));
 		const Counter = defineState("counter", { version: 1, schema: obj({ n: int() }), initial: () => ({ n: 1 }) });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(
 				D2,
 				(_, self) => {
 					const counter = self.state(Counter);
 					const set = async (n: number, ctx: Context) => {
-						await counter.change((draft) => {
+						await counter.change(draft => {
 							draft.n = n;
 						}, ctx);
 						return null;
@@ -1453,14 +1453,14 @@ describe("keyed mappings per member (final review)", () => {
 			params: {},
 			members: { first: keyed(int()), second: keyed(int()), set: method(int()) },
 		});
-		const K2 = evolve(K1, (e) => e.keyed("first", obj({ n: int() })).keyed("second", obj({ n: int() })));
+		const K2 = evolve(K1, e => e.keyed("first", obj({ n: int() })).keyed("second", obj({ n: int() })));
 		const Rows = defineState("rows", {
 			version: 1,
 			schema: obj({ n: int() }),
 			initial: () => ({ n: 0 }),
 			keyed: true,
 		});
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(
 				K2,
 				(_, self) => {
@@ -1468,7 +1468,7 @@ describe("keyed mappings per member (final review)", () => {
 					const set = async (n: number, ctx: Context) => {
 						await rows.change(
 							"a",
-							(draft) => {
+							draft => {
 								draft.n = n;
 							},
 							ctx,
@@ -1477,7 +1477,7 @@ describe("keyed mappings per member (final review)", () => {
 					};
 					return { first: rows, second: rows, set };
 				},
-				{ accepts: { 1: { keyed: { first: (value) => value.n, second: (value) => value.n * 10 } } } },
+				{ accepts: { 1: { keyed: { first: value => value.n, second: value => value.n * 10 } } } },
 			),
 		);
 		const host = createHost({ onError: () => {} });

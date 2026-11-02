@@ -79,7 +79,7 @@ class BatchStorage extends ControlledStorage {
 			await held.gate.promise;
 		}
 		const delay = this.latency?.();
-		if (delay !== undefined) await new Promise((resolve) => setTimeout(resolve, delay));
+		if (delay !== undefined) await new Promise(resolve => setTimeout(resolve, delay));
 		const refuses = (writes: readonly StorageWrite[]): boolean => {
 			if (this.refuse?.(writes) !== true) return false;
 			this.refuse = undefined;
@@ -106,7 +106,7 @@ async function open(conversations: number): Promise<{
 }> {
 	const storage = new BatchStorage();
 	const session = new SessionImpl(storage, Date.now, () => 600_000);
-	const ids = await session.commit(async (tx) => {
+	const ids = await session.commit(async tx => {
 		const created: ConversationId[] = [];
 		for (let n = 0; n < conversations; n++) {
 			created.push((await tx.createConversation({ ownership: { kind: "ownerless" } })).id);
@@ -114,7 +114,7 @@ async function open(conversations: number): Promise<{
 		return created;
 	}, context);
 	const published: ObservedCommit[] = [];
-	session.followCommits((publication) => {
+	session.followCommits(publication => {
 		published.push(publication);
 	});
 	return { storage, session, ids, published };
@@ -123,7 +123,7 @@ async function open(conversations: number): Promise<{
 /** Increment conversation `id`'s note; resolves with the value it read. */
 function bump(session: SessionImpl, id: ConversationId, options?: CommitOptions): Promise<number> {
 	return session.commit(
-		async (tx) => {
+		async tx => {
 			const note = await tx.doc(Note, id);
 			return note.n++;
 		},
@@ -155,9 +155,9 @@ async function notes(storage: BatchStorage, ids: readonly ConversationId[]): Pro
 
 /** The kinds of the entries `published` holds, in order. */
 function entryKinds(published: readonly ObservedCommit[]): string[] {
-	return published.flatMap((publication) =>
+	return published.flatMap(publication =>
 		publication.kind === "stored"
-			? publication.changes.flatMap((change) => (change.type === "entry" ? [change.value.kind] : []))
+			? publication.changes.flatMap(change => (change.type === "entry" ? [change.value.kind] : []))
 			: [],
 	);
 }
@@ -174,11 +174,11 @@ describe("group commit: batching", () => {
 		const first = bump(session, a);
 		await held.entered;
 		const ran: string[] = [];
-		const second = session.commit(async (tx) => {
+		const second = session.commit(async tx => {
 			(await tx.doc(Note, b)).n++;
 			ran.push("b");
 		}, context);
-		const third = session.commit(async (tx) => {
+		const third = session.commit(async tx => {
 			(await tx.doc(Note, c)).n++;
 			ran.push("c");
 		}, context);
@@ -189,8 +189,8 @@ describe("group commit: batching", () => {
 		held.release();
 		await Promise.all([first, second, third]);
 		expect(order).toEqual(["a", "b", "c"]);
-		expect(storage.calls.slice(-2).map((call) => call.length)).toEqual([1, 2]);
-		const seqs = published.map((publication) => (publication.kind === "stored" ? publication.seq : 0));
+		expect(storage.calls.slice(-2).map(call => call.length)).toEqual([1, 2]);
+		const seqs = published.map(publication => (publication.kind === "stored" ? publication.seq : 0));
 		expect(seqs).toEqual([...seqs].sort((x, y) => x - y));
 		expect(new Set(seqs).size).toBe(3);
 		await session.close(context);
@@ -202,11 +202,11 @@ describe("group commit: gates", () => {
 		const { storage, session, ids } = await open(1);
 		const held = storage.hold();
 		let leaked: EntryId | undefined;
-		const appending = session.commit(async (tx) => {
+		const appending = session.commit(async tx => {
 			leaked = (await tx.appendEntry(ids[0]!, { kind: "note" })).id;
 		}, context);
 		await held.entered;
-		const reading = session.commit((tx) => tx.entry(leaked!), context);
+		const reading = session.commit(tx => tx.entry(leaked!), context);
 		expect(await settled(reading)).toBe(false);
 		held.release();
 		await appending;
@@ -217,11 +217,11 @@ describe("group commit: gates", () => {
 	it("makes a job wait for an unpublished creation at a document address instead of creating it again", async () => {
 		const { storage, session } = await open(0);
 		const held = storage.hold();
-		const first = session.commit(async (tx) => {
+		const first = session.commit(async tx => {
 			(await tx.doc(Shared)).n++;
 		}, context);
 		await held.entered;
-		const second = session.commit(async (tx) => {
+		const second = session.commit(async tx => {
 			const shared = await tx.doc(Shared);
 			shared.n++;
 			return shared.n;
@@ -232,7 +232,7 @@ describe("group commit: gates", () => {
 		expect(await second).toBe(2);
 		const creations = storage.calls
 			.flat(2)
-			.filter((write) => write.type === "document.create" && write.record.kind === Shared.definition.kind);
+			.filter(write => write.type === "document.create" && write.record.kind === Shared.definition.kind);
 		expect(creations).toHaveLength(1);
 		await session.close(context);
 	});
@@ -241,11 +241,11 @@ describe("group commit: gates", () => {
 		const { storage, session } = await open(0);
 		const held = storage.hold();
 		let leaked: ConversationId | undefined;
-		const creating = session.commit(async (tx) => {
+		const creating = session.commit(async tx => {
 			leaked = (await tx.createConversation({ ownership: { kind: "ownerless" } })).id;
 		}, context);
 		await held.entered;
-		const appending = session.commit((tx) => tx.appendEntry(leaked!, { kind: "note" }), context);
+		const appending = session.commit(tx => tx.appendEntry(leaked!, { kind: "note" }), context);
 		expect(await settled(appending)).toBe(false);
 		held.release();
 		await creating;
@@ -257,22 +257,22 @@ describe("group commit: gates", () => {
 		// The Session's own helpers (newest entry, head marker), a transaction's scan, and the line's reads, each alone
 		// behind the creation, of a conversation Storage does not have yet.
 		const reads: Record<string, (session: SessionImpl, id: ConversationId) => Promise<unknown>> = {
-			latestEntryId: (session, id) => session.commit((tx) => tx.latestEntryId(id), context),
-			latestHeadMarker: (session, id) => session.commit((tx) => tx.latestHeadMarker(id), context),
+			latestEntryId: (session, id) => session.commit(tx => tx.latestEntryId(id), context),
+			latestHeadMarker: (session, id) => session.commit(tx => tx.latestHeadMarker(id), context),
 			"tx.scanEntries": (session, id) =>
-				session.commit(async (tx) => (await tx.scanEntries({ conversationId: id }, 1)).items, context),
+				session.commit(async tx => (await tx.scanEntries({ conversationId: id }, 1)).items, context),
 			"line scanEntries": (session, id) =>
 				session.readOnLine(
-					async (line) => (await line.scanEntries({ conversationId: id }, 1, undefined, context)).items,
+					async line => (await line.scanEntries({ conversationId: id }, 1, undefined, context)).items,
 				),
 			"line findLatestHeadMarker": (session, id) =>
-				session.readOnLine((line) => line.findLatestHeadMarker(id, undefined, context)),
+				session.readOnLine(line => line.findLatestHeadMarker(id, undefined, context)),
 		};
 		for (const [name, read] of Object.entries(reads)) {
 			const { storage, session } = await open(0);
 			const held = storage.hold();
 			let leaked: ConversationId | undefined;
-			const creating = session.commit(async (tx) => {
+			const creating = session.commit(async tx => {
 				leaked = (await tx.createConversation({ ownership: { kind: "ownerless" } })).id;
 			}, context);
 			await held.entered;
@@ -281,7 +281,7 @@ describe("group commit: gates", () => {
 			held.release();
 			await creating;
 			const result = await reading.then(
-				(value) => ({ value }),
+				value => ({ value }),
 				(error: unknown) => ({ error }),
 			);
 			expect(result, name).toEqual({ value: Array.isArray((result as { value?: unknown }).value) ? [] : undefined });
@@ -293,14 +293,11 @@ describe("group commit: gates", () => {
 		const { storage, session } = await open(0);
 		const held = storage.hold();
 		const creating = session.commit(
-			async (tx) => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
+			async tx => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
 			context,
 		);
 		await held.entered;
-		const scanning = session.commit(
-			async (tx) => (await tx.scanConversations({}, 10)).items.map((c) => c.id),
-			context,
-		);
+		const scanning = session.commit(async tx => (await tx.scanConversations({}, 10)).items.map(c => c.id), context);
 		expect(await settled(scanning)).toBe(false);
 		held.release();
 		expect(await scanning).toContain(await creating);
@@ -311,11 +308,11 @@ describe("group commit: gates", () => {
 		const { storage, session, ids } = await open(1);
 		const held = storage.hold();
 		let leaked: EntryId | undefined;
-		void session.commit(async (tx) => {
+		void session.commit(async tx => {
 			leaked = (await tx.appendEntry(ids[0]!, { kind: "note" })).id;
 		}, context);
 		await held.entered;
-		const reading = session.readOnLine((storage) => storage.entry(leaked!, context));
+		const reading = session.readOnLine(storage => storage.entry(leaked!, context));
 		await flush();
 		held.release();
 		expect((await reading)?.entry.id).toBe(leaked);
@@ -329,13 +326,13 @@ describe("group commit: gates", () => {
 		await bump(session, id, DEFERRED);
 		// The first commit only reads the held document: storing its held changes is its write of it.
 		const held = storage.hold();
-		const storing = session.commit(async (tx) => {
+		const storing = session.commit(async tx => {
 			await tx.doc(Note, id);
 			await tx.appendEntry(id, { kind: "a" });
 		}, context);
 		await held.entered;
 		let read = false;
-		const reading = session.commit(async (tx) => {
+		const reading = session.commit(async tx => {
 			await tx.doc(Note, id);
 			read = true;
 			await tx.appendEntry(id, { kind: "b" });
@@ -346,8 +343,8 @@ describe("group commit: gates", () => {
 		await Promise.all([storing, reading]);
 		const changes = storage.calls
 			.slice(-2)
-			.map((call) => call.flat().filter((write) => write.type === "document.change"));
-		expect(changes.map((writes) => writes.length)).toEqual([1, 0]);
+			.map(call => call.flat().filter(write => write.type === "document.change"));
+		expect(changes.map(writes => writes.length)).toEqual([1, 0]);
 		const record = (await storage.findDocument(
 			{ kind: Note.definition.kind, scope: { kind: "conversation", conversationId: id } },
 			"current",
@@ -365,7 +362,7 @@ describe("group commit: gates", () => {
 		const first = bump(session, b);
 		await held.entered;
 		const deferredCommit = session.commit(
-			async (tx) => {
+			async tx => {
 				(await tx.doc(Note, a)).n = 5;
 			},
 			context,
@@ -380,7 +377,7 @@ describe("group commit: gates", () => {
 		expect(await reader).toBe(5);
 		// The reader's own batch stored what the deferred commit held.
 		const stored = storage.calls.at(-1)!.flat();
-		expect(stored.filter((write) => write.type === "document.change")).toHaveLength(1);
+		expect(stored.filter(write => write.type === "document.change")).toHaveLength(1);
 		await session.close(context);
 		expect(await notes(storage, [a, b])).toEqual([6, 1]);
 	});
@@ -418,10 +415,10 @@ describe("group commit: outcomes", () => {
 		const first = bump(session, a);
 		await held.entered;
 		const stored = bump(session, b);
-		const refused = session.commit((tx) => tx.appendEntry(c, { kind: "refuse" }), context);
+		const refused = session.commit(tx => tx.appendEntry(c, { kind: "refuse" }), context);
 		const after = bump(session, d);
 		const read = session.readOnLine(async () => "read");
-		storage.refuse = (writes) => writes.some((write) => write.type === "entry" && write.value.kind === "refuse");
+		storage.refuse = writes => writes.some(write => write.type === "entry" && write.value.kind === "refuse");
 		// Every callback has run, so the three are admitted while the first call is in flight.
 		await flush();
 		held.release();
@@ -462,12 +459,12 @@ describe("group commit: failures per part", () => {
 		const { storage, session, ids, published } = await open(1);
 		const id = ids[0]!;
 		const held = storage.hold();
-		const first = session.commit((tx) => tx.appendEntry(id, { kind: "a" }), context);
+		const first = session.commit(tx => tx.appendEntry(id, { kind: "a" }), context);
 		await held.entered;
 		// Between the two parts of the failing call, a job without writes.
-		const before = session.commit((tx) => tx.appendEntry(id, { kind: "b" }), context);
+		const before = session.commit(tx => tx.appendEntry(id, { kind: "b" }), context);
 		const between = session.commit(async () => "no write", context);
-		const after = session.commit((tx) => tx.appendEntry(id, { kind: "d" }), context);
+		const after = session.commit(tx => tx.appendEntry(id, { kind: "d" }), context);
 		const outcomes = Promise.allSettled([first, before, between, after]);
 		await flush();
 		storage.rejectCall = storage.calls.length;
@@ -487,12 +484,12 @@ describe("group commit: failures per part", () => {
 		const { storage, session, ids, published } = await open(1);
 		const id = ids[0]!;
 		const held = storage.hold();
-		const inFlight = session.commit((tx) => tx.appendEntry(id, { kind: "a" }), context);
+		const inFlight = session.commit(tx => tx.appendEntry(id, { kind: "a" }), context);
 		await held.entered;
 		// A later job's read fails first, and fails the Session; then the call in flight rejects with another error.
 		const first = new Error("first failure: read");
 		vi.spyOn(storage, "task").mockRejectedValueOnce(first);
-		const reading = session.commit((tx) => tx.task(idFromNumber<TaskId>(999)), context);
+		const reading = session.commit(tx => tx.task(idFromNumber<TaskId>(999)), context);
 		reading.catch(() => {});
 		await flush();
 		expect(session.failure).toEqual({ error: first });
@@ -542,7 +539,7 @@ describe("group commit: failures per part", () => {
 			const first = bump(session, a);
 			await held.entered;
 			const refused = session
-				.commit((tx) => tx.appendEntry(b, { kind: "refuse" }), context)
+				.commit(tx => tx.appendEntry(b, { kind: "refuse" }), context)
 				.then(
 					() => ({ kind: "resolved" }),
 					(error: unknown) => ({ kind: "rejected", error }),
@@ -553,7 +550,7 @@ describe("group commit: failures per part", () => {
 			);
 			await flush();
 			storage.refusal = { value };
-			storage.refuse = (writes) => writes.some((write) => write.type === "entry" && write.value.kind === "refuse");
+			storage.refuse = writes => writes.some(write => write.type === "entry" && write.value.kind === "refuse");
 			held.release();
 			await first;
 			expect(await refused).toEqual({ kind: "rejected", error: value });
@@ -616,7 +613,7 @@ describe("group commit: a publication that throws", () => {
 		// Astra's: the only commit is the deferred one, on a storage that runs nothing else.
 		const storage = new ControlledStorage();
 		const session = new SessionImpl(storage);
-		const id = await session.commit(async (tx) => {
+		const id = await session.commit(async tx => {
 			const conversation = await tx.createConversation({ ownership: { kind: "ownerless" } });
 			await tx.doc(Note, conversation.id);
 			return conversation.id;
@@ -673,7 +670,7 @@ describe("group commit: deferred commits", () => {
 		expect(published).toHaveLength(0);
 		held.release();
 		await Promise.all([first, later]);
-		expect(published.map((publication) => publication.kind)).toEqual(["stored", "memory"]);
+		expect(published.map(publication => publication.kind)).toEqual(["stored", "memory"]);
 		await session.close(context);
 	});
 
@@ -683,10 +680,10 @@ describe("group commit: deferred commits", () => {
 		await bump(session, b);
 		published.length = 0;
 		const held = storage.hold();
-		const first = session.commit((tx) => tx.appendEntry(a, { kind: "refuse" }), context);
+		const first = session.commit(tx => tx.appendEntry(a, { kind: "refuse" }), context);
 		await held.entered;
 		const later = bump(session, b, DEFERRED);
-		storage.refuse = (writes) => writes.some((write) => write.type === "entry" && write.value.kind === "refuse");
+		storage.refuse = writes => writes.some(write => write.type === "entry" && write.value.kind === "refuse");
 		held.release();
 		await expect(first).rejects.toThrow("refused");
 		await expect(later).rejects.toBeInstanceOf(SessionFailed);
@@ -724,7 +721,7 @@ describe("group commit: the storage's publication scope", () => {
 		const scopes: string[] = [];
 		let depth = 0;
 		// Runs each publication a macrotask later, inside a scope of its own.
-		(storage as { publishing?: (publish: () => void, context: Context) => void }).publishing = (publish) => {
+		(storage as { publishing?: (publish: () => void, context: Context) => void }).publishing = publish => {
 			setTimeout(() => {
 				depth++;
 				scopes.push(`open ${published.length}`);
@@ -753,7 +750,7 @@ describe("group commit: the storage's publication scope", () => {
 	it("reports a scope that throws instead of running the publication, and publishes the commit", async () => {
 		const { storage, session, ids, published } = await open(1);
 		const reports: unknown[] = [];
-		session.report = (error) => {
+		session.report = error => {
 			reports.push(error);
 		};
 		(storage as { publishing?: (publish: () => void, context: Context) => void }).publishing = () => {
@@ -771,15 +768,15 @@ describe("group commit: a failure between two publications", () => {
 		const { storage, session, ids, published } = await open(1);
 		const id = ids[0]!;
 		const held = storage.hold();
-		const lead = session.commit((tx) => tx.appendEntry(id, { kind: "lead" }), context);
+		const lead = session.commit(tx => tx.appendEntry(id, { kind: "lead" }), context);
 		await held.entered;
-		const one = session.commit((tx) => tx.appendEntry(id, { kind: "one" }), context);
-		const two = session.commit((tx) => tx.appendEntry(id, { kind: "two" }), context);
+		const one = session.commit(tx => tx.appendEntry(id, { kind: "one" }), context);
+		const two = session.commit(tx => tx.appendEntry(id, { kind: "two" }), context);
 		two.catch(() => {});
 		// What `one` resolves runs in the hop before `two` is published: a read there fails the Session.
 		const read = new Error("read failed between publications");
 		vi.spyOn(storage, "task").mockRejectedValue(read);
-		const failing = one.then(() => session.commit((tx) => tx.task(idFromNumber<TaskId>(999)), context));
+		const failing = one.then(() => session.commit(tx => tx.task(idFromNumber<TaskId>(999)), context));
 		failing.catch(() => {});
 		await flush();
 		held.release();
@@ -798,12 +795,12 @@ describe("group commit: a failure between two publications", () => {
 		const { storage, session, ids, published } = await open(1);
 		const id = ids[0]!;
 		const held = storage.hold();
-		const lead = session.commit((tx) => tx.appendEntry(id, { kind: "lead" }), context);
+		const lead = session.commit(tx => tx.appendEntry(id, { kind: "lead" }), context);
 		await held.entered;
 		const failure = new Error("failed between publications");
-		const one = session.commit((tx) => tx.appendEntry(id, { kind: "one" }), context);
+		const one = session.commit(tx => tx.appendEntry(id, { kind: "one" }), context);
 		void one.then(() => session.fail(failure));
-		const two = session.commit((tx) => tx.appendEntry(id, { kind: "two" }), context);
+		const two = session.commit(tx => tx.appendEntry(id, { kind: "two" }), context);
 		two.catch(() => {});
 		await flush();
 		held.release();
@@ -818,14 +815,14 @@ describe("group commit: a failure between two publications", () => {
 		const failure = new Error("failed before a deferred publication ran");
 		let calls = 0;
 		// The second publication's scope is entered before the failure; it runs the publication only after it.
-		(storage as { publishing?: (publish: () => void, context: Context) => void }).publishing = (publish) => {
+		(storage as { publishing?: (publish: () => void, context: Context) => void }).publishing = publish => {
 			if (++calls === 2) session.fail(failure);
 			setTimeout(publish, 0);
 		};
 		const held = storage.hold();
-		const lead = session.commit((tx) => tx.appendEntry(id, { kind: "lead" }), context);
+		const lead = session.commit(tx => tx.appendEntry(id, { kind: "lead" }), context);
 		await held.entered;
-		const one = session.commit((tx) => tx.appendEntry(id, { kind: "one" }), context);
+		const one = session.commit(tx => tx.appendEntry(id, { kind: "one" }), context);
 		one.catch(() => {});
 		await flush();
 		held.release();
@@ -863,7 +860,7 @@ describe("group commit: upkeep through the writer", () => {
 			history: "latest",
 			fork: "initial",
 			initial: () => ({ n: 0, migrated: true }),
-			migrate: (value) => ({ ...(value as { n: number }), migrated: true }),
+			migrate: value => ({ ...(value as { n: number }), migrated: true }),
 		});
 		const { storage, session, ids } = await open(2);
 		const [a, b] = ids as [ConversationId, ConversationId];
@@ -873,7 +870,7 @@ describe("group commit: upkeep through the writer", () => {
 		const held = storage.hold();
 		const first = bump(session, a);
 		await held.entered;
-		const reloading = session.commit(async (tx) => (await tx.doc(NoteV2, b)).n, context);
+		const reloading = session.commit(async tx => (await tx.doc(NoteV2, b)).n, context);
 		expect(await settled(reloading)).toBe(false);
 		held.release();
 		await first;
@@ -927,7 +924,7 @@ describe("group commit: backpressure and bounds", () => {
 		const appends: Promise<unknown>[] = [];
 		for (let n = 0; n < 300; n++) {
 			appends.push(
-				session.commit(async (tx) => {
+				session.commit(async tx => {
 					ran++;
 					await tx.appendEntry(b, { kind: "note" });
 				}, context),
@@ -962,9 +959,9 @@ describe("group commit: randomized interleavings", () => {
 			const log = ids[0]!;
 			storage.latency = () => Math.floor(next() * 3);
 			const refuseAt = seed % 2 === 0 ? Math.floor(next() * 60) : -1;
-			storage.refuse = (writes) =>
+			storage.refuse = writes =>
 				writes.some(
-					(write) => write.type === "entry" && (write.value.data as { index?: number })?.index === refuseAt,
+					write => write.type === "entry" && (write.value.data as { index?: number })?.index === refuseAt,
 				);
 			// Per commit, in line order: the notes it increments and the values it read.
 			const plans: ConversationId[][] = [];
@@ -973,7 +970,7 @@ describe("group commit: randomized interleavings", () => {
 			for (let index = 0; index < 60; index++) {
 				const touched = ids.filter(() => next() < 0.4);
 				plans.push(touched);
-				const outcome = session.commit(async (tx) => {
+				const outcome = session.commit(async tx => {
 					const values: number[] = [];
 					for (const id of touched) values.push((await tx.doc(Note, id)).n++);
 					reads[index] = values;
@@ -991,9 +988,9 @@ describe("group commit: randomized interleavings", () => {
 			// Outcomes match storage: a commit resolved exactly when its log entry is stored.
 			const reopened = new SessionImpl(storage.reopen());
 			const logged = new Set<number>();
-			const entries = await reopened.commit((tx) => tx.scanEntries({ conversationId: log }, 1_000), context);
+			const entries = await reopened.commit(tx => tx.scanEntries({ conversationId: log }, 1_000), context);
 			for (const entry of entries.items) logged.add((entry.data as { index: number }).index);
-			const stored = results.map((result) => result.status === "fulfilled");
+			const stored = results.map(result => result.status === "fulfilled");
 			for (const [index, ok] of stored.entries()) expect(logged.has(index), `commit ${index}`).toBe(ok);
 			// Each callback read every earlier stored increment of what it touched, and nothing else.
 			for (const [index, values] of reads.entries()) {

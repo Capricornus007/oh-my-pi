@@ -24,7 +24,7 @@ type Attempts = { [operation: string]: unknown };
 async function probe(attempt: (host: Host, self: Reference<typeof Probe>) => Attempts) {
 	const seen: Attempts[] = [];
 	const holder: { host?: Host; reference?: Reference<typeof Probe> } = {};
-	const { host } = await loaded((h) =>
+	const { host } = await loaded(h =>
 		h.serve(Probe, (_, self) => {
 			const num = self.state(Num);
 			return {
@@ -35,7 +35,7 @@ async function probe(attempt: (host: Host, self: Reference<typeof Probe>) => Att
 				}),
 				fixed: constant(1),
 				set: async (n, ctx) => {
-					await num.change((draft) => {
+					await num.change(draft => {
 						draft.n = n;
 					}, ctx);
 					return null;
@@ -104,7 +104,7 @@ describe("delivery", () => {
 			params: {},
 			members: { bad: obj({ a: int() }), other: obj({ n: int() }), set: method(int()) },
 		});
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Two, (_, self) => {
 				const num = self.state(Num);
 				const other = self.state(Other);
@@ -114,7 +114,7 @@ describe("delivery", () => {
 					other,
 					set: async (n, ctx) => {
 						// `num` is adopted first, so the derive's delivery comes before `other`'s.
-						await self.tx(async (tx) => {
+						await self.tx(async tx => {
 							(await tx.draft(num)).n = n;
 							(await tx.draft(other)).n = n;
 						}, ctx);
@@ -136,7 +136,7 @@ describe("delivery", () => {
 describe("flushes", () => {
 	it("run once per listing at the end of the commit, after its deliveries; a throwing one is reported", () => {
 		const reported: BatchError[] = [];
-		const batch = new Batch((error) => reported.push(error), undefined);
+		const batch = new Batch(error => reported.push(error), undefined);
 		const order: string[] = [];
 		batch.commit(() => {
 			batch.flushing(() => order.push("first"));

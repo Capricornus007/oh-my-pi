@@ -173,7 +173,7 @@ export class NodeFileWatcher implements FileWatcher {
 		onChange: (change: FileChange) => void,
 		options: NodeWatchOptions,
 	): Promise<NodeFileWatcher> {
-		const resolved = targets.map((target) => ({
+		const resolved = targets.map(target => ({
 			path: resolvePath(target.path),
 			recursive: target.recursive === true,
 			hidden: target.exclude?.hidden === true,
@@ -183,7 +183,7 @@ export class NodeFileWatcher implements FileWatcher {
 		// every watched directory open: watching would break renames of their parents, so Windows polls.
 		const mode =
 			options.mode ??
-			(process.platform === "win32" || (await anyUnreliable(resolved.map((target) => target.path)))
+			(process.platform === "win32" || (await anyUnreliable(resolved.map(target => target.path)))
 				? "polling"
 				: "native");
 		const watcher = new NodeFileWatcher(resolved, onChange, mode, options);
@@ -312,8 +312,8 @@ export class NodeFileWatcher implements FileWatcher {
 
 	/** An ancestor that changed identity moved every target below it; report those targets. */
 	#reported(path: string): string {
-		if (this.#targets.some((target) => isWithin(path, target.path))) return path;
-		return this.#targets.find((target) => isWithin(target.path, path))?.path ?? path;
+		if (this.#targets.some(target => isWithin(path, target.path))) return path;
+		return this.#targets.find(target => isWithin(target.path, path))?.path ?? path;
 	}
 
 	async #scan(): Promise<Scan> {
@@ -341,7 +341,7 @@ export class NodeFileWatcher implements FileWatcher {
 				Date.now() - stats.mtimeMs < HASH_RECENT_MS
 			) {
 				hash = await readFile(path).then(
-					(content) => createHash("sha256").update(content).digest("hex"),
+					content => createHash("sha256").update(content).digest("hex"),
 					() => undefined,
 				);
 			}
@@ -502,7 +502,7 @@ export class NodeFileWatcher implements FileWatcher {
 			if (!isWithin(path, target.path) || path === target.path) continue;
 			const components = relative(target.path, path).split(sep);
 			if (!target.recursive && components.length > 1) continue;
-			if (components.some((name) => excluded(target, name))) continue;
+			if (components.some(name => excluded(target, name))) continue;
 			return true;
 		}
 		return false;

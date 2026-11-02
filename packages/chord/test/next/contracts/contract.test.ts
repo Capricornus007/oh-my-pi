@@ -40,7 +40,7 @@ describe("contract handles", () => {
 		const copy = { ...Notes };
 		const refusal = "notes: not a declared contract (spread and hand-built copies are refused)";
 		expect(() => contractData(copy)).toThrow(refusal);
-		expect(() => evolve(copy, (e) => e)).toThrow(refusal);
+		expect(() => evolve(copy, e => e)).toThrow(refusal);
 		expect(() => checkAccepts(copy, {})).toThrow(refusal);
 		expect(() => bindProvider(copy, {})).toThrow(refusal);
 		expect(() => checkParams(copy, { session: "s", page: 1 }, BACKGROUND_CONTEXT)).toThrow(refusal);

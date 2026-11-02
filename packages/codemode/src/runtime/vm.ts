@@ -296,7 +296,7 @@ export async function startVm(options: StartVmOptions): Promise<VmSession> {
 		});
 
 		// These handles live as long as the VM, which the caller disposes as a whole.
-		api = vm.withScope((scope) =>
+		api = vm.withScope(scope =>
 			scope.escape(
 				vm.callFunction(
 					vm.evalCode(PRELUDE_SOURCE, "codemode-prelude.js"),

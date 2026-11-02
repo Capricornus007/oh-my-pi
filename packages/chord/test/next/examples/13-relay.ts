@@ -41,14 +41,14 @@ type Start = { readonly id: string; readonly title: string };
 
 /** The worker's core facet, made from its start message (base code, loaded under a fixed name). */
 const coreWorkerFacet = (init: { id: string; title: string; pid: number }) =>
-	defineFacet<P>((host) => {
+	defineFacet<P>(host => {
 		host.serve(SessionInfo, () => ({ init: constant(init) }));
 	});
 
 const NotesDoc = defineState("notes", { schema: obj({ list: arr(str()) }), version: 1, initial: () => ({ list: [] }) });
 
 /** A plugin's facet on the worker: its notes, and the start data read through a reference. */
-const notesFacet = defineFacet<P>((host) => {
+const notesFacet = defineFacet<P>(host => {
 	host.serve(Notes, (_, _principal, self) => {
 		const doc = self.state(NotesDoc);
 		const info = self.get(SessionInfo, {});
@@ -58,7 +58,7 @@ const notesFacet = defineFacet<P>((host) => {
 				info: info.init,
 				notes: self.derive([doc], ([d]) => d.list),
 				add: async ({ text }, ctx) => {
-					await doc.change((draft) => void draft.list.push(text), ctx);
+					await doc.change(draft => void draft.list.push(text), ctx);
 					return doc.value.list.length;
 				},
 			},
@@ -69,7 +69,7 @@ const notesFacet = defineFacet<P>((host) => {
 if (process.argv[2] === "worker") {
 	// The worker. 1. Its link first: it queues the link's messages until the host listens, and skips the app's own.
 	const link = ipcLink(process as unknown as IpcPort);
-	const start = await new Promise<Start>((resolve) => {
+	const start = await new Promise<Start>(resolve => {
 		const listener = (message: unknown) => {
 			if (message instanceof Uint8Array) return;
 			process.off("message", listener);
@@ -100,10 +100,10 @@ if (process.argv[2] === "worker") {
 	server.route(
 		Session,
 		{
-			authorize: (principal) => principal.kind === "owner",
+			authorize: principal => principal.kind === "owner",
 			// No `signal` for the fork: the context is aborted when the host closes, which would kill the worker (and emit
 			// `error` on the child); a link Chord closes, at `host.close` or because it arrived after it, ends the worker.
-			resolve: async (address) => {
+			resolve: async address => {
 				const child = fork(fileURLToPath(import.meta.url), ["worker"], {
 					serialization: "advanced",
 					execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
@@ -119,8 +119,8 @@ if (process.argv[2] === "worker") {
 
 	// 4. Tabs reach the server over a WebSocket; its entry point stamps each as the owner here.
 	const wss = new WebSocketServer({ host: "127.0.0.1", port: 0 });
-	await new Promise((resolve) => wss.once("listening", resolve));
-	wss.on("connection", (socket) => server.accept(webSocketLink(socket), { principal: { kind: "owner" } }, context));
+	await new Promise(resolve => wss.once("listening", resolve));
+	wss.on("connection", socket => server.accept(webSocketLink(socket), { principal: { kind: "owner" } }, context));
 	const { port } = wss.address() as AddressInfo;
 
 	// 5. A tab: Node's own WebSocket, as a browser's. Its holds go tab → server (relay) → worker.
@@ -131,7 +131,7 @@ if (process.argv[2] === "worker") {
 	console.log("tab: S1 info", s1.info.value, "server pid", process.pid);
 	await s1.add({ text: "milk" }, context);
 	await s1.add({ text: "bread" }, context);
-	await new Promise((resolve) => setTimeout(resolve, 10));
+	await new Promise(resolve => setTimeout(resolve, 10));
 	console.log("tab: S1 notes", s1.notes.value);
 
 	// 6. Another session is another worker process.
@@ -141,6 +141,6 @@ if (process.argv[2] === "worker") {
 	// 7. Closing the server closes its route links; each worker exits when its link closes.
 	await tab.close(context);
 	await server.close(context);
-	await new Promise((resolve) => wss.close(resolve));
+	await new Promise(resolve => wss.close(resolve));
 	console.log("closed");
 }

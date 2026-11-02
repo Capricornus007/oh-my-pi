@@ -11,7 +11,7 @@ function replica() {
 	const source = new Replica(batch, { kind: "value", value: { n: 1 } });
 	const double = new Derive([source], ([value]) => (value as { n: number }).n * 2, batch);
 	double.attach(
-		(declared) => declared as Replica,
+		declared => declared as Replica,
 		() => {},
 	);
 	return { batch, source, double };

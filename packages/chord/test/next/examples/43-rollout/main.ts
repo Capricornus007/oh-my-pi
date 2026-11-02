@@ -16,7 +16,7 @@ import { Banner, Label, Session } from "./plugins/notes/contract.ts";
 
 /** Waits until `done()` holds (a watcher's mark, a frame from a worker), checking every 10 ms. */
 async function waitUntil(done: () => boolean): Promise<void> {
-	while (!done()) await new Promise((resolve) => setTimeout(resolve, 10));
+	while (!done()) await new Promise(resolve => setTimeout(resolve, 10));
 }
 
 /** One line for what a rollout step did on one of its hosts. */
@@ -44,9 +44,9 @@ const workers = createWorkers(
 		entry: fileURLToPath(new URL("./worker.ts", import.meta.url)),
 		execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
 		authorize: () => true,
-		principal: (address) => ({ kind: "worker", session: address.params.id }),
+		principal: address => ({ kind: "worker", session: address.params.id }),
 		start: () => ({}),
-		lock: (address) => `example-43:${process.pid}:${address.key}`,
+		lock: address => `example-43:${process.pid}:${address.key}`,
 		plugins,
 		onError: console.error,
 	},

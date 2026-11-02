@@ -13,7 +13,7 @@ describe("memory links", () => {
 		a.send(bytes(1));
 		a.send(bytes(2));
 		await flushed();
-		b.onMessage((message) => got.push(message[0]!));
+		b.onMessage(message => got.push(message[0]!));
 		expect(got).toEqual([1, 2]);
 		a.send(bytes(3));
 		expect(got).toEqual([1, 2]);
@@ -27,7 +27,7 @@ describe("memory links", () => {
 		const got: number[] = [];
 		a.onClose(() => closes.push("a"));
 		b.onClose(() => closes.push("b"));
-		b.onMessage((message) => got.push(message[0]!));
+		b.onMessage(message => got.push(message[0]!));
 		a.close();
 		expect(closes).toEqual(["a"]);
 		a.send(bytes(1));
@@ -44,7 +44,7 @@ describe("memory links", () => {
 	it("drop messages still in flight to a closed end", async () => {
 		const [a, b] = memoryLinkPair();
 		const got: number[] = [];
-		a.onMessage((message) => got.push(message[0]!));
+		a.onMessage(message => got.push(message[0]!));
 		b.send(bytes(1));
 		a.close();
 		await flushed();
@@ -57,7 +57,7 @@ describe("memory links", () => {
 		a.send(bytes(1));
 		a.send(bytes(2));
 		await flushed();
-		b.onMessage((message) => {
+		b.onMessage(message => {
 			got.push(message[0]!);
 			b.close();
 		});

@@ -11,7 +11,7 @@ const context = BACKGROUND_CONTEXT;
 
 // The first answer waits until we let it go, so the conversation stays busy while we submit more.
 let release!: () => void;
-const held = new Promise<void>((resolve) => {
+const held = new Promise<void>(resolve => {
 	release = resolve;
 });
 const slow: FauxResponseStep = async () => {
@@ -48,7 +48,7 @@ console.log("withdraw:", await withdrawn.abort(context));
 const inbox = await harness.snapshot(InboxDoc, root.id, context);
 console.log(
 	"inbox:",
-	inbox?.items.map((item) => `${item.id} ${item.mode}`),
+	inbox?.items.map(item => `${item.id} ${item.mode}`),
 );
 
 // The first answer ends the run at a final boundary: the write is placed first, then the steer and the
@@ -67,6 +67,6 @@ await status("withdrawn", withdrawn);
 const page = await root.entries({}, 20, undefined, context);
 console.log(
 	"transcript:",
-	[...page.items].reverse().map((entry) => entry.kind),
+	[...page.items].reverse().map(entry => entry.kind),
 );
 await harness.close(context);

@@ -148,7 +148,7 @@ class IndexedDbFailure extends Error {}
  */
 function fromIndexedDb(error: unknown): boolean {
 	const seen = new Set<unknown>();
-	for (let at: unknown = error; at !== null && typeof at === "object" && !seen.has(at); ) {
+	for (let at: unknown = error; at !== null && typeof at === "object" && !seen.has(at);) {
 		if (at instanceof DOMException || at instanceof IndexedDbFailure) return true;
 		seen.add(at);
 		at = (at as { cause?: unknown }).cause;
@@ -421,7 +421,7 @@ export class IndexedDbStorage implements Storage {
 		const factory = options.indexedDB ?? globalThis.indexedDB;
 		if (factory === undefined) throw new Error("IndexedDB is not available");
 		const request = factory.open(name, DATABASE_VERSION);
-		request.addEventListener("upgradeneeded", (event) => {
+		request.addEventListener("upgradeneeded", event => {
 			if ((event as IDBVersionChangeEvent).oldVersion === 0) createSchema(request.result);
 		});
 		const database = await requestResult(request);
@@ -461,7 +461,7 @@ export class IndexedDbStorage implements Storage {
 		this.assertOpen();
 		const seqs: Seq[] = [];
 		let refused: { readonly error: unknown } | undefined;
-		await this.transaction(ALL_STORES, "readwrite", async (transaction) => {
+		await this.transaction(ALL_STORES, "readwrite", async transaction => {
 			const metaStore = transaction.objectStore(STORES.meta);
 			const metadata = await requestResult(metaStore.get(META_KEY) as IDBRequest<MetaRow>);
 			if (metadata === undefined) throw new Error("Durable IndexedDB metadata is missing");
@@ -499,7 +499,7 @@ export class IndexedDbStorage implements Storage {
 
 	async mintId<I extends Id<string>>(): Promise<I> {
 		this.assertOpen();
-		return this.transaction(STORES.meta, "readwrite", async (transaction) => {
+		return this.transaction(STORES.meta, "readwrite", async transaction => {
 			const store = transaction.objectStore(STORES.meta);
 			const metadata = await requestResult(store.get(META_KEY) as IDBRequest<MetaRow>);
 			if (metadata === undefined) throw new Error("Durable IndexedDB metadata is missing");
@@ -513,7 +513,7 @@ export class IndexedDbStorage implements Storage {
 		return this.transaction(
 			STORES.conversations,
 			"readonly",
-			async (transaction) =>
+			async transaction =>
 				(
 					await requestResult(
 						transaction.objectStore(STORES.conversations).get(id) as IDBRequest<ConversationRow | undefined>,
@@ -529,7 +529,7 @@ export class IndexedDbStorage implements Storage {
 		_context: Context,
 	): Promise<Page<ConversationRecord, Cursor>> {
 		const start = scanStart(query.order, cursor, "ascending");
-		return this.transaction(STORES.conversations, "readonly", async (transaction) => {
+		return this.transaction(STORES.conversations, "readonly", async transaction => {
 			const store = transaction.objectStore(STORES.conversations);
 			const accept = (row: ConversationRow) =>
 				query.ownerConversationId === undefined || row.ownerConversationId === query.ownerConversationId;
@@ -560,7 +560,7 @@ export class IndexedDbStorage implements Storage {
 				);
 			}
 			return page(
-				rows.map((row) => row.record),
+				rows.map(row => row.record),
 				limit,
 				start.order,
 			);
@@ -578,7 +578,7 @@ export class IndexedDbStorage implements Storage {
 		idOrContext: EntryId | Context,
 		context?: Context,
 	): Promise<{ readonly entry: EntryRecord; readonly commitSeq: Seq } | undefined> {
-		return this.transaction([STORES.conversations, STORES.entries], "readonly", async (transaction) => {
+		return this.transaction([STORES.conversations, STORES.entries], "readonly", async transaction => {
 			const id =
 				context === undefined
 					? idFromNumber<EntryId>(idOrConversationId)
@@ -614,7 +614,7 @@ export class IndexedDbStorage implements Storage {
 		atOrBeforeEntryId: EntryId | undefined,
 		_context: Context,
 	): Promise<(EntryRecord & { readonly head: EntryId }) | undefined> {
-		return this.transaction([STORES.conversations, STORES.entries], "readonly", async (transaction) => {
+		return this.transaction([STORES.conversations, STORES.entries], "readonly", async transaction => {
 			let conversation = await this.readConversation(transaction, conversationId);
 			if (conversation === undefined) throw new StorageRequestError(`Unknown conversation: ${conversationId}`);
 			let upper = atOrBeforeEntryId ?? MAX_KEY;
@@ -636,7 +636,7 @@ export class IndexedDbStorage implements Storage {
 		_context: Context,
 	): Promise<Page<EntryRecord, Cursor>> {
 		const start = scanStart(query.order, cursor, "descending");
-		return this.transaction([STORES.conversations, STORES.entries], "readonly", async (transaction) => {
+		return this.transaction([STORES.conversations, STORES.entries], "readonly", async transaction => {
 			const values =
 				start.order === "ascending"
 					? await this.readEntriesAscending(transaction, query, limit, start.after)
@@ -649,7 +649,7 @@ export class IndexedDbStorage implements Storage {
 		return this.transaction(
 			STORES.tasks,
 			"readonly",
-			async (transaction) =>
+			async transaction =>
 				(await requestResult(transaction.objectStore(STORES.tasks).get(id) as IDBRequest<TaskRow | undefined>))
 					?.record,
 		);
@@ -662,7 +662,7 @@ export class IndexedDbStorage implements Storage {
 		_context: Context,
 	): Promise<Page<StoredTask, Cursor>> {
 		const start = scanStart(query.order, cursor, "ascending");
-		return this.transaction(STORES.tasks, "readonly", async (transaction) => {
+		return this.transaction(STORES.tasks, "readonly", async transaction => {
 			const store = transaction.objectStore(STORES.tasks);
 			const accept = (row: TaskRow) =>
 				(query.conversationId === undefined || row.conversationId === query.conversationId) &&
@@ -699,7 +699,7 @@ export class IndexedDbStorage implements Storage {
 						)
 					: await scanCompoundRows<TaskRow>(source as IDBIndex, prefix, start, limit + 1, accept);
 			return page(
-				rows.map((row) => row.record),
+				rows.map(row => row.record),
 				limit,
 				start.order,
 			);
@@ -710,7 +710,7 @@ export class IndexedDbStorage implements Storage {
 		return this.transaction(
 			STORES.submissions,
 			"readonly",
-			async (transaction) =>
+			async transaction =>
 				(
 					await requestResult(
 						transaction.objectStore(STORES.submissions).get(id) as IDBRequest<SubmissionRow | undefined>,
@@ -726,7 +726,7 @@ export class IndexedDbStorage implements Storage {
 		_context: Context,
 	): Promise<Page<SubmissionRecord, Cursor>> {
 		const start = scanStart(query.order, cursor, "ascending");
-		return this.transaction(STORES.submissions, "readonly", async (transaction) => {
+		return this.transaction(STORES.submissions, "readonly", async transaction => {
 			const store = transaction.objectStore(STORES.submissions);
 			const accept = (row: SubmissionRow) =>
 				(query.conversationId === undefined || row.conversationId === query.conversationId) &&
@@ -758,7 +758,7 @@ export class IndexedDbStorage implements Storage {
 				);
 			}
 			return page(
-				rows.map((row) => row.record),
+				rows.map(row => row.record),
 				limit,
 				start.order,
 			);
@@ -770,7 +770,7 @@ export class IndexedDbStorage implements Storage {
 		requestId: string,
 		_context: Context,
 	): Promise<SubmissionRecord | undefined> {
-		return this.transaction(STORES.submissions, "readonly", async (transaction) => {
+		return this.transaction(STORES.submissions, "readonly", async transaction => {
 			const row = await requestResult(
 				transaction
 					.objectStore(STORES.submissions)
@@ -782,19 +782,19 @@ export class IndexedDbStorage implements Storage {
 	}
 
 	findDocument(address: DocumentAddress, at: DocumentPoint, _context: Context): Promise<DocumentRecord | undefined> {
-		return this.transaction(STORES.documents, "readonly", async (transaction) => {
+		return this.transaction(STORES.documents, "readonly", async transaction => {
 			const row = await firstCursorValue<DocumentRow>(
 				transaction.objectStore(STORES.documents).index(INDEXES.documentsByAddress),
 				keyRanges().bound([...addressPrefix(address), 0, 0], [...addressPrefix(address), MAX_KEY, MAX_KEY]),
 				"prev",
-				(value) => isAliveAt(value.record, at),
+				value => isAliveAt(value.record, at),
 			);
 			return row?.record;
 		});
 	}
 
 	document(id: DocumentId, at: DocumentPoint, _context: Context): Promise<StoredDocument | undefined> {
-		return this.transaction([STORES.documents, STORES.documentRevisions], "readonly", (transaction) =>
+		return this.transaction([STORES.documents, STORES.documentRevisions], "readonly", transaction =>
 			this.materializeDocument(transaction, id, at),
 		);
 	}
@@ -806,7 +806,7 @@ export class IndexedDbStorage implements Storage {
 		_context: Context,
 	): Promise<Page<DocumentRecord, Cursor>> {
 		const after = cursorId<DocumentId>(cursor);
-		return this.transaction(STORES.documents, "readonly", async (transaction) => {
+		return this.transaction(STORES.documents, "readonly", async transaction => {
 			const scope = scopeColumns(query.scope);
 			const store = transaction.objectStore(STORES.documents);
 			const index =
@@ -820,10 +820,10 @@ export class IndexedDbStorage implements Storage {
 				compoundIdRange(prefix, after ?? 0, MAX_KEY, after !== undefined),
 				"next",
 				limit + 1,
-				(row) => isAliveAt(row.record, query.at),
+				row => isAliveAt(row.record, query.at),
 			);
 			return page(
-				rows.map((row) => row.record),
+				rows.map(row => row.record),
 				limit,
 			);
 		});
@@ -839,7 +839,7 @@ export class IndexedDbStorage implements Storage {
 
 	private async closeDatabase(): Promise<void> {
 		if (this.activeOperations > 0) {
-			await new Promise<void>((resolve) => {
+			await new Promise<void>(resolve => {
 				this.operationsDrained = resolve;
 			});
 		}
@@ -910,7 +910,7 @@ export class IndexedDbStorage implements Storage {
 					"prev",
 					limit + 1 - values.length,
 				);
-				values.push(...rows.map((row) => row.record));
+				values.push(...rows.map(row => row.record));
 			}
 			if (values.length > limit || conversation.parent === undefined) break;
 			upper = Math.min(upper, conversation.parent.at);
@@ -949,7 +949,7 @@ export class IndexedDbStorage implements Storage {
 				"next",
 				limit + 1 - values.length,
 			);
-			values.push(...rows.map((row) => row.record));
+			values.push(...rows.map(row => row.record));
 			if (values.length > limit) break;
 		}
 		return values;
@@ -1107,7 +1107,7 @@ export class IndexedDbStorage implements Storage {
 			transaction.objectStore(STORES.documents).index(INDEXES.documentsByAddress),
 			keyRanges().bound([...addressPrefix(address), 0, 0], [...addressPrefix(address), MAX_KEY, MAX_KEY]),
 			"prev",
-			(value) => value.retiredAt === undefined,
+			value => value.retiredAt === undefined,
 		);
 		return row?.id;
 	}

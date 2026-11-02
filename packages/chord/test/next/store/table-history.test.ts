@@ -10,8 +10,8 @@ import { evolveTable } from "../../../src/next/store/table-evolve.ts";
 import { planTable } from "../../../src/next/store/table-history.ts";
 
 const V1 = defineTable("edits", { version: 1, columns: { id: str(), at: int() }, key: ["id"] });
-const V2 = evolveTable(V1, (t) => t.add("dir", str({ default: "" })).rows(() => ({})));
-const V3 = evolveTable(V2, (t) => t.index("by_at", ["at"]));
+const V2 = evolveTable(V1, t => t.add("dir", str({ default: "" })).rows(() => ({})));
+const V3 = evolveTable(V2, t => t.index("by_at", ["at"]));
 
 /** The record of `definition` in `state`. */
 function recorded(definition: TableDefinition, state: "ready" | "migrating" = "ready"): TableRecord {
@@ -46,7 +46,7 @@ describe("refusals", () => {
 		],
 		[
 			"a history edited in place",
-			evolveTable(V1, (t) => t.add("dir", str({ default: "x" }))),
+			evolveTable(V1, t => t.add("dir", str({ default: "x" }))),
 			recorded(V2),
 			"recorded with another definition",
 		],

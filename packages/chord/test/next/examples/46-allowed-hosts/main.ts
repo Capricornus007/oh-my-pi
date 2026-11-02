@@ -31,10 +31,10 @@ const { port } = await http.listening(context);
 
 /** GET /hello through `host` (as a tunnel would forward it), printed. */
 async function hello(host: string): Promise<void> {
-	const answer = await new Promise<string>((resolve) => {
-		const req = request({ host: "127.0.0.1", port, path: "/hello", headers: { host } }, (res) => {
+	const answer = await new Promise<string>(resolve => {
+		const req = request({ host: "127.0.0.1", port, path: "/hello", headers: { host } }, res => {
 			let body = "";
-			res.on("data", (chunk) => {
+			res.on("data", chunk => {
 				body += chunk;
 			});
 			res.on("end", () => resolve(`${res.statusCode} ${body}`));

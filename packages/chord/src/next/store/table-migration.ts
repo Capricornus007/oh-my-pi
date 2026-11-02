@@ -110,7 +110,7 @@ async function migrateSteps(
 ): Promise<void> {
 	const { before, step, after } = definition.evolution!.migration;
 	const { table } = target;
-	const edits = (list: typeof before): StagedWrite[] => list.map((edit) => stageEdit(table, definition.version, edit));
+	const edits = (list: typeof before): StagedWrite[] => list.map(edit => stageEdit(table, definition.version, edit));
 	const ready = [...edits(after), recordOf(definition, definition, "ready", table)];
 	if (step === undefined) return commit([...edits(before), ...ready], target, context);
 	if (from === "begin")
@@ -162,15 +162,15 @@ async function rowsStep(
 		for (;;) {
 			const statement = sql.select(below, order, after, MIGRATION_CHUNK + 1);
 			const stored = await target.store.read(
-				(executor) => executor.all<{ [column: string]: SqliteValue }>(statement.sql, ...statement.params),
+				executor => executor.all<{ [column: string]: SqliteValue }>(statement.sql, ...statement.params),
 				context,
 			);
 			const last = stored.length <= MIGRATION_CHUNK;
 			if (!last) stored.length = MIGRATION_CHUNK;
-			const writes = stored.map((row) => patchRow(step, row, v, sql, target.table, context));
+			const writes = stored.map(row => patchRow(step, row, v, sql, target.table, context));
 			if (last) return await commit([...writes, ...ready], target, context);
 			await commit(writes, target, context);
-			after = columns.key.map((name) => stored[MIGRATION_CHUNK - 1]![name]!);
+			after = columns.key.map(name => stored[MIGRATION_CHUNK - 1]![name]!);
 			await macrotask(() => {
 				channel ??= new MessageChannel();
 				return channel;
@@ -190,7 +190,7 @@ async function rowsStep(
  * migration bench: 100 ms against 70 ms).
  */
 function macrotask(channel: () => InstanceType<typeof MessageChannel>): Promise<void> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		// A runtime feature check: Workers and browsers have no `setImmediate`. Read once from the global, and called only
 		// when it is a function: a check by name (`in`) and a later lookup could disagree.
 		const immediate = (globalThis as { readonly setImmediate?: unknown }).setImmediate;
@@ -235,7 +235,7 @@ function patchRow(
 	// Key columns are non-opt `str` or `int`: stored scalars.
 	for (const name of definition.key) key[name] = stored[name] as Scalar;
 	const versions = jsonVersions(definition, set);
-	const params = definition.key.map((name) => stored[name]!);
+	const params = definition.key.map(name => stored[name]!);
 	const statement = sql.update({ ...set, [ROW_VERSION]: v }, params, versions);
 	return stageUpdate(statement, table, key, set, recordedVersions(set, versions), v);
 }

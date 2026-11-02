@@ -431,18 +431,18 @@ export class TaskScheduler {
 	 * `running` task stays as committed, running in another process.
 	 */
 	async open(context: Context): Promise<void> {
-		this.#session.followCommits((publication) => this.#observe(publication));
+		this.#session.followCommits(publication => this.#observe(publication));
 		this.#session.subscribeClose(() => this.#seal());
 		this.#unsubscribeRegistry = this.#registry.subscribe(() => {
 			this.#notifyBlocked();
 			this.#kick();
 		});
-		await this.#session.commitWith(async (tx) => {
+		await this.#session.commitWith(async tx => {
 			await this.#published();
 			// Every table read before the first write.
 			const scans = [];
 			for (const status of LIVE_STATUSES) {
-				scans.push(await scanAll((cursor) => tx.scanTasks({ status }, SCAN_PAGE_SIZE, cursor)));
+				scans.push(await scanAll(cursor => tx.scanTasks({ status }, SCAN_PAGE_SIZE, cursor)));
 			}
 			for (const records of scans) {
 				for (const record of records) {
@@ -538,8 +538,7 @@ export class TaskScheduler {
 		for (const record of this.#live.values()) {
 			const state = record.state;
 			if (state.status === "completing") continue;
-			if (state.status === "waiting" && !record.abortRequested && state.on.some((id) => this.#live.has(id)))
-				continue;
+			if (state.status === "waiting" && !record.abortRequested && state.on.some(id => this.#live.has(id))) continue;
 			if (state.status === "sleeping" && !record.abortRequested && state.until > now) continue;
 			// An abort invocation waits for the live work below it, which counts itself.
 			if (record.abortRequested && this.#waitingOn(record, true).length > 0) continue;
@@ -568,13 +567,13 @@ export class TaskScheduler {
 	async join(): Promise<void> {
 		const stopped = [...this.#invocations.values()];
 		for (const invocation of stopped) invocation.controller.abort();
-		await Promise.allSettled(stopped.map((invocation) => invocation.done));
+		await Promise.allSettled(stopped.map(invocation => invocation.done));
 		if (stopped.length === 0) return;
 		// A close is not a crash: a task it stopped is `pending` again, so the next open counts no restart for it. Read
 		// on the line after commits admitted before the seal, such as an abort mark, so the write keeps them. A failure
 		// leaves them `running`, counted as if cut off; the Storage guard fails the Session and reports it.
 		await this.#writeAtClose(() =>
-			stopped.flatMap((invocation) => {
+			stopped.flatMap(invocation => {
 				const record = this.#live.get(invocation.taskId);
 				if (record?.state.status !== "running") return [];
 				const value = withState(record, { status: "pending", checkpoint: record.state.checkpoint });
@@ -591,7 +590,7 @@ export class TaskScheduler {
 	 * as for an owner's own cleanup, such a task keeps its mark and waits on.
 	 */
 	async abort(id: TaskId, context: Context, keepRestart = false): Promise<"marked" | "terminal"> {
-		const marked = await this.#session.commitWith(async (tx) => {
+		const marked = await this.#session.commitWith(async tx => {
 			const current = await tx.task(id);
 			if (current === undefined) throw new Error(`Task ${id} does not exist`);
 			if (current.state.status === "terminal") return { result: "terminal" as const };
@@ -623,7 +622,7 @@ export class TaskScheduler {
 
 	async waitForTask(id: TaskId, context: Context): Promise<SettledTask<JsonValue>> {
 		// Check and register on the line so no terminal publication falls between them.
-		const found = await this.#session.readOnLine(async (storage) => {
+		const found = await this.#session.readOnLine(async storage => {
 			if (this.#closing) throw closedError(this.#session);
 			if (await this.#region(() => this.#liveRecord(id) !== undefined)) {
 				return { promise: this.#taskWaiters.add(id, context) };
@@ -652,7 +651,7 @@ export class TaskScheduler {
 	 * crosses background boundaries, and the wait also covers every task it reached.
 	 */
 	async abortConversation(conversationId: ConversationId, background: boolean, context: Context): Promise<void> {
-		const reached = await this.#session.commitWith(async (tx) => {
+		const reached = await this.#session.commitWith(async tx => {
 			await this.#published();
 			const queued = await this.#loadScopes(true);
 			const scope = { conversation: conversationId };
@@ -683,7 +682,7 @@ export class TaskScheduler {
 	membershipKeys(tx: Transaction): readonly string[] | Promise<readonly string[]> {
 		const tasks = tx.stagedTasks();
 		const conversations = tx.stagedConversations();
-		if (tasks.length === 0 && conversations.every((record) => record.owner === undefined)) return NO_KEYS;
+		if (tasks.length === 0 && conversations.every(record => record.owner === undefined)) return NO_KEYS;
 		return this.#membershipKeys(tx, tasks, conversations);
 	}
 
@@ -1023,7 +1022,7 @@ export class TaskScheduler {
 		const work = this.#reconcileWork();
 		if (work) this.#reconcilingWork++;
 		try {
-			await this.#session.commitInternal(async (tx) => {
+			await this.#session.commitInternal(async tx => {
 				if (this.#closing) return;
 				// A cascade scans the queued inputs, which waits for every unpublished commit: a request made before the scan
 				// is covered by it, and none is published while the job holds the line after it.
@@ -1033,7 +1032,7 @@ export class TaskScheduler {
 				const marks = await this.#marks();
 				for (const { record, reason } of marks.values()) tx.setTask(withAbortMark(record, reason));
 				const withdrawn = await this.#region(
-					() => queued.filter((id) => this.#belowCancelled({ conversation: id })),
+					() => queued.filter(id => this.#belowCancelled({ conversation: id })),
 					this.#reloadScopes,
 				);
 				for (const id of withdrawn) await this.#withdrawInputs(tx, id);
@@ -1104,7 +1103,7 @@ export class TaskScheduler {
 			const owner = this.#liveRecord(id)!;
 			// Only an owner abandoned after a restart, and nothing else, passes its reason on.
 			const restart = owner.abortReason === "restart" && !failedOutcome(owner);
-			for (const { node, live } of this.#walkDown(id, { enter: (below) => !this.#intent.has(below) })) {
+			for (const { node, live } of this.#walkDown(id, { enter: below => !this.#intent.has(below) })) {
 				if (live !== undefined && !node.background) mark(live, restart ? "restart" : undefined);
 			}
 		}
@@ -1222,11 +1221,11 @@ export class TaskScheduler {
 		}
 		if (!queued) return [];
 		// A scan, which cannot be keyed: it waits for every unpublished commit.
-		const submissions = await scanAll((cursor) =>
+		const submissions = await scanAll(cursor =>
 			this.#session.lineStorage.scanSubmissions({ status: "queued" }, SCAN_PAGE_SIZE, cursor, this.#context),
 		);
-		const inputs = submissions.filter((submission) => submission.type === "input");
-		const conversations = [...new Set(inputs.map((submission) => submission.conversationId))];
+		const inputs = submissions.filter(submission => submission.type === "input");
+		const conversations = [...new Set(inputs.map(submission => submission.conversationId))];
 		for (const id of conversations) await this.#loadChain({ conversation: id });
 		return conversations;
 	}
@@ -1283,7 +1282,7 @@ export class TaskScheduler {
 		} finally {
 			// `#idle()` counts a live task whose chain is not loaded as inside every scope it may be in: what this load
 			// resolved, also when it stopped early, can make such a scope idle without a task change below it.
-			if (passed.some((id) => this.#live.has(id)) || (installed && this.#liveUnloaded())) {
+			if (passed.some(id => this.#live.has(id)) || (installed && this.#liveUnloaded())) {
 				this.#unknownsChanged = true;
 				// A waiter such a task held is checked again at the pass's end, also when this load was not a reconcile's.
 				this.#scheduleReconcile();
@@ -1524,7 +1523,7 @@ export class TaskScheduler {
 	 */
 	#nearestLiveAbove(node: TaskNode, overlay?: Overlay): AnyTaskRecord | undefined {
 		this.#record(INTENT_KEY);
-		for (let current = node; !current.background; ) {
+		for (let current = node; !current.background;) {
 			const owner = current.owner ?? this.#edge(current.conversationId, overlay);
 			if (owner === undefined || owner === null) return undefined;
 			const record = overlay?.tasks.get(owner) ?? this.#liveRecord(owner);
@@ -1896,14 +1895,12 @@ export class TaskScheduler {
 		const faulted: { readonly record: AnyTaskRecord; readonly message: string }[] = [];
 		let abandoned: TaskId[] = [];
 		try {
-			await this.#session.commitInternal(async (tx) => {
+			await this.#session.commitInternal(async tx => {
 				if (!this.#enabled || this.#closing) return;
 				if (this.#abandoned.size > 0) {
 					const ids = [...this.#abandoned];
 					const unmarked = await this.#region(() =>
-						ids
-							.map((id) => this.#liveRecord(id))
-							.filter((record) => record !== undefined && !record.abortRequested),
+						ids.map(id => this.#liveRecord(id)).filter(record => record !== undefined && !record.abortRequested),
 					);
 					for (const record of unmarked) tx.setTask(withAbortMark(record!, "restart"));
 					abandoned = ids;
@@ -2034,8 +2031,8 @@ export class TaskScheduler {
 	#waitingOn(record: AnyTaskRecord, first = false): readonly TaskId[] {
 		if (record.abortRequested) return this.#ownedLive(record.id, { first });
 		if (record.state.status !== "waiting") return [];
-		if (!first) return record.state.on.filter((id) => this.#live.has(id));
-		const live = record.state.on.find((id) => this.#live.has(id));
+		if (!first) return record.state.on.filter(id => this.#live.has(id));
+		const live = record.state.on.find(id => this.#live.has(id));
 		return live === undefined ? [] : [live];
 	}
 
@@ -2196,7 +2193,7 @@ export class TaskScheduler {
 		const runtime = this.#runtime(invocation, phase);
 		const progress = (tx: Transaction, current: ErasedRunningTask) =>
 			this.#progress(tx, current, state, invocation.extension, invocation.context);
-		let current = await this.#step(invocation, (task) => this.#rules(task, undefined), progress);
+		let current = await this.#step(invocation, task => this.#rules(task, undefined), progress);
 		while (current !== undefined && !this.#closing) {
 			const task = current;
 			current = await this.#phase(invocation, task, async () => {
@@ -2210,7 +2207,7 @@ export class TaskScheduler {
 				} catch (error) {
 					previous = { checkpoint, failure: { error } };
 				}
-				return this.#step(invocation, (next) => this.#rules(next, previous), progress);
+				return this.#step(invocation, next => this.#rules(next, previous), progress);
 			});
 		}
 	}
@@ -2234,7 +2231,7 @@ export class TaskScheduler {
 				resumed,
 				...(attempt === undefined ? {} : { attempt }),
 			},
-			async (span) => {
+			async span => {
 				if (span.propagation !== undefined && invocation.links !== undefined) {
 					for (const carrier of invocation.links) span.addLink({ context: span.propagation.extract(carrier) });
 				}
@@ -2374,7 +2371,7 @@ export class TaskScheduler {
 	): Promise<ErasedRunningTask | undefined> {
 		let fault: { readonly error: unknown } | undefined;
 		try {
-			const continued = await this.#session.commitInternal(async (tx) => {
+			const continued = await this.#session.commitInternal(async tx => {
 				const decided = await this.#region(() => {
 					const found = this.#liveRecord(invocation.taskId);
 					if (found?.state.status !== "running" || this.#closing) return { plan: END };
@@ -2564,7 +2561,7 @@ export class TaskScheduler {
 			walked.add(id);
 			// Below a walked task the walk does not go again: its own walk covered what lies below.
 			const found: TaskId[] = [];
-			const walk = this.#walkDown(id, { overlay, enter: (below) => !walked.has(below) });
+			const walk = this.#walkDown(id, { overlay, enter: below => !walked.has(below) });
 			for (const { id: below, node, live } of walk) {
 				if (live === undefined || node.background) continue;
 				found.push(below);
@@ -2651,12 +2648,12 @@ export class TaskScheduler {
 			get models() {
 				return models();
 			},
-			agent: (context) =>
+			agent: context =>
 				invocation.ended ? Promise.reject(endedError(invocation)) : awaitWithContext(agent(), context),
 			get settings() {
 				return settings();
 			},
-			env: (context) => this.#read(invocation, () => this.#env(invocation.conversationId, context)),
+			env: context => this.#read(invocation, () => this.#env(invocation.conversationId, context)),
 			hooks: hooks as ErasedRuntime["hooks"],
 			get registry() {
 				return phase.snapshot();
@@ -2746,13 +2743,13 @@ export class TaskScheduler {
 				)) as ErasedRuntime["snapshotAsOf"],
 			getTask: ((id: TaskId, context: Context) =>
 				this.#read(invocation, () =>
-					this.#session.readOnLine((storage) => storage.task(id, context)),
+					this.#session.readOnLine(storage => storage.task(id, context)),
 				)) as ErasedRuntime["getTask"],
 			waitForTask: ((id: TaskId, context: Context) =>
 				this.#read(invocation, () =>
 					this.waitForTask(id, withAbortSignal(invocation.controller.signal, context)),
 				)) as ErasedRuntime["waitForTask"],
-			ownedTasks: (context) =>
+			ownedTasks: context =>
 				this.#read(invocation, () =>
 					this.#session.readOnLine(async () => {
 						// The step that ends the invocation may have run on the line before this.
@@ -2771,13 +2768,13 @@ export class TaskScheduler {
 						// Copies, as from storage: the scheduler reads its own.
 						return owned
 							.sort((a, b) => a.id - b.id)
-							.map((record) => copyJson(record as unknown as JsonValue) as unknown as AnyTaskRecord);
+							.map(record => copyJson(record as unknown as JsonValue) as unknown as AnyTaskRecord);
 					}),
 				),
 			abortOwned: (id, context) =>
 				this.#read(invocation, async () => {
 					const bound = withAbortSignal(invocation.controller.signal, context);
-					const record = await this.#session.readOnLine((storage) => storage.task(id, bound));
+					const record = await this.#session.readOnLine(storage => storage.task(id, bound));
 					if (record?.owner !== invocation.taskId) {
 						throw new Error(`Task ${id} is not owned by task ${invocation.taskId}`);
 					}
@@ -2787,7 +2784,7 @@ export class TaskScheduler {
 				}),
 			outcomes: ((ids: readonly TaskId[], context: Context) =>
 				this.#read(invocation, () =>
-					this.#session.readOnLine(async (storage) => {
+					this.#session.readOnLine(async storage => {
 						const outcomes: TaskOutcome<JsonValue>[] = [];
 						for (const id of ids) {
 							const state = (await storage.task(id, context))?.state;
@@ -2820,14 +2817,14 @@ export class TaskScheduler {
 					const kept = this.#contexts.get(invocation.conversationId);
 					const entry =
 						(kept === undefined ? undefined : rangeEntry(kept.range, id)) ??
-						(await this.#session.readOnLine((storage) => storage.entry(invocation.conversationId, id, context)))
+						(await this.#session.readOnLine(storage => storage.entry(invocation.conversationId, id, context)))
 							?.entry;
 					return token === undefined || entry?.kind === token.kind ? entry : undefined;
 				});
 			}) as ErasedRuntime["entry"],
 			entries: (query, limit, cursor, context) =>
 				this.#read(invocation, () =>
-					this.#session.readOnLine((storage) =>
+					this.#session.readOnLine(storage =>
 						storage.scanEntries(conversationEntries(invocation.conversationId, query), limit, cursor, context),
 					),
 				),
@@ -2933,7 +2930,7 @@ export class TaskScheduler {
 	): Promise<T> {
 		if (invocation.ended) return Promise.reject(endedError(invocation));
 		return this.#session.commitWith(
-			async (tx) => {
+			async tx => {
 				if (invocation.ended) throw endedError(invocation);
 				if (this.#closing) throw closedError(this.#session);
 				const current = await this.#region(() => {
@@ -2978,7 +2975,7 @@ const TELEMETRY: ReportInfo = { kind: "host_error", callback: "telemetry" };
 /** The extension that installed `task` in `snapshot`, the last one that lists it; none for a built-in task. */
 function installerOf(snapshot: RegistrySnapshot, task: AnyTask | undefined): string | undefined {
 	if (task === undefined) return undefined;
-	return snapshot.installed().findLast((installed) => installed.tasks?.includes(task) === true)?.name;
+	return snapshot.installed().findLast(installed => installed.tasks?.includes(task) === true)?.name;
 }
 
 /** The report info of a failure of a task. */
@@ -3061,8 +3058,8 @@ function nodeOf(record: AnyTaskRecord): TaskNode {
 }
 
 function overlayOf(tx: Transaction): Overlay {
-	const tasks = new Map(tx.stagedTasks().map((record) => [record.id, record]));
-	const edges = new Map(tx.stagedConversations().map((record) => [record.id, record.owner?.taskId ?? null]));
+	const tasks = new Map(tx.stagedTasks().map(record => [record.id, record]));
+	const edges = new Map(tx.stagedConversations().map(record => [record.id, record.owner?.taskId ?? null]));
 	return { tasks, edges };
 }
 
@@ -3154,5 +3151,5 @@ function jsonEqual(left: JsonValue | undefined, right: JsonValue | undefined): b
 	}
 	const keys = Object.keys(left);
 	if (keys.length !== Object.keys(right).length) return false;
-	return keys.every((key) => Object.hasOwn(right, key) && jsonEqual(left[key], right[key]));
+	return keys.every(key => Object.hasOwn(right, key) && jsonEqual(left[key], right[key]));
 }

@@ -3,7 +3,7 @@
 import { constant, defineFacet } from "@earendil-works/chord/next";
 import { Process } from "./contract.ts";
 
-export default defineFacet((host) =>
+export default defineFacet(host =>
 	host.serve(Process, () => ({
 		variant: "main",
 		members: {

@@ -146,7 +146,7 @@ for (const variant of DOCUMENTATION_VARIANTS) {
 	discoveries.push(parseDiscoveredCases(JSON.parse(await readFile(path, "utf8"))));
 }
 compareDiscovery(discoveries[0], discoveries[1]);
-const cases = discoveries[0].map((evalCase) => ({ ...evalCase, file: normalizeDiscoveredFile(evalCase.file) }));
+const cases = discoveries[0].map(evalCase => ({ ...evalCase, file: normalizeDiscoveredFile(evalCase.file) }));
 if (cases.length === 0) throw new Error("No documentation eval cases matched the selection.");
 const tasks = createTaskPlan(cases, modelIdentity, cli.runsPerVariant);
 
@@ -179,7 +179,7 @@ for (const [index, task] of tasks.entries()) {
 	observations.push(observation);
 	await writeFile(
 		resolve(artifactDirectory, "observations.jsonl"),
-		`${observations.map((item) => JSON.stringify(item)).join("\n")}\n`,
+		`${observations.map(item => JSON.stringify(item)).join("\n")}\n`,
 	);
 }
 

@@ -159,7 +159,7 @@ async function runCommand(
 	args: string[],
 	timeoutMs: number,
 ): Promise<{ stdout: string; status: number | null }> {
-	return await new Promise((resolve) => {
+	return await new Promise(resolve => {
 		let stdout = "";
 		let child: ReturnType<typeof spawn>;
 		try {
@@ -182,7 +182,7 @@ async function runCommand(
 			clearTimeout(timeout);
 			resolve({ stdout: "", status: null });
 		});
-		child.on("close", (status) => {
+		child.on("close", status => {
 			clearTimeout(timeout);
 			resolve({ stdout, status });
 		});
@@ -212,7 +212,7 @@ function isLegacyWslBashPath(path: string): boolean {
 	if (systemRoot) {
 		if (!/^[a-z]:[\\/]/i.test(systemRoot)) return false;
 		return ["System32", "Sysnative"].some(
-			(directory) => normalized === win32.join(systemRoot, directory, "bash.exe").toLowerCase(),
+			directory => normalized === win32.join(systemRoot, directory, "bash.exe").toLowerCase(),
 		);
 	}
 	// Fall back to conventional launcher paths only when the Windows directory is unknown.
@@ -252,7 +252,7 @@ async function getShellConfig(customShellPath?: string): Promise<Result<ShellCon
 					`  1. Install Git for Windows: https://git-scm.com/download/win\n` +
 					`  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n` +
 					"  3. Configure an explicit shellPath\n\n" +
-					`Searched Git Bash in:\n${candidates.map((path) => `  ${path}`).join("\n")}`,
+					`Searched Git Bash in:\n${candidates.map(path => `  ${path}`).join("\n")}`,
 			),
 		);
 	}
@@ -529,7 +529,7 @@ class NodeBinaryReader implements BinaryReader {
 		}
 		const chunk = new Uint8Array(64 * 1024);
 		try {
-			for (let position = 0; ; ) {
+			for (let position = 0; ;) {
 				const { bytesRead } = await this.file.read(chunk, 0, chunk.length, position);
 				const afterReadAbort = abortResult<LineScan>(context.abortSignal, this.path);
 				if (afterReadAbort) return afterReadAbort;
@@ -635,7 +635,7 @@ export class NodeExecutionEnv implements ExecutionEnv {
 		try {
 			const watcher = await NodeFileWatcher.open(
 				targets,
-				(path) => resolvePath(this.cwd, path),
+				path => resolvePath(this.cwd, path),
 				onChange,
 				this.watchOptions,
 			);
@@ -700,7 +700,7 @@ export class NodeExecutionEnv implements ExecutionEnv {
 			);
 		}
 
-		return await new Promise((resolvePromise) => {
+		return await new Promise(resolvePromise => {
 			let settled = false;
 			let timedOut = false;
 			let callbackError: ExecutionError | undefined;
@@ -800,7 +800,7 @@ export class NodeExecutionEnv implements ExecutionEnv {
 				await spillStart;
 				const stream = spillStream;
 				if (stream === undefined || spillError !== undefined || stream.destroyed) return;
-				await new Promise<void>((resolveFinish) => {
+				await new Promise<void>(resolveFinish => {
 					stream.once("error", () => resolveFinish());
 					stream.once("finish", resolveFinish);
 					stream.end();

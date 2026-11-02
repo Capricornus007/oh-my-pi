@@ -100,13 +100,13 @@ function examples() {
 		sections: [
 			section("preamble", () => "You are an expert coding assistant.", { tag: false }),
 			// The environment the host built for this conversation, in the conversation's directory.
-			section("cwd", (input) => input.env && `Working directory: ${input.env.cwd}`),
+			section("cwd", input => input.env && `Working directory: ${input.env.cwd}`),
 		],
 	});
 	const Permissions = defineExtension({
 		name: "permissions",
 		hooks: [
-			hook(ToolTask, { beforeTool: async (call) => (isDangerous(call) ? { block: "Needs approval" } : undefined) }),
+			hook(ToolTask, { beforeTool: async call => (isDangerous(call) ? { block: "Needs approval" } : undefined) }),
 		],
 	});
 	// A role and a review loop, for conversations that select it.
@@ -119,7 +119,7 @@ function examples() {
 	const Timing = defineExtension({
 		name: "timing",
 		wraps: [
-			wrapTool(bashTool, (tool) => ({
+			wrapTool(bashTool, tool => ({
 				...tool,
 				execute: async (args, api, context) => {
 					const start = Date.now();
@@ -175,7 +175,7 @@ function examples() {
 				replay: "safe",
 				execute: async (args, api, context) => {
 					const { task } = args;
-					const child = await api.commit(async (tx) => {
+					const child = await api.commit(async tx => {
 						const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
 						if (existing !== undefined) return existing.id;
 						// Starts as a copy of this conversation's agent: model, thinking level, cwd, extensions, tools.
@@ -335,7 +335,7 @@ function examples() {
 
 			registry.install(PlanMode);
 			// PlanMode is in the default selection; /plan toggles this conversation's state.
-			await root.commit(async (tx) => {
+			await root.commit(async tx => {
 				(await tx.doc(PlanModeDoc, root.id)).enabled = true;
 			}, context);
 
@@ -376,7 +376,7 @@ function examples() {
 
 		// Section 4: table reads before the first table write; documents stay usable.
 		tableRules: async () => {
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				const conversation = await tx.conversation(conversationId); // table read
 				const live = await tx.doc(LiveDoc, conversationId);
 
@@ -390,7 +390,7 @@ function examples() {
 		// Section 3.4: drafts are revoked after their commit.
 		revokedDraft: async () => {
 			let escaped: Draft<LiveState> | undefined;
-			await session.commit(async (tx) => {
+			await session.commit(async tx => {
 				escaped = await tx.doc(LiveDoc, conversationId);
 			}, context);
 			escaped!.generation = undefined; // throws: the draft was revoked

@@ -17,7 +17,7 @@ const Kept = remote("app.kept", {
 
 describe("host.activity", () => {
 	it("counts holds arriving over links and served here, not this host's own references", async () => {
-		const { server, client } = await linked((h) => void serveNotes(h));
+		const { server, client } = await linked(h => void serveNotes(h));
 		expect(server.activity.value).toEqual({ references: 0, calls: 0, jobs: 0, lingering: 0 });
 		const notes = await client.get(Notes, { session: "S1" }, context);
 		await server.get(Notes, { session: "S2" }, context);
@@ -41,7 +41,7 @@ describe("host.activity", () => {
 	});
 
 	it("counts method calls running on this host, local and remote, until they settle", async () => {
-		const { server, client } = await linked((h) => void serveNotes(h));
+		const { server, client } = await linked(h => void serveNotes(h));
 		const remoteRef = await client.get(Notes, { session: "S1" }, context);
 		const localRef = await server.get(Notes, { session: "S1" }, context);
 		const calls = [remoteRef.wait(context), localRef.wait(context)];
@@ -56,7 +56,7 @@ describe("host.activity", () => {
 
 	it("publishes once per microtask turn with changes; a slow watcher gets the newest counts", async () => {
 		const Counter = local("app.counter", { version: 1, params: {}, members: { bump: method() } });
-		const { host } = await loaded((h) => h.serve(Counter, () => ({ bump: async () => null })));
+		const { host } = await loaded(h => h.serve(Counter, () => ({ bump: async () => null })));
 		const counter = await host.get(Counter, {}, context);
 		const watch = await host.activity.watch(context);
 		const frames = framesOf(watch);
@@ -73,12 +73,12 @@ describe("host.activity", () => {
 
 	it("gives a slow watcher the newest counts once it is free: its pending frames fold", async () => {
 		const Counter = local("app.counter", { version: 1, params: {}, members: { bump: method() } });
-		const { host } = await loaded((h) => h.serve(Counter, () => ({ bump: async () => null })));
+		const { host } = await loaded(h => h.serve(Counter, () => ({ bump: async () => null })));
 		const counter = await host.get(Counter, {}, context);
 		const watch = await host.activity.watch(context);
 		const gate = Promise.withResolvers<void>();
 		const seen: unknown[] = [];
-		watch.start(async (call) => {
+		watch.start(async call => {
 			if (call.kind !== "value") return;
 			seen.push(call.value);
 			if (seen.length === 1) await gate.promise;
@@ -97,7 +97,7 @@ describe("host.activity", () => {
 	it("schedules nothing while nobody watches or derives from it; a later watch reads the counts then", async () => {
 		const Counter = local("app.counter", { version: 1, params: {}, members: { bump: method(), wait: method() } });
 		const gate = Promise.withResolvers<null>();
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Counter, () => ({ bump: async () => null, wait: () => gate.promise })),
 		);
 		const counter = await host.get(Counter, {}, context);
@@ -120,7 +120,7 @@ describe("host.activity", () => {
 	it("feeds derives (base code holding the host): they recompute in the publishing batch", async () => {
 		const Busy = local("app.busy", { version: 1, params: {}, members: { busy: bool(), work: method() } });
 		const host = createHost({ onError: () => {} });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Busy, (_, self) => ({
 				busy: self.derive([host.activity], ([{ calls }]) => calls > 0),
 				work: async () => null,
@@ -139,7 +139,7 @@ describe("host.activity", () => {
 		fakeTimers();
 
 		it("counts live objects kept by their type's linger after their last reference, until they end", async () => {
-			const { server, client } = await linked((h) =>
+			const { server, client } = await linked(h =>
 				h.serve(Kept, () => ({ variant: "v", members: { n: constant(1) } }), { linger: 1000 }),
 			);
 			const kept = await client.get(Kept, {}, context);

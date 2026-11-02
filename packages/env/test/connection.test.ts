@@ -119,12 +119,12 @@ describe("Connection start failures", () => {
 
 	it("passes stderr to onLog unchanged", async () => {
 		const logged: string[] = [];
-		await startError(connect(failing("\u001b[31mred\u001b[0m\n"), (text) => logged.push(text)));
+		await startError(connect(failing("\u001b[31mred\u001b[0m\n"), text => logged.push(text)));
 		expect(logged.join("")).toBe("\u001b[31mred\u001b[0m\n");
 	});
 
 	// #10716: acknowledge the first stderr read before writing the remaining UTF-8 bytes.
-	it.each(["\u00e9", "\u9519", "\u{1f600}"])("decodes %s split across stderr chunks", async (character) => {
+	it.each(["\u00e9", "\u9519", "\u{1f600}"])("decodes %s split across stderr chunks", async character => {
 		const directory = mkdtempSync(join(tmpdir(), "pi-env-stderr-"));
 		const acknowledged = join(directory, "logged");
 		const stderr = `prefix ${character} suffix\n`;
@@ -144,7 +144,7 @@ const poll = setInterval(() => {
 	process.stderr.write(bytes.subarray(${split}), () => process.exit(7));
 }, 5);
 `,
-			(text) => {
+			text => {
 				logged.push(text);
 				if (!existsSync(acknowledged)) writeFileSync(acknowledged, "");
 			},
@@ -165,7 +165,7 @@ const poll = setInterval(() => {
 	it("flushes an incomplete UTF-8 character when stderr ends", async () => {
 		const logged: string[] = [];
 		const error = await startError(
-			connect("process.stderr.write(Buffer.from([0x78, 0xf0, 0x9f]), () => process.exit(7));", (text) =>
+			connect("process.stderr.write(Buffer.from([0x78, 0xf0, 0x9f]), () => process.exit(7));", text =>
 				logged.push(text),
 			),
 		);

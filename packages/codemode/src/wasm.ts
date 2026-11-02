@@ -24,7 +24,7 @@ export function loadQuickJSWasm(path?: string): Promise<CodemodeWasmModule> {
 	if (!module) {
 		const { WebAssembly } = globalThis as unknown as { WebAssembly: WebAssemblyGlobal };
 		module = readFile(resolved)
-			.then((bytes) => WebAssembly.compile(bytes))
+			.then(bytes => WebAssembly.compile(bytes))
 			.catch((error: unknown) => {
 				modules.delete(resolved);
 				throw error;

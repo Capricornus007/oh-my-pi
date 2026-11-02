@@ -24,14 +24,14 @@ const context = BACKGROUND_CONTEXT;
 // Version 1, the base, written in full.
 const EditsV1 = defineTable("edits", { version: 1, columns: { id: str(), file: str(), at: int() }, key: ["id"] });
 // Version 2: `file` becomes `path`, a `dir` column is added and filled from each row (the data step).
-const EditsV2 = evolveTable(EditsV1, (t) =>
+const EditsV2 = evolveTable(EditsV1, t =>
 	t
 		.rename("file", "path")
 		.add("dir", str({ default: "" }))
-		.rows((row) => ({ dir: row.path.slice(0, row.path.lastIndexOf("/")) })),
+		.rows(row => ({ dir: row.path.slice(0, row.path.lastIndexOf("/")) })),
 );
 // Version 3: `dir` is dropped again, an index is added. Data functions stay as deployed; history only grows.
-const EditsV3 = evolveTable(EditsV2, (t) => t.drop("dir").index("by_path", ["path", "at"]));
+const EditsV3 = evolveTable(EditsV2, t => t.drop("dir").index("by_path", ["path", "at"]));
 
 const History = local("example.history", {
 	version: 1,
@@ -41,13 +41,13 @@ const History = local("example.history", {
 
 /** The facet of one deployment: its newest table version, and how it writes a row. */
 function facetOf(definition: TableDefinition, row: (id: string, at: number) => Record<string, unknown>) {
-	return defineFacet((host) => {
+	return defineFacet(host => {
 		host.serve(History, (_, self) => {
 			const edits = self.table(definition);
 			return {
 				record: async ({ id, at }, ctx) => {
 					// A deployment's rows match its own version (an example shortcut for two versions in one file).
-					await self.tx(async (tx) => tx.put(edits, row(id, at) as never), ctx);
+					await self.tx(async tx => tx.put(edits, row(id, at) as never), ctx);
 					return null;
 				},
 				dump: async (_, ctx) => {
@@ -67,7 +67,7 @@ async function deployment(
 	work: (history: Reference<typeof History>) => Promise<void>,
 ) {
 	const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(path)), context);
-	const host = createHost({ store, onError: (error) => console.error("background error:", error) });
+	const host = createHost({ store, onError: error => console.error("background error:", error) });
 	// Objects with empty params activate at load: the migration runs before `load` resolves.
 	await host.load([{ name: "@example/history", facet }], context);
 	await work(await host.get(History, {}, context));
@@ -81,7 +81,7 @@ try {
 	await deployment(
 		path,
 		facetOf(EditsV1, (id, at) => ({ id, file: `src/${id}.ts`, at })),
-		async (history) => {
+		async history => {
 			for (let i = 0; i < 3; i++) await history.record({ id: `e${i}`, at: i }, context);
 			console.log("version 1:", await history.dump({}, context));
 		},
@@ -90,7 +90,7 @@ try {
 	await deployment(
 		path,
 		facetOf(EditsV3, (id, at) => ({ id, path: `lib/${id}.ts`, at })),
-		async (history) => {
+		async history => {
 			await history.record({ id: "e9", at: 9 }, context);
 			console.log("version 3:", await history.dump({}, context));
 		},

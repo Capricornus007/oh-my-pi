@@ -32,7 +32,7 @@ function task(name: string, version: number, options: { gate?: Promise<void>; mi
 }
 
 function stateOf(tasks: readonly TaskInspection[], id: TaskId): TaskInspection["state"] | undefined {
-	return tasks.find((entry) => entry.record.id === id)?.state;
+	return tasks.find(entry => entry.record.id === id)?.state;
 }
 
 describe("Harness.inspect()", () => {
@@ -75,7 +75,7 @@ describe("Harness.inspect()", () => {
 		];
 		const { harness } = await openTasks(new MemoryStorage(), registered);
 		const root = await harness.root(context);
-		const ids = await root.commit(async (tx) => {
+		const ids = await root.commit(async tx => {
 			gateId = await tx.createTask(Gate, null, { ownership: { kind: "conversation" } });
 			return {
 				gate: gateId,
@@ -93,7 +93,7 @@ describe("Harness.inspect()", () => {
 
 		const paused = await harness.inspect(context);
 		expect(paused.scheduling).toBe("paused");
-		expect(paused.tasks.map((entry) => entry.record.id)).toEqual(Object.values(ids));
+		expect(paused.tasks.map(entry => entry.record.id)).toEqual(Object.values(ids));
 		expect(stateOf(paused.tasks, ids.gate)).toEqual({ kind: "pending", migrates: false });
 		expect(stateOf(paused.tasks, ids.dependent)).toEqual({ kind: "pending", migrates: false });
 		expect(stateOf(paused.tasks, ids.migrating)).toEqual({ kind: "pending", migrates: true });
@@ -133,7 +133,7 @@ describe("Harness.inspect()", () => {
 		gate.resolve();
 		await harness.waitForTask(ids.dependent, context);
 		const settled = await harness.inspect(context);
-		expect(settled.tasks.map((entry) => entry.record.id)).toEqual([
+		expect(settled.tasks.map(entry => entry.record.id)).toEqual([
 			ids.noMigration,
 			ids.failing,
 			ids.tooOld,
@@ -154,7 +154,7 @@ describe("Harness.inspect()", () => {
 
 		const inspection = await harness.inspect(context);
 		expect(inspection.submissions).toEqual([await input.status(context)]);
-		expect(inspection.tasks.map((entry) => [entry.record.kind, entry.state.kind])).toEqual([
+		expect(inspection.tasks.map(entry => [entry.record.kind, entry.state.kind])).toEqual([
 			["pi.generation", "running"],
 		]);
 		await harness.close(context);

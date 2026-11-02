@@ -42,7 +42,7 @@ const submitPlan = defineTool({
 	description: "Submit the plan as a list of steps.",
 	parameters: obj({ steps: arr(str()) }),
 	execute: async (args, api, callContext) => {
-		await api.commit(async (tx) => {
+		await api.commit(async tx => {
 			(await tx.doc(PlanDoc, api.conversationId)).steps = args.steps;
 		}, callContext);
 		return { output: [{ type: "text", text: "Plan submitted." }], control: { terminate: true } };
@@ -89,7 +89,7 @@ const harness = await Harness.open(
 	context,
 );
 const root = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
-const tools = async () => (await root.agent(context)).tools.map((tool) => tool.name);
+const tools = async () => (await root.agent(context)).tools.map(tool => tool.name);
 console.log("tools:", await tools());
 
 await root.configure(enterPlanMode, context);
@@ -108,8 +108,8 @@ for (const message of messages) {
 	console.log("system:", {
 		// A null section value removes it.
 		sections: message.sections,
-		added: message.toolsAdded?.map((tool) => tool.name),
-		removed: message.toolsRemoved?.map((tool) => tool.name),
+		added: message.toolsAdded?.map(tool => tool.name),
+		removed: message.toolsRemoved?.map(tool => tool.name),
 	});
 }
 

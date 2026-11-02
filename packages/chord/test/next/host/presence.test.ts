@@ -36,7 +36,7 @@ const holds = instancesOf(Hold, "start");
 
 describe("host.references", () => {
 	it("lists every reference with the object's params, its principal and its incarnation", async () => {
-		const { server, client } = await linked((h) => void serveNotes(h), { child: { kind: "guest", session: "S1" } });
+		const { server, client } = await linked(h => void serveNotes(h), { child: { kind: "guest", session: "S1" } });
 		const notes = server.references(Notes);
 		expect(notes.value).toEqual([]);
 		await client.get(Notes, { session: "S1" }, context);
@@ -55,7 +55,7 @@ describe("host.references", () => {
 	});
 
 	it("is made for the first ask with the references that exist then, and kept", async () => {
-		const { server, client } = await linked((h) => void serveNotes(h));
+		const { server, client } = await linked(h => void serveNotes(h));
 		await client.get(Notes, { session: "S1" }, context);
 		const notes = server.references(Notes);
 		expect(notes.value).toHaveLength(1);
@@ -63,7 +63,7 @@ describe("host.references", () => {
 	});
 
 	it("changes in the batch where a reference binds or ends: a watch gets one splice per change", async () => {
-		const { server, client } = await linked((h) => void serveNotes(h));
+		const { server, client } = await linked(h => void serveNotes(h));
 		const watch = await server.references(Notes).watch(context);
 		const frames = framesOf(watch);
 		const one = await client.get(Notes, { session: "S1" }, context);
@@ -94,12 +94,12 @@ describe("host.references", () => {
 			[
 				{
 					name: "@test/app",
-					facet: defineFacet<TestPrincipal>((host) => {
+					facet: defineFacet<TestPrincipal>(host => {
 						host.serve(Shown, () => ({ variant: "v", members: { here: constant(1) } }));
 						host.serve(Viewers, ({ session }, self) => ({
 							count: self.derive(
 								[host.references(Shown)],
-								([refs]) => refs.filter((ref) => ref.params.session === session).length,
+								([refs]) => refs.filter(ref => ref.params.session === session).length,
 							),
 						}));
 					}),
@@ -137,7 +137,7 @@ describe("host.references", () => {
 			variants: { v: { state: { count: int(), viewers: int() } } },
 		});
 		const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((host) => {
+		const facet = defineFacet<TestPrincipal>(host => {
 			serveNotes(host);
 			host.serve(Viewed, ({ session }, _principal, self) => {
 				const store = self.get(NoteStore, { session });
@@ -177,7 +177,7 @@ describe("host.references", () => {
 		drop.armed = true;
 		await addNote(server, "S1", "x");
 		await transported();
-		const states = kept.received.filter((message) => message.kind === "state");
+		const states = kept.received.filter(message => message.kind === "state");
 		const changed = states.map(({ holds }) => holds.flatMap(({ members }) => members.map(({ member }) => member)));
 		// The commit's message carries the commit (the count); the departure is the next batch's (the viewers).
 		expect(changed).toEqual([[names.count], [names.viewers]]);
@@ -192,7 +192,7 @@ describe("host.references", () => {
 			variants: { v: { state: { viewers: int() } } },
 		});
 		const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((host) => {
+		const facet = defineFacet<TestPrincipal>(host => {
 			host.serve(
 				Viewed,
 				(_params, _principal, self) => ({
@@ -230,7 +230,7 @@ describe("host.references", () => {
 			variants: { v: { state: { viewers: int() } } },
 		});
 		const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((host) => {
+		const facet = defineFacet<TestPrincipal>(host => {
 			host.serve(
 				Viewed,
 				(_params, _principal, self) => ({
@@ -258,7 +258,7 @@ describe("host.references", () => {
 		await transported();
 		expect(peer.closed).toBe(true);
 		expect(server.activity.value).toMatchObject({ references: 0, lingering: 1 });
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		expect(server.references(Viewed).value).toEqual([]);
 		expect(server.activity.value).toMatchObject({ references: 0, lingering: 0 });
 		await server.close(context);
@@ -268,10 +268,10 @@ describe("host.references", () => {
 		const server = createHost<TestPrincipal, { session: string }>({
 			address: Server(),
 			principal: { kind: "server" },
-			revokedBy: (principal) => (principal.kind === "guest" ? [{ session: principal.session }] : []),
+			revokedBy: principal => (principal.kind === "guest" ? [{ session: principal.session }] : []),
 			onError: () => {},
 		});
-		await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }], context);
+		await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }], context);
 		const [a, b] = memoryLinkPair();
 		server.accept(a, { principal: { kind: "guest", session: "S1" }, codec: testCodec() }, context);
 		const peer = new RawPeer(b);
@@ -318,7 +318,7 @@ describe("host.references", () => {
 			hostAddress: () => Server(),
 			variants: { v: { state: { n: int() } } },
 		});
-		const { server, client } = await linked((h) =>
+		const { server, client } = await linked(h =>
 			h.serve(Kept, () => ({ variant: "v", members: { n: constant(1) } }), { linger: 60_000 }),
 		);
 		const kept = await client.get(Kept, {}, context);
@@ -333,7 +333,7 @@ describe("host.references", () => {
 
 	it("keeps no released reference (GC)", async () => {
 		const { server, refs } = await (async () => {
-			const { server, client } = await linked((h) => void serveNotes(h));
+			const { server, client } = await linked(h => void serveNotes(h));
 			const references = server.references(Notes);
 			const held = holds.length;
 			const notes = await client.get(Notes, { session: "S1" }, context);
@@ -352,9 +352,9 @@ describe("host.references", () => {
 /** `link`, closing itself on a send once `drop.armed`, as a transport whose send fails. */
 function closingOnSend(link: Link, drop: { readonly armed: boolean }): Link {
 	return {
-		send: (message) => (drop.armed ? link.close() : link.send(message)),
-		onMessage: (listener) => link.onMessage(listener),
+		send: message => (drop.armed ? link.close() : link.send(message)),
+		onMessage: listener => link.onMessage(listener),
 		close: () => link.close(),
-		onClose: (listener) => link.onClose(listener),
+		onClose: listener => link.onClose(listener),
 	};
 }

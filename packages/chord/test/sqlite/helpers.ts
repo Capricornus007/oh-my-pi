@@ -45,7 +45,7 @@ export function durableObjectStorage(
 					statement.run(...bindings.map(toNode));
 					return cursor([]);
 				}
-				const rows = (statement.all(...bindings.map(toNode)) as Record<string, unknown>[]).map((row) =>
+				const rows = (statement.all(...bindings.map(toNode)) as Record<string, unknown>[]).map(row =>
 					Object.fromEntries(Object.entries(row).map(([key, value]) => [key, fromNode(value)])),
 				);
 				return cursor(rows);

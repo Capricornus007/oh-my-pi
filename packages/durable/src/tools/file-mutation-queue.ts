@@ -40,7 +40,7 @@ export async function withFileMutationQueue<T>(
 	// Take the slot without awaiting, so no other call can take it in between.
 	const previous = queues.get(key) ?? Promise.resolve();
 	let release = (): void => {};
-	const done = new Promise<void>((resolve) => {
+	const done = new Promise<void>(resolve => {
 		release = resolve;
 	});
 	const tail = previous.then(() => done);

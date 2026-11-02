@@ -377,7 +377,7 @@ export function migratesTables(object: ChordObject, recorded: Recorded): boolean
 	const { store } = object.host;
 	if (store === undefined) return false;
 	const owner = object.served.contract.name;
-	return recorded.tables.some((table) => {
+	return recorded.tables.some(table => {
 		const stored = store.table(tableSqlName(owner, table.name));
 		return stored !== undefined && stored.version < table.version;
 	});

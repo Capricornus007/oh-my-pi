@@ -22,7 +22,7 @@ const Notes = local("example.notes", {
 });
 const Badge = local("example.badge", { version: 1, params: { user: str() }, members: { label: str() } });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Notes, (_, self) => {
 		const notes = self.state(NotesDoc);
 		// mapShared calls its function once per note object: unchanged notes keep the same title, so the derive's
@@ -36,7 +36,7 @@ const facet = defineFacet((host) => {
 			titles: self.derive([notes], ([n]) => title(n.list)),
 			count: self.derive([notes], ([n]) => n.list.length),
 			add: async ({ text }, ctx) => {
-				await notes.change((draft) => {
+				await notes.change(draft => {
 					draft.list.push({ text });
 				}, ctx);
 				return null;
@@ -50,7 +50,7 @@ const facet = defineFacet((host) => {
 	});
 });
 
-const host = createHost({ onError: (error) => console.error("background error:", error) });
+const host = createHost({ onError: error => console.error("background error:", error) });
 await host.load([{ name: "@example/notes", facet }], context);
 const notes = await host.get(Notes, {}, context);
 const badge = await host.get(Badge, { user: "mario" }, context);

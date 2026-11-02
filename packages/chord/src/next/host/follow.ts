@@ -100,8 +100,8 @@ export class FollowSource extends Source {
 	 */
 	async attach(context: Context): Promise<void> {
 		const observer: FollowObserver<JsonValue> = {
-			advance: (call) => this.#advance(call),
-			end: (end) => this.#end(end),
+			advance: call => this.#advance(call),
+			end: end => this.#end(end),
 		};
 		const attached = await this.#attach(observer, context);
 		if (attached === undefined) {

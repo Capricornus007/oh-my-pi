@@ -117,7 +117,7 @@ export type Literal = string | number | boolean;
 
 /** One of the given literals: a union of `lit(...)` schemas, in order. */
 export function oneOf<const V extends Literal[]>(...values: V): LiteralsSchema<V[number]> {
-	return { anyOf: values.map((value) => lit(value)) };
+	return { anyOf: values.map(value => lit(value)) };
 }
 
 /** Any of the given schemas. */

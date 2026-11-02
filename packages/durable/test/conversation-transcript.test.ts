@@ -31,7 +31,7 @@ function loader(entries: readonly EntryRecord[]): EntryLoader & { calls: number 
 	const load = async (query: Parameters<EntryLoader>[0], limit: number) => {
 		load.calls++;
 		const matching = entries.filter(
-			(entry) =>
+			entry =>
 				(query.minEntryId === undefined || entry.id >= query.minEntryId) &&
 				(query.maxEntryId === undefined || entry.id <= query.maxEntryId),
 		);
@@ -61,12 +61,12 @@ function windowOf(
 
 /** Items as a compact list: entry IDs, `gap after..upTo`, and `earlier`. */
 function shape(view: TranscriptView): (number | string)[] {
-	return view.items.map((item) =>
+	return view.items.map(item =>
 		item.kind === "entry" ? item.entry.id : item.kind === "gap" ? `gap ${item.after}..${item.upTo}` : "earlier",
 	);
 }
 
-const idsOf = (entries: readonly EntryRecord[]) => entries.map((entry) => entry.id);
+const idsOf = (entries: readonly EntryRecord[]) => entries.map(entry => entry.id);
 const gapOf = (view: TranscriptView) =>
 	view.items.find((item): item is Extract<TranscriptItem, { kind: "gap" }> => item.kind === "gap")!;
 
@@ -128,7 +128,7 @@ describe("ConversationTranscript", () => {
 		let view = helper.merge(windowOf(all, 190, 199));
 		view = await helper.fillGap(gapOf(view), context);
 		expect(gapOf(view)).toEqual({ kind: "gap", after: all[119]!.id, upTo: all[190]!.id });
-		while (view.items.some((item) => item.kind === "gap")) view = await helper.fillGap(gapOf(view), context);
+		while (view.items.some(item => item.kind === "gap")) view = await helper.fillGap(gapOf(view), context);
 		expect(shape(view)).toEqual(["earlier", ...idsOf(all.slice(100))]);
 	});
 
@@ -260,7 +260,7 @@ describe("ConversationTranscript loads", () => {
 		const before = helper.merge(windowOf(all, 90, 99));
 		const view = helper.merge({ conversation: CONVERSATION, entries: [], before: all[65]!.id, docs: before.docs });
 		expect(view.items).toBe(before.items);
-		expect(view.items.filter((item) => item.kind === "gap")).toHaveLength(1);
+		expect(view.items.filter(item => item.kind === "gap")).toHaveLength(1);
 	});
 
 	it("shares one load between a stale gap descriptor and the gap it shrank into", async () => {
@@ -318,7 +318,7 @@ describe("ConversationTranscript loads", () => {
 describe("ConversationTranscript over a Harness", () => {
 	it("follows the walkthrough: live appends, a stall, fillGap, loadEarlier, and a resume with `from`", async () => {
 		const { harness, root } = await openChat(new MemoryStorage(), chatSetup());
-		const note = () => root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+		const note = () => root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		for (let index = 0; index < 120; index++) await note();
 		const helper = new ConversationTranscript((query, limit, callContext) =>
 			root.entries(query, limit, undefined, callContext),
@@ -332,25 +332,25 @@ describe("ConversationTranscript over a Harness", () => {
 			}),
 		);
 		for (let index = 0; index < 15; index++) await note();
-		await new Promise((resolve) => setTimeout(resolve, 0));
-		expect(view.items.some((item) => item.kind === "gap")).toBe(false);
-		expect(view.items.filter((item) => item.kind === "entry")).toHaveLength(25);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(view.items.some(item => item.kind === "gap")).toBe(false);
+		expect(view.items.filter(item => item.kind === "entry")).toHaveLength(25);
 		// A drop: the client misses 40 entries, more than `max`, and resumes after the newest it has.
 		await watch.stop();
 		for (let index = 0; index < 40; index++) await note();
 		const resumed = await root.watch(context, { ...window, ...helper.resume });
 		view = helper.merge(resumed.value);
-		expect(view.items.filter((item) => item.kind === "gap")).toHaveLength(1);
-		while (view.items.some((item) => item.kind === "gap")) view = await helper.fillGap(gapOf(view), context);
+		expect(view.items.filter(item => item.kind === "gap")).toHaveLength(1);
+		while (view.items.some(item => item.kind === "gap")) view = await helper.fillGap(gapOf(view), context);
 		while (view.items[0]?.kind === "earlier") view = await helper.loadEarlier(context);
-		const entries = view.items.flatMap((item) => (item.kind === "entry" ? [item.entry.id] : []));
+		const entries = view.items.flatMap(item => (item.kind === "entry" ? [item.entry.id] : []));
 		expect(entries).toEqual(idsOf(await allEntries(root)));
 		// A short drop resumes without a gap.
 		for (let index = 0; index < 3; index++) await note();
 		const again = await root.watch(context, { ...window, ...helper.resume });
 		expect(again.value.entries).toHaveLength(3);
 		view = helper.merge(again.value);
-		expect(view.items.some((item) => item.kind !== "entry")).toBe(false);
+		expect(view.items.some(item => item.kind !== "entry")).toBe(false);
 		await resumed.stop();
 		await again.stop();
 		await harness.close(context);

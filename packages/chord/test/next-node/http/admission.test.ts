@@ -84,7 +84,7 @@ describe("provenance", () => {
 	it("admits a forwarded request on loopback that a relay verifies, with its origin and framer", () => {
 		const radius: HttpRelay = {
 			name: "radius",
-			verify: (request) =>
+			verify: request =>
 				request.headers.get("x-relay-secret") === "s"
 					? { origin: "https://me.radius.example", framer: "https://radius.example" }
 					: undefined,

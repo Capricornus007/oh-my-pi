@@ -27,10 +27,10 @@ const Who = remote("test.who", {
 	variants: { main: { methods: { who: method(undefined, str()) } } },
 });
 
-const serveWho = defineFacet<TestPrincipal>((host) =>
+const serveWho = defineFacet<TestPrincipal>(host =>
 	host.serve(Who, () => ({
 		variant: "main",
-		members: { who: async (ctx) => JSON.stringify(ctx.principal ?? null) },
+		members: { who: async ctx => JSON.stringify(ctx.principal ?? null) },
 	})),
 );
 
@@ -39,7 +39,7 @@ const echo = contributing({
 	sockets: {
 		"/echo/:room": (socket, request, ctx) => {
 			socket.send(`${request.params.room} as ${ctx.principal?.kind ?? "nobody"}`);
-			socket.on("message", (data) => socket.send(String(data)));
+			socket.on("message", data => socket.send(String(data)));
 		},
 	},
 	maxPayload: 64,
@@ -82,7 +82,7 @@ describe("the links endpoint", () => {
 				config: {
 					links: {
 						path: "/chord",
-						options: (request) => {
+						options: request => {
 							if (request.headers.has("x-fail")) throw new Error("options");
 							return {};
 						},
@@ -226,12 +226,12 @@ describe("revocation", () => {
 	it("keeps a writable contribution's own sockets when only its hosts change", async () => {
 		const Tunnel = local("app.tunnel", { version: 1, params: {}, members: { name: method(arr(str())) } });
 		const handler = (): void => {};
-		const tunnel = defineFacet<TestPrincipal>((host) =>
+		const tunnel = defineFacet<TestPrincipal>(host =>
 			host.serve(Tunnel, (_, self) => {
 				const contribution = self.writable<HttpContribution>({ hosts: [], sockets: { "/own": handler } });
 				self.contribute(Http, contribution);
 				return {
-					name: async (hosts) => {
+					name: async hosts => {
 						contribution.set({ hosts, sockets: { "/own": handler } });
 						return null;
 					},
@@ -242,7 +242,7 @@ describe("revocation", () => {
 		const handle = await server.host.get(Tunnel, {}, context);
 		const socket = await socketTo(server.port, "/own", { "x-principal": "owner" });
 		await handle.name(["t.example.com"], context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(socket.readyState).toBe(socket.OPEN);
 		socket.close();
 		await server.close();
@@ -252,7 +252,7 @@ describe("revocation", () => {
 	it("a raw peer whose host or contribution left can send nothing more to the handler", async () => {
 		const calls: string[] = [];
 		const sockets = contributing({
-			sockets: { "/echo": (socket) => void socket.on("message", (data) => calls.push(String(data))) },
+			sockets: { "/echo": socket => void socket.on("message", data => calls.push(String(data))) },
 		});
 		const tunnel = contributing({ hosts: ["t.example"] });
 		const server = await served({ "@app/sockets": sockets, "@app/tunnel": tunnel });
@@ -260,10 +260,10 @@ describe("revocation", () => {
 		const local = await rawSocket(server.port, `localhost:${server.port}`, "/echo");
 		await server.host.reload(server.facets({ "@app/sockets": sockets }), context);
 		throughHost.write(frame("after the host left"));
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		await server.host.reload(server.facets({}), context);
 		local.write(frame("after the contribution left"));
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(calls).toEqual([]);
 		throughHost.destroy();
 		local.destroy();
@@ -299,7 +299,7 @@ describe("cancellation", () => {
 	// Fable's second recheck: only a reset (RST) was seen; a clean disconnect (FIN, a tab closing) was not.
 	it.each(["ends its connection", "resets its connection"] as const)(
 		"aborts an upgrade's authentication when its client %s",
-		async (how) => {
+		async how => {
 			const entered = Promise.withResolvers<void>();
 			let signal: AbortSignal | undefined;
 			const server = await served(
@@ -319,7 +319,7 @@ describe("cancellation", () => {
 				`GET /s HTTP/1.1\r\nHost: 127.0.0.1:${server.port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n`,
 			);
 			await entered.promise;
-			const aborted = new Promise((resolve) => signal?.addEventListener("abort", resolve, { once: true }));
+			const aborted = new Promise(resolve => signal?.addEventListener("abort", resolve, { once: true }));
 			if (how === "ends its connection") socket.end();
 			else socket.resetAndDestroy();
 			await aborted;
@@ -334,7 +334,7 @@ describe("heartbeat", () => {
 	it("pings a plugin socket after 15 s of silence and terminates it 15 s later without an answer", async () => {
 		const server = await served({
 			"@app/quiet": contributing({
-				sockets: { "/quiet": (socket) => void socket.on("message", (data) => socket.send(data)) },
+				sockets: { "/quiet": socket => void socket.on("message", data => socket.send(data)) },
 			}),
 		});
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -427,7 +427,7 @@ describe("GC", () => {
 		const closed = closeOf(socket);
 		socket.close();
 		await closed;
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		await expectCollected(...refs);
 		await server.close();
 	});

@@ -99,7 +99,7 @@ export class JobRun {
 		this.phase = phase;
 		this.trace = trace;
 		const waiters = this.#waiters;
-		this.handle = { id, outcome: (context) => waiters.wait(context) };
+		this.handle = { id, outcome: context => waiters.wait(context) };
 	}
 
 	/**
@@ -207,7 +207,7 @@ class Waiters {
 			reject(signal?.reason);
 		};
 		const waiter: Waiter = {
-			settle: (each) => {
+			settle: each => {
 				signal?.removeEventListener("abort", abort);
 				if (each.kind === "done") resolve(each.outcome);
 				else reject(each.error);

@@ -427,7 +427,7 @@ const diffObject = (
 ): void => {
 	const beforeKeys = Object.keys(before);
 	const afterKeys = Object.keys(after);
-	if ([...beforeKeys, ...afterKeys].some((key) => RESERVED_SEGMENTS.has(key))) {
+	if ([...beforeKeys, ...afterKeys].some(key => RESERVED_SEGMENTS.has(key))) {
 		if (!equalJson(before, after)) emitSet(path, after, operations);
 		return;
 	}

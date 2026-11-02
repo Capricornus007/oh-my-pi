@@ -31,7 +31,7 @@ const table: StoreWrite = {
 async function applied(...writes: StoreWrite[]): Promise<unknown[]> {
 	const db = await openNodeSqliteDatabase(":memory:");
 	try {
-		return await db.transaction(async (executor) => {
+		return await db.transaction(async executor => {
 			const step = new Step(executor, 1, new IdAllocator(2), new Map());
 			for (const write of writes) await applyWrite(step, write, "test");
 			return executor.all(`SELECT * FROM "${TABLE}"`);

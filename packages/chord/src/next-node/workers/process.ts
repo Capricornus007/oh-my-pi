@@ -69,7 +69,7 @@ export class WorkerProcess {
 			const control = controlOf<FromWorker>(message);
 			if (control !== undefined) events.control(control);
 		});
-		this.exited = new Promise<Exit>((resolve) => {
+		this.exited = new Promise<Exit>(resolve => {
 			const ended = (exit: Exit): void => {
 				// However the leader ended, nothing it spawned outlives it.
 				this.#killGroup();

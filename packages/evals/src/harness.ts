@@ -122,7 +122,7 @@ function resolveSandboxIdentity(): SandboxIdentity | undefined {
 async function chownTree(path: string, identity: SandboxIdentity): Promise<void> {
 	const stats = await lstat(path);
 	if (stats.isDirectory() && !stats.isSymbolicLink()) {
-		await Promise.all((await readdir(path)).map((entry) => chownTree(join(path, entry), identity)));
+		await Promise.all((await readdir(path)).map(entry => chownTree(join(path, entry), identity)));
 	}
 	await chown(path, identity.uid, identity.gid);
 }
@@ -214,7 +214,7 @@ function toTranscriptEvents(messages: AgentSession["messages"]): TranscriptEvent
 				type: "tool_result",
 				toolCallId: message.toolCallId,
 				name: message.toolName,
-				content: message.content.every((part) => part.type === "text") ? text : toJsonValue(message.content),
+				content: message.content.every(part => part.type === "text") ? text : toJsonValue(message.content),
 				...(message.isError ? { error: { message: text || "Tool failed" } } : {}),
 			});
 		}
@@ -242,7 +242,7 @@ async function promptAgent(session: AgentSession, input: string, signal: AbortSi
 	const assistant = session.messages
 		.slice(previousMessageCount)
 		.reverse()
-		.find((message) => message.role === "assistant");
+		.find(message => message.role === "assistant");
 	if (!assistant) throw new Error("Agent run completed without an assistant message.");
 	if (assistant.stopReason !== "stop" && assistant.stopReason !== "toolUse") {
 		throw new Error(
@@ -291,7 +291,7 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 		extensionFactories.push({
 			name: "eval-system-prompt-transform",
 			hidden: true,
-			factory: (pi) => {
+			factory: pi => {
 				pi.on("before_agent_start", ({ systemPrompt }) => {
 					forcedSystemPrompt = transform(systemPrompt);
 					return { systemPrompt: forcedSystemPrompt };
@@ -357,7 +357,7 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 		const expectedInlinePaths = new Set(extensionFactories.map(({ name }) => `<inline:${name}>`));
 		const unexpectedExtensions = session.extensionRunner
 			.getExtensionPaths()
-			.filter((path) => !expectedInlinePaths.has(path));
+			.filter(path => !expectedInlinePaths.has(path));
 		if (unexpectedExtensions.length > 0) {
 			throw new Error(`Isolated eval loaded unexpected extensions: ${unexpectedExtensions.join(", ")}`);
 		}

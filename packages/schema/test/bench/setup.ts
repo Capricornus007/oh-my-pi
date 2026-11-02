@@ -43,9 +43,7 @@ for (const candidate of candidates) {
 console.log("| candidate | compile | check 1 | check 2 | check 3 | checks 4-10 |");
 console.log("|---|---:|---:|---:|---:|---:|");
 for (const [name, r] of Object.entries(results)) {
-	console.log(
-		`| ${name} | ${r.compileUs.toFixed(1)} µs | ${r.checkUs.map((x) => `${x.toFixed(2)} µs`).join(" | ")} |`,
-	);
+	console.log(`| ${name} | ${r.compileUs.toFixed(1)} µs | ${r.checkUs.map(x => `${x.toFixed(2)} µs`).join(" | ")} |`);
 }
 const out = process.argv.indexOf("--json");
 if (out >= 0) writeFileSync(process.argv[out + 1], JSON.stringify(results, null, "\t"));

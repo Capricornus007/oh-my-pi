@@ -13,7 +13,7 @@ import {
 	remote,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 const unexpectedError = (error: unknown) => assert.fail(String(error));
 const Eager = local("ready.eager", { version: 1, input: obj({}, { open: true }) });
 const Lazy = local("ready.lazy", { version: 1, input: obj({}, { open: true }) });
@@ -36,7 +36,7 @@ describe("host: eager readiness", () => {
 							self.resource("r", {
 								version: 1,
 								open: () =>
-									new Promise<void>((resolve) => {
+									new Promise<void>(resolve => {
 										opened = resolve;
 									}),
 							});
@@ -71,7 +71,7 @@ describe("host: eager readiness", () => {
 		for (const failure of ["factory", "dependency", "resource"] as const) {
 			it(`${operation} rejects eager ${failure} failure with the activation error`, async () => {
 				const errors: unknown[] = [];
-				const host = createHost({ self: { kind: "host" }, onError: (error) => errors.push(error) });
+				const host = createHost({ self: { kind: "host" }, onError: error => errors.push(error) });
 				const cause = forbidden(`${failure} failed`);
 				const facet = {
 					name: "bad",
@@ -100,9 +100,9 @@ describe("host: eager readiness", () => {
 				try {
 					await assert.rejects(
 						operation === "install" ? host.install(facet) : host.load([facet]),
-						(error) => error === cause,
+						error => error === cause,
 					);
-					await assert.rejects(host.ready(), (error) => error === cause);
+					await assert.rejects(host.ready(), error => error === cause);
 					assert.deepEqual(errors, [cause]);
 				} finally {
 					await host.close();
@@ -153,7 +153,7 @@ describe("host: eager readiness", () => {
 							),
 					},
 				]),
-				(error) => isChordError(error, "unavailable") && error.reason === "unknown_type",
+				error => isChordError(error, "unavailable") && error.reason === "unknown_type",
 			);
 		} finally {
 			await host.close();

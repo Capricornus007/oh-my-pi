@@ -23,7 +23,7 @@ describe("delta tracker retention across GC jobs", () => {
 		"tracker-with-open-draft",
 	])(
 		"validates %s retention semantics",
-		(scenario) => {
+		scenario => {
 			const child = spawnSync(
 				process.execPath,
 				["--expose-gc", fileURLToPath(new URL("./retention.worker.ts", import.meta.url)), scenario],

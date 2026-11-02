@@ -69,7 +69,7 @@ export function planTable(definition: TableDefinition, recorded: TableRecord | u
 		throw new Error(`${what}: the store has version ${version}, newer than the code's ${definition.version}`);
 	}
 	const versions = historyOf(definition);
-	const at = versions.find((each) => each.version === version);
+	const at = versions.find(each => each.version === version);
 	if (at === undefined) {
 		throw new Error(
 			`${what}: the store has version ${version}, older than the history's base ${versions[0]!.version}`,
@@ -83,9 +83,9 @@ export function planTable(definition: TableDefinition, recorded: TableRecord | u
 		throw new Error(`${what}: version ${version} is recorded migrating, but has no data step to resume`);
 	}
 	if (state === "migrating") {
-		return { kind: "migrate", versions: versions.filter((each) => each.version >= version), first: "resume" };
+		return { kind: "migrate", versions: versions.filter(each => each.version >= version), first: "resume" };
 	}
-	return { kind: "migrate", versions: versions.filter((each) => each.version > version), first: "begin" };
+	return { kind: "migrate", versions: versions.filter(each => each.version > version), first: "begin" };
 }
 
 /** Every version of `definition`'s history, the base first. */

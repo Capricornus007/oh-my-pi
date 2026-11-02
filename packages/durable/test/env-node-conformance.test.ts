@@ -25,7 +25,7 @@ async function removeTempDir(dir: string): Promise<void> {
 		} catch (error) {
 			const code = (error as NodeJS.ErrnoException).code;
 			if (attempt >= 80 || (code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY")) throw error;
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise(resolve => setTimeout(resolve, 100));
 		}
 	}
 }
@@ -33,7 +33,7 @@ async function removeTempDir(dir: string): Promise<void> {
 registerEnvConformance(
 	{ describe, expect, it },
 	"NodeExecutionEnv conformance",
-	async (use) => {
+	async use => {
 		const cwd = mkdtempSync(join(tmpdir(), "pi-durable-env-conformance-"));
 		try {
 			await use(new NodeExecutionEnv({ cwd }));
@@ -48,7 +48,7 @@ registerEnvConformance(
 registerEnvConformance(
 	{ describe, expect, it },
 	"NodeExecutionEnv conformance with polling watches",
-	async (use) => {
+	async use => {
 		const cwd = mkdtempSync(join(tmpdir(), "pi-durable-env-conformance-"));
 		try {
 			await use(new NodeExecutionEnv({ cwd, watch: { mode: "polling", pollIntervalMs: 100 } }));
@@ -74,12 +74,12 @@ describe("NodeExecutionEnv watch limits", () => {
 			getOrThrow(await env.remove("tree/c", { recursive: true }, context));
 			const changes: FileChange[] = [];
 			const watcher = getOrThrow(
-				await env.watch([{ path: "tree", recursive: true }], (change) => changes.push(change), context),
+				await env.watch([{ path: "tree", recursive: true }], change => changes.push(change), context),
 			);
 			getOrThrow(await env.createDir("tree/d", undefined, context));
 			const deadline = Date.now() + 3000;
-			while (!changes.some((change) => change.kind === "failed") && Date.now() < deadline) {
-				await new Promise((resolve) => setTimeout(resolve, 20));
+			while (!changes.some(change => change.kind === "failed") && Date.now() < deadline) {
+				await new Promise(resolve => setTimeout(resolve, 20));
 			}
 			expect(changes.at(-1)).toMatchObject({ kind: "failed", error: { code: "invalid" } });
 			await watcher.stop(context);

@@ -48,7 +48,7 @@ function serveCounter(self: Self) {
 	return {
 		doc,
 		bump: async (ctx: typeof context) => {
-			await doc.change((draft) => {
+			await doc.change(draft => {
 				draft.n++;
 			}, ctx);
 			return null;
@@ -58,7 +58,7 @@ function serveCounter(self: Self) {
 
 describe("references", () => {
 	it("are hydrated when got; their state members are watchables", async () => {
-		const { host } = await loaded((h) => h.serve(Counter, (_, self) => serveCounter(self)));
+		const { host } = await loaded(h => h.serve(Counter, (_, self) => serveCounter(self)));
 		const counter = await host.get(Counter, {}, context);
 		expect(counter.doc.value).toEqual({ n: 0 });
 		const frames = framesOf(await counter.doc.watch(context));
@@ -69,7 +69,7 @@ describe("references", () => {
 	});
 
 	it("throw released on every use after release, which is idempotent", async () => {
-		const { host } = await loaded((h) => h.serve(Counter, (_, self) => serveCounter(self)));
+		const { host } = await loaded(h => h.serve(Counter, (_, self) => serveCounter(self)));
 		const counter = await host.get(Counter, {}, context);
 		counter.release();
 		counter.release();
@@ -80,7 +80,7 @@ describe("references", () => {
 	});
 
 	it("end their watches when released, while other references keep the object", async () => {
-		const { host } = await loaded((h) => h.serve(Counter, (_, self) => serveCounter(self)));
+		const { host } = await loaded(h => h.serve(Counter, (_, self) => serveCounter(self)));
 		const first = await host.get(Counter, {}, context);
 		const second = await host.get(Counter, {}, context);
 		const one = await first.doc.watch(context);
@@ -96,7 +96,7 @@ describe("references", () => {
 	it("declared with self.get keep their object alive and are released when the declaring object ends", async () => {
 		const Inner = local("app.inner", { version: 1, params: { id: int() }, members: { n: int() } });
 		const inner = vi.fn(() => ({ n: constant(1) }));
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Inner, inner);
 			h.serve(Viewer, ({ id }, self) => ({ n: self.get(Inner, { id }).n }));
 		});
@@ -120,7 +120,7 @@ describe("cycles (Q5)", () => {
 
 	it("fail a two-object cycle with invalid/cycle and keep nothing", async () => {
 		const factories = { a: vi.fn(), b: vi.fn() };
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(A, ({ n }, self) => {
 				factories.a();
 				return { v: self.get(B, { n }).v };
@@ -140,7 +140,7 @@ describe("cycles (Q5)", () => {
 	});
 
 	it("fail a three-object cycle", async () => {
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(A, ({ n }, self) => ({ v: self.get(B, { n }).v }));
 			h.serve(B, ({ n }, self) => ({ v: self.get(C, { n }).v }));
 			h.serve(C, ({ n }, self) => ({ v: self.get(A, { n }).v }));
@@ -151,7 +151,7 @@ describe("cycles (Q5)", () => {
 	});
 
 	it("fail an object that gets itself", async () => {
-		const { host } = await loaded((h) => h.serve(A, ({ n }, self) => ({ v: self.get(A, { n }).v })));
+		const { host } = await loaded(h => h.serve(A, ({ n }, self) => ({ v: self.get(A, { n }).v })));
 		expect(await rejection(host.get(A, { n: 1 }, context))).toMatchObject({
 			message: "dependency cycle: a(1) → a(1)",
 		});
@@ -165,7 +165,7 @@ describe("GC", () => {
 		["without a caller's signal", () => context],
 		["with a long-lived caller's signal", () => withAbortSignal(new AbortController().signal, context)],
 	])("10,000 calls on one reference retain flat memory, %s", async (_case, caller) => {
-		const { host } = await loaded((h) => h.serve(Counter, (_, self) => serveCounter(self)));
+		const { host } = await loaded(h => h.serve(Counter, (_, self) => serveCounter(self)));
 		const counter = await host.get(Counter, {}, context);
 		const calls = caller();
 		const run = async () => {
@@ -180,7 +180,7 @@ describe("GC", () => {
 
 	it("a released reference keeps neither its contract nor its object", async () => {
 		const objects: WeakRef<object>[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Viewer, ({ id }, self) => {
 				objects.push(new WeakRef(self));
 				return { n: constant(id) };
@@ -200,7 +200,7 @@ describe("GC", () => {
 
 	it("a released reference whose state was read keeps no host", async () => {
 		const { reference, host } = await (async () => {
-			const { host } = await loaded((h) => h.serve(Viewer, ({ id }) => ({ n: constant(id) })));
+			const { host } = await loaded(h => h.serve(Viewer, ({ id }) => ({ n: constant(id) })));
 			const reference = await host.get(Viewer, { id: 1 }, context);
 			expect(reference.state.value).toEqual({ kind: "live" });
 			await (await reference.state.watch(context)).stop();
@@ -213,7 +213,7 @@ describe("GC", () => {
 
 	it("a released reference whose state was read after a failure keeps neither the failure's error nor the host", async () => {
 		const { reference, refs } = await (async () => {
-			const { host } = await loaded((h) =>
+			const { host } = await loaded(h =>
 				h.serve(Viewer, (_, self) => {
 					self.open(
 						async () => {
@@ -250,7 +250,7 @@ describe("GC", () => {
 
 	it("a released hold keeps neither its object, nor its state's watches, nor a remote object without a link", async () => {
 		const objects: WeakRef<object>[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Viewer, ({ id }, self) => {
 				objects.push(new WeakRef(self));
 				self.open(
@@ -272,7 +272,7 @@ describe("GC", () => {
 			local.release();
 			remote.release();
 			await Promise.all(waits);
-			const refs = [...watches.map((watch) => new WeakRef(watch)), ...remoteObjects.slice(made)];
+			const refs = [...watches.map(watch => new WeakRef(watch)), ...remoteObjects.slice(made)];
 			return { refs, held: [local, remote] };
 		})();
 		await expectCollected(...objects, ...refs);
@@ -284,10 +284,10 @@ describe("release", () => {
 	it("rejects the calls made through the reference with released and aborts their handlers' contexts", async () => {
 		const Slow = local("app.slow", { version: 1, params: {}, members: { wait: method() } });
 		const aborted: unknown[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Slow, () => ({
-				wait: (ctx) =>
-					new Promise((resolve) =>
+				wait: ctx =>
+					new Promise(resolve =>
 						ctx.abortSignal?.addEventListener("abort", () => {
 							aborted.push(ctx.abortSignal?.reason);
 							resolve(null);
@@ -309,7 +309,7 @@ describe("release", () => {
 
 	it("reads, watches and calls after the object ended carry the end's reason; the holder's own release has none", async () => {
 		const Ended = local("app.ended", { version: 1, params: {}, members: { n: int(), m: method() } });
-		const { host } = await loaded((h) => h.serve(Ended, () => ({ n: constant(1), m: async () => null })));
+		const { host } = await loaded(h => h.serve(Ended, () => ({ n: constant(1), m: async () => null })));
 		const ended = await host.get(Ended, {}, context);
 		const released = await host.get(Ended, {}, context);
 		released.release();
@@ -347,7 +347,7 @@ describe("remote references", () => {
 		const seen: unknown[] = [];
 		const owner = { kind: "owner" } as const;
 		const host = createHost<typeof owner>({ address: Server(), principal: owner, onError: () => {} });
-		const facet = defineFacet<typeof owner>((h) => {
+		const facet = defineFacet<typeof owner>(h => {
 			h.serve(Two, () => ({ variant: "view", members: { m: constant(1) } }));
 			h.serve(Holder, (_, self) => {
 				const two = self.get(Two, {});
@@ -426,7 +426,7 @@ describe("keyed state members (slice 6a §12)", () => {
 		let memos: KeyedHandle<{ title: string }> | undefined;
 		const pinned: Watchable<{ title: string }>[] = [];
 		const refs: object[] = [];
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(NoteStore, (_, self) => {
 				memos = self.state(Memo);
 				return {
@@ -434,7 +434,7 @@ describe("keyed state members (slice 6a §12)", () => {
 					write: async ({ id, title }, ctx) => {
 						await memos!.change(
 							id,
-							(draft) => {
+							draft => {
 								draft.title = title;
 							},
 							ctx,
@@ -484,7 +484,7 @@ describe("keyed state members (slice 6a §12)", () => {
 		const first = await host.get(NoteView, { id: "a", copy: 1 }, context);
 		const second = await host.get(NoteView, { id: "a", copy: 2 }, context);
 		const slot = (memos() as unknown as { slot: { source(key: string): { pins: number } | undefined } }).slot;
-		const [one, two] = pinned.map((at) => (at as unknown as { source: object }).source);
+		const [one, two] = pinned.map(at => (at as unknown as { source: object }).source);
 		// Each reference's own source of the key, on the store's instance (decision "References are the only indirection").
 		expect(one).not.toBe(two);
 		const shared = slot.source("a")!;
@@ -557,7 +557,7 @@ describe("keyed state members (slice 6a §12)", () => {
 	/** Serves `NoteStore` over `definition` (persisted) on `store`, and views pinning one key each. */
 	async function persistedNotes(store: Store, definition: ReturnType<typeof persistedMemo>) {
 		return loaded(
-			(h) => {
+			h => {
 				h.serve(NoteStore, (_, self) => {
 					const memos = self.state(definition);
 					return {
@@ -565,7 +565,7 @@ describe("keyed state members (slice 6a §12)", () => {
 						write: async ({ id, title }, ctx) => {
 							await memos.change(
 								id,
-								(draft) => {
+								draft => {
 									draft.title = title;
 								},
 								ctx,
@@ -646,7 +646,7 @@ describe("keyed state members (slice 6a §12)", () => {
 	});
 
 	it("a provider returning something else for a keyed member fails broken", async () => {
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			// Plugin code returning a wrong value for the keyed member.
 			h.serve(
 				NoteStore,
@@ -663,7 +663,7 @@ describe("keyed state members (slice 6a §12)", () => {
 describe("a binding released while it binds (fix round 5)", () => {
 	it("ends cleanly when its object's hold releases it at once, keeping nothing (Sol)", async () => {
 		const Type = local("app.reentrant", { version: 1, params: {}, members: { x: int() } });
-		const facet = defineFacet((h) => h.serve(Type, () => ({ x: constant(1) })));
+		const facet = defineFacet(h => h.serve(Type, () => ({ x: constant(1) })));
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@app/reentrant", facet }], context);
 		let ref = await host.get(Type, {}, context);

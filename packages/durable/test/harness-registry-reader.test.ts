@@ -108,11 +108,11 @@ describe("registryReader", () => {
 		harness.resume();
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Done, undefined, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Done, undefined, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const done = harness.waitForTask(id, context);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		await (await host.get(Plugin, {}, context)).install(context);
 		expect((await done).state.outcome).toEqual({ status: "completed", result: null });
 		await harness.close(context);
@@ -130,10 +130,10 @@ const Durable = local("app.durable", { version: 1, params: {}, members: { close:
 const Viewer = local("app.viewer", { version: 1, params: {}, members: { kinds: arr(str()) } });
 
 function serveViews(host: FacetHost): void {
-	host.serve(Harnesses, { compose: (table) => table.at(-1)?.value.value });
+	host.serve(Harnesses, { compose: table => table.at(-1)?.value.value });
 	host.serve(Durable, (_, self) => {
 		const harness = self.open(
-			async (open) => {
+			async open => {
 				const opened = await Harness.open(
 					new MemoryStorage(),
 					{ models: createModels(), registry: createRegistry() },
@@ -147,7 +147,7 @@ function serveViews(host: FacetHost): void {
 		self.contribute(Harnesses, harness);
 		self.follow((observer, ctx) => harness.value.observeTaskGraph(observer, ctx));
 		return {
-			close: async (ctx) => {
+			close: async ctx => {
 				await harness.value.close(ctx);
 				return null;
 			},
@@ -166,7 +166,7 @@ function serveViews(host: FacetHost): void {
 				? undefined
 				: harness.value.observeConversation(ROOT_CONVERSATION_ID, observer, ctx),
 		);
-		return { kinds: self.derive([view], ([v]) => v.entries.map((entry) => entry.kind)) };
+		return { kinds: self.derive([view], ([v]) => v.entries.map(entry => entry.kind)) };
 	});
 }
 
@@ -176,22 +176,22 @@ describe("Durable's views from other objects (slice 8 §5, S1)", () => {
 		await host.load([{ name: "@app/core", facet: defineFacet(serveViews) }], context);
 		const durable = host.hold(Durable, {}, context);
 		const viewer = host.hold(Viewer, {}, context);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		await durable.write("app.first", context);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect(viewer.kinds.value).toContain("app.first");
 		// The Session closes: both followers fail `transient` (S1); a retry opens the next Harness, whose contribution
 		// wakes the viewer (`retryOn`), which follows it.
 		// The call is cut off by its object's failure: the Session's close fails the object that opened it.
 		await expect(durable.close(context)).rejects.toThrow("session closed");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect(viewer.state.value).toMatchObject({ kind: "failed", cause: { kind: "transient" } });
 		durable.retry();
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(viewer.state.value).toEqual({ kind: "live" });
 		expect(viewer.kinds.value).not.toContain("app.first");
 		await durable.write("app.second", context);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect(viewer.kinds.value).toContain("app.second");
 		await host.close(context);
 	});

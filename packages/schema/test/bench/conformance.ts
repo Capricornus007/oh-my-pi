@@ -20,7 +20,7 @@ for (const file of suiteFiles()) {
 			? "optional"
 			: "core";
 	const section = `${file.name.split("/")[0]} ${kind}`;
-	results[section] ??= { total: 0, passed: Object.fromEntries(candidates.map((c) => [c.name, 0])) };
+	results[section] ??= { total: 0, passed: Object.fromEntries(candidates.map(c => [c.name, 0])) };
 	for (const group of file.groups) {
 		results[section].total += group.tests.length;
 		for (const candidate of candidates) {
@@ -46,11 +46,11 @@ for (const file of suiteFiles()) {
 	}
 }
 
-const names = candidates.map((c) => c.name);
+const names = candidates.map(c => c.name);
 console.log(`| section | tests | ${names.join(" | ")} |`);
 console.log(`|---|---:|${names.map(() => "---:").join("|")}|`);
 for (const [section, r] of Object.entries(results)) {
-	console.log(`| ${section} | ${r.total} | ${names.map((n) => r.passed[n]).join(" | ")} |`);
+	console.log(`| ${section} | ${r.total} | ${names.map(n => r.passed[n]).join(" | ")} |`);
 }
 const out = process.argv.indexOf("--json");
 if (out >= 0) writeFileSync(process.argv[out + 1], JSON.stringify(results, null, "\t"));

@@ -174,7 +174,7 @@ async function result(chat: Chat, id: TaskId<CompactionResult>) {
 }
 
 async function kinds(conversation: Conversation): Promise<string[]> {
-	return (await allEntries(conversation)).map((entry) => entry.kind);
+	return (await allEntries(conversation)).map(entry => entry.kind);
 }
 
 async function live(chat: Chat) {
@@ -187,7 +187,7 @@ function userText(message: Message | undefined): string {
 
 /** Text of the first user message; a leading baseline system message comes before it. */
 function firstUserText(messages: readonly Message[]): string {
-	return userText(messages.find((message) => message.role === "user"));
+	return userText(messages.find(message => message.role === "user"));
 }
 
 // ─── Range selection ──────────────────────────────────────────────────────
@@ -205,10 +205,7 @@ function entry(kind: string, model: Message[], head?: number): EntryRecord {
 const user = (content: string): UserMessage => ({ role: "user", content, timestamp: 0 });
 const assistant = (content: string, calls: string[] = [], stopReason: AssistantMessage["stopReason"] = "stop") =>
 	({
-		...fauxAssistantMessage([
-			{ type: "text", text: content },
-			...calls.map((id) => fauxToolCall("read", {}, { id })),
-		]),
+		...fauxAssistantMessage([{ type: "text", text: content }, ...calls.map(id => fauxToolCall("read", {}, { id }))]),
 		stopReason,
 	}) as AssistantMessage;
 const toolResult = (callId: string, content: string): Message => ({
@@ -223,9 +220,9 @@ const toolResult = (callId: string, content: string): Message => ({
 /** A view over `entries` whose contributions are their models, with excluded assistants removed. */
 function view(entries: EntryRecord[], head?: EntryRecord): ContextView {
 	const all = head === undefined ? entries : [head, ...entries];
-	const contributions = all.map((record) =>
+	const contributions = all.map(record =>
 		(record.model ?? []).filter(
-			(message) => message.role !== "assistant" || !["error", "aborted", "deferred"].includes(message.stopReason),
+			message => message.role !== "assistant" || !["error", "aborted", "deferred"].includes(message.stopReason),
 		),
 	);
 	return { head, entries: all, contributions, messages: orderToolResults(contributions.flat()) };
@@ -391,7 +388,7 @@ describe("manual compaction", () => {
 		const after = await allEntries(chat.root);
 		expect(after.slice(0, before.length)).toEqual(before);
 		const marker = after.at(-1)!;
-		const u3 = before.find((record) => userText(record.model?.[0]).startsWith("u3"))!;
+		const u3 = before.find(record => userText(record.model?.[0]).startsWith("u3"))!;
 		expect(marker).toMatchObject({ kind: "pi.compaction", head: u3.id, data: { reason: "manual" } });
 		expect(placed.status === "done" && placed.entry).toBe(marker.id);
 		expect(userText(marker.model?.[0])).toBe(
@@ -424,7 +421,7 @@ describe("manual compaction", () => {
 		await turn(chat, "next", "done");
 		const agent = chat.faux.agentRequests.at(-1)!.messages;
 		// The next request: one complete system baseline leading the summary, the kept turn, and the new input (#10904).
-		expect(agent.map((message) => message.role)).toEqual(["system", "user", "user", "assistant", "user"]);
+		expect(agent.map(message => message.role)).toEqual(["system", "user", "user", "assistant", "user"]);
 		expect(agent[0]).toMatchObject({ sections: { preamble: "You are helpful." } });
 		await chat.harness.close(context);
 	});
@@ -433,7 +430,7 @@ describe("manual compaction", () => {
 	it("creates provider state before a legacy conversation's summarization request", async () => {
 		const chat = await open();
 		await history(chat);
-		await chat.root.commit((tx) => tx.retireDoc(ProviderDoc, chat.root.id), context);
+		await chat.root.commit(tx => tx.retireDoc(ProviderDoc, chat.root.id), context);
 		expect(await chat.harness.snapshot(ProviderDoc, chat.root.id, context)).toBeUndefined();
 		chat.faux.summaries.push(summary());
 		expect((await result(chat, await chat.root.compact(undefined, context))).status).toBe("completed");
@@ -521,7 +518,7 @@ describe("manual compaction", () => {
 		expect((await followUp.wait(context)).status).toBe("done");
 		const request = chat.faux.agentRequests.at(-1)!.messages;
 		expect(firstUserText(request)).toContain("SUMMARY");
-		expect(request.some((message) => userText(message) === "follow-up")).toBe(true);
+		expect(request.some(message => userText(message) === "follow-up")).toBe(true);
 		await chat.harness.close(context);
 	});
 
@@ -722,7 +719,7 @@ describe("manual compaction", () => {
 		const wait = chat.root.waitForIdle(context).then(() => {
 			idle = true;
 		});
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(idle).toBe(false);
 		gate.resolve();
 		await wait;
@@ -766,7 +763,7 @@ describe("compaction outcomes", () => {
 			},
 		});
 		addHooks(chat.setup.registry, CompactionTask, {
-			beforeCompact: (compaction) => {
+			beforeCompact: compaction => {
 				seen.push(compaction);
 				return { summary: "FROM HOOK" };
 			},
@@ -780,14 +777,14 @@ describe("compaction outcomes", () => {
 		expect(chat.setup.reports).toEqual([expect.objectContaining({ message: "hook broke" })]);
 		const compaction = seen[0] as { entries: EntryRecord[]; messages: Message[]; firstKept: number };
 		expect(compaction).toMatchObject({ reason: "manual", instructions: "why" });
-		expect(compaction.entries.map((record) => record.kind)).toEqual([
+		expect(compaction.entries.map(record => record.kind)).toEqual([
 			"pi.user",
 			"pi.system",
 			"pi.assistant",
 			"pi.user",
 			"pi.assistant",
 		]);
-		expect(compaction.messages.filter((message) => message.role !== "system").map(userText)).toEqual([
+		expect(compaction.messages.filter(message => message.role !== "system").map(userText)).toEqual([
 			text("u1", 100),
 			text("a1", 100),
 			text("u2", 100),
@@ -899,7 +896,7 @@ describe("compaction outcomes", () => {
 		// 0.8 * 2000 = 1600, above the model's 900.
 		expect(request.options?.maxTokens).toBe(900);
 		expect(request.messages).toHaveLength(2);
-		expect(request.messages.some((message) => message.role === "system" && message.toolsAdded !== undefined)).toBe(
+		expect(request.messages.some(message => message.role === "system" && message.toolsAdded !== undefined)).toBe(
 			false,
 		);
 		await chat.harness.close(context);
@@ -949,7 +946,7 @@ const BLOCKING: CompactionPolicy = { enabled: true, reserveTokens: 300, keepRece
 
 async function compactionTasks(chat: Chat) {
 	const inspection = await chat.harness.inspect(context);
-	return inspection.tasks.map((task) => task.record).filter((record) => record.kind === "pi.compaction");
+	return inspection.tasks.map(task => task.record).filter(record => record.kind === "pi.compaction");
 }
 
 describe("background threshold compaction", () => {
@@ -1005,7 +1002,7 @@ describe("background threshold compaction", () => {
 		await reached.promise;
 		chat.setup.settings.compaction = BACKGROUND;
 		await turn(chat, text("u4", 100), text("a4", 100));
-		expect((await compactionTasks(chat)).map((task) => task.id)).toEqual([manual]);
+		expect((await compactionTasks(chat)).map(task => task.id)).toEqual([manual]);
 		await chat.harness.abortTask(manual, context);
 		await chat.harness.close(context);
 	});
@@ -1023,9 +1020,9 @@ describe("background threshold compaction", () => {
 		// The value that drops the compaction's status records its failure.
 		const ended = (taskId: TaskId) => {
 			const states = views.live();
-			const listed = states.findIndex((state) => state.compactions?.some((status) => status.taskId === taskId));
+			const listed = states.findIndex(state => state.compactions?.some(status => status.taskId === taskId));
 			return states.find(
-				(state, index) => index > listed && !state.compactions?.some((status) => status.taskId === taskId),
+				(state, index) => index > listed && !state.compactions?.some(status => status.taskId === taskId),
 			)!;
 		};
 		expect(ended(recorded!.taskId).compactionFailure).toEqual(recorded);
@@ -1095,7 +1092,7 @@ describe("blocking threshold compaction", () => {
 		expect((await kinds(chat.root)).slice(-3)).toEqual(["pi.compaction", "pi.system", "pi.assistant"]);
 		const request = chat.faux.agentRequests.at(-1)!.messages;
 		expect(firstUserText(request)).toContain("SUMMARY");
-		const systems = request.filter((message) => message.role === "system");
+		const systems = request.filter(message => message.role === "system");
 		expect(systems).toHaveLength(1);
 		expect(systems[0]).toMatchObject({
 			sections: { preamble: "You are helpful.", extra: "<extra>\nEXTRA\n</extra>" },
@@ -1110,7 +1107,7 @@ describe("blocking threshold compaction", () => {
 		chat.faux.summaries.push(summary());
 		await turn(chat, text("u4", 400), "a4");
 		expect(chat.faux.summaryRequests).toHaveLength(1);
-		expect((await kinds(chat.root)).filter((kind) => kind === "pi.compaction")).toHaveLength(1);
+		expect((await kinds(chat.root)).filter(kind => kind === "pi.compaction")).toHaveLength(1);
 		await chat.harness.close(context);
 	});
 
@@ -1190,7 +1187,7 @@ describe("blocking threshold compaction", () => {
 		views.detach();
 		// The compaction's status leaves before the run ends.
 		const states = views.live();
-		const busy = states.findIndex((state) => state.compactions !== undefined);
+		const busy = states.findIndex(state => state.compactions !== undefined);
 		const compactionEnd = states.findIndex((state, index) => index > busy && state.compactions === undefined);
 		const runEnd = states.findIndex((state, index) => index > busy && state.run === undefined);
 		expect(busy).toBeGreaterThan(0);
@@ -1247,12 +1244,12 @@ describe("overflow compaction", () => {
 			"pi.system",
 			"pi.assistant",
 		]);
-		const [compaction] = (await allEntries(chat.root)).filter((record) => record.kind === "pi.compaction");
+		const [compaction] = (await allEntries(chat.root)).filter(record => record.kind === "pi.compaction");
 		expect(compaction).toMatchObject({ data: { reason: "overflow" } });
 		const retry = chat.faux.agentRequests.at(-1)!.messages;
 		expect(retry[0]?.role).toBe("system");
 		expect(userText(retry[1])).toContain("SUMMARY");
-		expect(retry.some((message) => message.role === "assistant" && message.stopReason === "error")).toBe(false);
+		expect(retry.some(message => message.role === "assistant" && message.stopReason === "error")).toBe(false);
 		await chat.harness.close(context);
 	});
 
@@ -1268,7 +1265,7 @@ describe("overflow compaction", () => {
 			reason: "model_error",
 			detail: OVERFLOW,
 		});
-		expect((await kinds(chat.root)).filter((kind) => kind === "pi.compaction")).toHaveLength(1);
+		expect((await kinds(chat.root)).filter(kind => kind === "pi.compaction")).toHaveLength(1);
 		expect((await kinds(chat.root)).at(-1)).toBe("pi.assistant");
 		await chat.harness.close(context);
 	});
@@ -1393,9 +1390,9 @@ describe("compaction estimates and interactions", () => {
 		chat.faux.summaries.push(summary());
 		await result(chat, await chat.root.compact(undefined, context));
 		// The kept range holds the delta for the terse mood; the next request has one complete baseline.
-		expect((await chat.root.context(context)).entries.some((record) => record.kind === "pi.system")).toBe(true);
+		expect((await chat.root.context(context)).entries.some(record => record.kind === "pi.system")).toBe(true);
 		await turn(chat, "next", "ok");
-		const systems = chat.faux.agentRequests.at(-1)!.messages.filter((message) => message.role === "system");
+		const systems = chat.faux.agentRequests.at(-1)!.messages.filter(message => message.role === "system");
 		expect(systems).toHaveLength(1);
 		expect(systems[0]).toMatchObject({ sections: { preamble: "You are helpful.", mood: "terse" } });
 		await chat.harness.close(context);
@@ -1423,7 +1420,7 @@ describe("compaction estimates and interactions", () => {
 		);
 		let messages: readonly Message[] = [];
 		addHooks(chat.setup.registry, CompactionTask, {
-			beforeCompact: (compaction) => {
+			beforeCompact: compaction => {
 				messages = compaction.messages;
 				return undefined;
 			},
@@ -1444,7 +1441,7 @@ describe("compaction estimates and interactions", () => {
 		const outcome = await result(chat, await fork.compact(undefined, context));
 		const submissionId = outcome.status === "completed" ? outcome.result.submissionId! : undefined;
 		expect((await (await chat.harness.submission(submissionId!, context))!.wait(context)).status).toBe("done");
-		const u3 = entries.find((record) => userText(record.model?.[0]).startsWith("u3"))!;
+		const u3 = entries.find(record => userText(record.model?.[0]).startsWith("u3"))!;
 		const view = await fork.context(context);
 		expect(view.head).toMatchObject({ kind: "pi.compaction", head: u3.id, conversationId: fork.id });
 		expect(view.messages.slice(1).map(userText)).toEqual([text("u3", 100), text("a3", 100)]);
@@ -1454,7 +1451,7 @@ describe("compaction estimates and interactions", () => {
 		const watch = await fork.watch(context);
 		expect(watch.value.entries).toEqual(await allEntries(fork));
 		expect(watch.value.entries.at(-1)).toEqual(view.head);
-		expect(watch.value.entries.some((entry) => entry.id === u3.id)).toBe(true);
+		expect(watch.value.entries.some(entry => entry.id === u3.id)).toBe(true);
 		await watch.stop();
 		await chat.harness.close(context);
 	});
@@ -1513,7 +1510,7 @@ describe("compaction estimates and interactions", () => {
 		addTask(chat.setup.registry, Child);
 		addHooks(chat.setup.registry, CompactionTask, {
 			beforeCompact: async (_compaction, api, hookContext) => {
-				await chat.harness.commit(async (tx) => {
+				await chat.harness.commit(async tx => {
 					await tx.createTask(
 						Child,
 						{},
@@ -1592,7 +1589,7 @@ describe("compaction live status", () => {
 		await chat.harness.abortTask(id, context);
 		await waitFor(async () => (await live(chat)).compactions === undefined);
 		views.detach();
-		const listed = views.live().flatMap((state) => state.compactions ?? []);
+		const listed = views.live().flatMap(state => state.compactions ?? []);
 		expect(listed[0]).toEqual({ taskId: id, trigger: "manual", blocking: false, attempt: 1 });
 		// An abort is not a failure.
 		expect(views.live().at(-1)!.compactionFailure).toBeUndefined();
@@ -1608,7 +1605,7 @@ describe("compaction live status", () => {
 		const a = await chat.root.compact(undefined, context);
 		const b = await chat.root.compact(undefined, context);
 		await Promise.all([first.promise, second.promise]);
-		expect((await live(chat)).compactions?.map((status) => status.taskId)).toEqual([a, b]);
+		expect((await live(chat)).compactions?.map(status => status.taskId)).toEqual([a, b]);
 		await chat.root.abort(context);
 		expect((await live(chat)).compactions).toBeUndefined();
 		await chat.harness.close(context);
@@ -1718,7 +1715,7 @@ describe("compaction recovery", () => {
 		expect(chat.faux.summaryRequests).toHaveLength(2);
 		const [, resent] = chat.faux.summaryRequests;
 		expect(resent!.messages).toEqual(
-			chat.faux.summaryRequests[0]!.messages.map((message) => ({ ...message, timestamp: expect.any(Number) })),
+			chat.faux.summaryRequests[0]!.messages.map(message => ({ ...message, timestamp: expect.any(Number) })),
 		);
 		const usage = (await chat.harness.snapshot(UsageDoc, chat.root.id, context))!.models["faux/faux-1"]!;
 		expect(usage.input).toBeGreaterThan(usageBefore.input);
@@ -1907,7 +1904,7 @@ describe("compaction and the inbox", () => {
 		expect(watch.value.entries).toEqual(await allEntries(chat.root));
 		const head = (await chat.root.context(context)).head!;
 		expect(watch.value.entries.at(-1)).toEqual(head);
-		expect(watch.value.entries.some((entry) => entry.id === head.head)).toBe(true);
+		expect(watch.value.entries.some(entry => entry.id === head.head)).toBe(true);
 		await watch.stop();
 		await chat.harness.close(context);
 	});
@@ -1957,7 +1954,7 @@ describe("compaction edge cases", () => {
 		await reached.promise;
 		release.resolve();
 		expect((await input.wait(context)).status).toBe("done");
-		expect((await compactionTasks(chat)).map((task) => task.id)).toEqual([manual]);
+		expect((await compactionTasks(chat)).map(task => task.id)).toEqual([manual]);
 		// A background compaction would have sent its own summarization request.
 		expect(chat.faux.summaryRequests).toHaveLength(1);
 		await chat.harness.abortTask(manual, context);
@@ -2042,11 +2039,11 @@ describe("compaction edge cases", () => {
 		await result(chat, await chat.root.compact(undefined, context));
 		views.detach();
 		const states = views.live();
-		const listed = states.findIndex((state) => state.compactions !== undefined);
+		const listed = states.findIndex(state => state.compactions !== undefined);
 		const ended = states.findIndex((state, index) => index > listed && state.compactions === undefined);
 		const before = views.views[ended - 1]!;
 		const after = views.views[ended]!;
-		expect(after.entries.slice(before.entries.length).map((entry) => entry.kind)).toEqual(["pi.compaction"]);
+		expect(after.entries.slice(before.entries.length).map(entry => entry.kind)).toEqual(["pi.compaction"]);
 		await chat.harness.close(context);
 	});
 
@@ -2061,9 +2058,9 @@ describe("compaction edge cases", () => {
 		await turn(chat, text("u4", 100), "a4");
 		await waitFor(async () => (await live(chat)).compactions !== undefined);
 		views.detach();
-		const started = views.live().findIndex((state) => state.compactions !== undefined);
+		const started = views.live().findIndex(state => state.compactions !== undefined);
 		const appended = views.views[started]!.entries.slice(views.views[started - 1]!.entries.length);
-		expect(appended.map((entry) => entry.kind)).toEqual(["pi.system"]);
+		expect(appended.map(entry => entry.kind)).toEqual(["pi.system"]);
 		await chat.harness.abortTask((await compactionTasks(chat))[0]!.id, context);
 		await chat.harness.close(context);
 	});
@@ -2176,12 +2173,12 @@ describe("blocking and manual compaction together", () => {
 		// The request after the blocking compaction used its summary; the manual one landed at the final boundary.
 		expect(firstUserText(chat.faux.agentRequests.at(-1)!.messages)).toContain("BLOCKING");
 		expect((await submission.wait(context)).status).toBe("done");
-		const markers = (await allEntries(chat.root)).filter((record) => record.kind === "pi.compaction");
+		const markers = (await allEntries(chat.root)).filter(record => record.kind === "pi.compaction");
 		expect(markers).toHaveLength(2);
 		expect(markers[1]!.head).toBe(markers[0]!.head);
 		const messages = (await chat.root.context(context)).messages;
 		expect(firstUserText(messages)).toContain("MANUAL");
-		expect(messages.some((message) => userText(message).includes("BLOCKING"))).toBe(false);
+		expect(messages.some(message => userText(message).includes("BLOCKING"))).toBe(false);
 		await chat.harness.close(context);
 	});
 
@@ -2210,7 +2207,7 @@ describe("blocking and manual compaction together", () => {
 		chat.faux.summaries.push(gated(deferred(), summary("MANUAL"), manualReached));
 		const manual = await chat.root.compact(undefined, context);
 		await manualReached.promise;
-		expect((await live(chat)).compactions?.map((status) => status.blocking)).toEqual([true, false]);
+		expect((await live(chat)).compactions?.map(status => status.blocking)).toEqual([true, false]);
 		await chat.root.abort(context);
 		expect(await run.input.wait(context)).toMatchObject({ status: "unanswered", reason: "aborted" });
 		expect((await result(chat, run.blocking)).status).toBe("aborted");
@@ -2243,7 +2240,7 @@ describe("blocking and manual compaction together", () => {
 		const request = chat.faux.agentRequests.at(-1)!.messages;
 		expect(firstUserText(request)).toContain("SUMMARY");
 		expect(request.map(userText)).toContain("u5");
-		const tail = (await allEntries(chat.root)).slice(-4).map((record) => record.kind);
+		const tail = (await allEntries(chat.root)).slice(-4).map(record => record.kind);
 		expect(tail).toEqual(["pi.compaction", "pi.user", "pi.system", "pi.assistant"]);
 		await chat.harness.close(context);
 	});
@@ -2270,7 +2267,7 @@ describe("compaction pinning, silent overflow, and late policy changes", () => {
 			return summary();
 		});
 		expect((await result(chat, await chat.root.compact(undefined, context))).status).toBe("completed");
-		expect(chat.faux.summaryRequests.map((request) => request.model)).toEqual(["faux-1", "faux-1"]);
+		expect(chat.faux.summaryRequests.map(request => request.model)).toEqual(["faux-1", "faux-1"]);
 		expect(attempt).toBe(2);
 		const usage = (await chat.harness.snapshot(UsageDoc, chat.root.id, context))!.models;
 		expect(Object.keys(usage)).toEqual(["faux/faux-1"]);
@@ -2333,7 +2330,7 @@ describe("compaction pinning, silent overflow, and late policy changes", () => {
 		});
 		await turn(chat, text("u4", 200), "a4");
 		const compactions = (await chat.harness.inspect(context)).tasks.filter(
-			(task) => task.record.kind === "pi.compaction",
+			task => task.record.kind === "pi.compaction",
 		);
 		expect(compactions).toEqual([]);
 		expect(chat.faux.summaryRequests).toHaveLength(0);
@@ -2349,7 +2346,7 @@ describe("blocked compaction", () => {
 		let { harness, root } = await openChat(await openNodeSqliteStorage(path), setup);
 		// A compaction stored by a newer version than this process registers, for example after a downgrade.
 		const newer = { definition: { ...CompactionTask.definition, version: 2 } } as typeof CompactionTask;
-		const id = await root.commit(async (tx) => {
+		const id = await root.commit(async tx => {
 			const taskId = await tx.createTask(newer, { reason: "manual" }, { ownership: { kind: "conversation" } });
 			const live = await tx.doc(LiveDoc, root.id);
 			live.compactions = [{ taskId, trigger: "manual", blocking: false, attempt: 1 }];
@@ -2360,7 +2357,7 @@ describe("blocked compaction", () => {
 		harness.resume();
 		const chat = { harness, root, setup, faux: script(setup) };
 		const inspection = await chat.harness.inspect(context);
-		expect(inspection.tasks.find((task) => task.record.id === id)?.state).toEqual({
+		expect(inspection.tasks.find(task => task.record.id === id)?.state).toEqual({
 			kind: "blocked",
 			reason: "task_too_old",
 		});
@@ -2378,7 +2375,7 @@ describe("blocked compaction", () => {
 describe("context contributions", () => {
 	it("apply edits carried by an older head marker in the range", async () => {
 		const chat = await open();
-		const ids = await chat.root.commit(async (tx) => {
+		const ids = await chat.root.commit(async tx => {
 			const a = await tx.appendEntry(chat.root.id, { kind: "app.note", model: [user("a")] });
 			const b = await tx.appendEntry(chat.root.id, { kind: "app.note", model: [user("b")] });
 			// An older marker that omits b, then a newer one whose range still contains the older marker.
@@ -2392,8 +2389,8 @@ describe("context contributions", () => {
 			return { a: a.id, b: b.id, c: c.id };
 		}, context);
 		const view = await chat.root.context(context);
-		expect(view.entries.map((record) => record.id).slice(1)).toEqual([ids.a, ids.b, ids.c]);
-		expect(view.contributions.map((messages) => messages.map(userText))).toEqual([["H"], ["a"], [], ["c"]]);
+		expect(view.entries.map(record => record.id).slice(1)).toEqual([ids.a, ids.b, ids.c]);
+		expect(view.contributions.map(messages => messages.map(userText))).toEqual([["H"], ["a"], [], ["c"]]);
 		expect(view.messages.map(userText)).toEqual(["H", "a", "c"]);
 		// The summarizer sees the same contributions: the omitted entry stays out.
 		chat.setup.settings.compaction = { ...MANUAL, keepRecentTokens: 1 };
@@ -2469,10 +2466,10 @@ describe("pi.live migrations", () => {
 			checkpointWhen: () => false,
 		});
 		const conversationId = await session.commit(
-			async (tx) => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
+			async tx => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
 			context,
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveV1, conversationId);
 			live.run = { taskId: 9, inputs: [4] };
 			live.compactions = [{ taskId: 7, reason: "threshold", blocking: true, attempt: 2 }];
@@ -2501,7 +2498,7 @@ describe("pi.live migrations", () => {
 			version: 1,
 			value: { compactions: [{ reason: "threshold" }], compactionFailure: { reason: "manual" } },
 		});
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveDoc, conversationId)).compactions![0]!.attempt = 3;
 		}, context);
 		expect(await stored()).toMatchObject({
@@ -2525,10 +2522,10 @@ describe("pi.live migrations", () => {
 			checkpointWhen: () => false,
 		});
 		const conversationId = await session.commit(
-			async (tx) => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
+			async tx => (await tx.createConversation({ ownership: { kind: "ownerless" } })).id,
 			context,
 		);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const live = await tx.doc(LiveV2, conversationId);
 			live.run = { taskId: 9, inputs: [4] };
 			live.compactions = [{ taskId: 7, trigger: "threshold", blocking: true, attempt: 2 }];
@@ -2538,7 +2535,7 @@ describe("pi.live migrations", () => {
 			compactions: [{ taskId: 7, trigger: "threshold", blocking: true, attempt: 2 }],
 		});
 		// A version 2 run that has a count keeps it.
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(LiveV2, conversationId)).run = { taskId: 9, inputs: [4], turns: 3 };
 		}, context);
 		expect((await session.snapshot(LiveDoc, conversationId, context))?.run?.turns).toBe(3);

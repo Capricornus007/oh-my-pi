@@ -17,7 +17,7 @@ import {
 	remote,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 
 /** Lives on `session:` + its input's `session`. */
 const Note = remote("t.note", {
@@ -59,8 +59,8 @@ function cluster() {
 	// Relays need a route (where authorization lives); it finds the connected child.
 	server.route("session:", {
 		authorize: () => true,
-		resolve: async (name) => links.get(name)!,
-		principal: (name) => name,
+		resolve: async name => links.get(name)!,
+		principal: name => name,
 	});
 	return { server, s1: s1.host, s2: s2.host, close };
 }
@@ -90,7 +90,7 @@ describe("placement", () => {
 		);
 		const misplaced: Facet = {
 			name: "misplaced",
-			setup: (api) => api.serve(Note, () => ({ variant: "main", where: () => "" })),
+			setup: api => api.serve(Note, () => ({ variant: "main", where: () => "" })),
 		};
 		await assert.rejects(server.reload([misplaced]), /declared for session:<session>, but server serves it/);
 		await host.close();
@@ -104,12 +104,11 @@ describe("placement", () => {
 			const [down, raw] = memoryLinkPair();
 			server.accept(down, { principal: "guest" });
 			const frames: Frame[] = [];
-			raw.receive((frame) => frames.push(frame));
+			raw.receive(frame => frames.push(frame));
 			raw.send({ t: "hello", protocol: PROTOCOL_VERSION, name: "raw", kind: "client", codeVersion: 0 });
 			raw.send({ t: "hold", id: 1, at: target, token: Note.description, input });
-			for (let i = 0; i < 50 && !frames.some((frame) => frame.t === "shape" || frame.t === "gone"); i++)
-				await tick();
-			return frames.find((frame) => frame.t === "shape" || frame.t === "gone");
+			for (let i = 0; i < 50 && !frames.some(frame => frame.t === "shape" || frame.t === "gone"); i++) await tick();
+			return frames.find(frame => frame.t === "shape" || frame.t === "gone");
 		};
 		// A client picks session:S2 for a note of S1: the relay refuses, nothing reaches S2.
 		const relayed = await holds("session:S2", { session: "S1", id: "x" });
@@ -151,7 +150,7 @@ describe("placement", () => {
 		const host = createHost({ name: "server", self: "host", onError: () => {} });
 		const facet = (version: number, place: string): Facet => ({
 			name: "moved",
-			setup: (api) =>
+			setup: api =>
 				api.serve(
 					remote("t.moved", {
 						version,
@@ -160,7 +159,7 @@ describe("placement", () => {
 						variants: { main: { methods: { ping: method() } } },
 					}),
 					() => ({ variant: "main", ping: () => {} }),
-					{ accepts: { 1: (current) => current } },
+					{ accepts: { 1: current => current } },
 				),
 		});
 		await host.install(facet(1, "server"));
@@ -175,8 +174,8 @@ describe("placement", () => {
 			variants: { main: { methods: { ping: method() } } },
 		});
 		assert.throws(
-			() => bind(moved, { 1: (current) => current }, at("server")),
-			(error) => isChordError(error, "contract_mismatch") && /lives on session:S1/.test(error.message),
+			() => bind(moved, { 1: current => current }, at("server")),
+			error => isChordError(error, "contract_mismatch") && /lives on session:S1/.test(error.message),
 		);
 		await host.close();
 	});

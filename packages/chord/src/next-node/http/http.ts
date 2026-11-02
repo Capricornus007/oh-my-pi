@@ -146,13 +146,13 @@ class Component<P extends Principal> implements HttpComponent<P>, Handler {
 			void this.#upgrade(message, socket, head).catch(() => socket.destroy());
 		};
 		const { listen } = options;
-		this.facet = defineFacet<P>((facet) => {
+		this.facet = defineFacet<P>(facet => {
 			facet.serve(Http, { compose: composeRouter });
 			facet.serve(Authenticators, { compose: composeAuthenticators });
 			if (listen === undefined) return;
 			facet.serve(HttpListener, (_params, self) => {
 				self.open(
-					(opening) => this.#listen(listen, opening),
+					opening => this.#listen(listen, opening),
 					async (listener, _reason, closing) => {
 						listener.stop();
 						await this.close(closing);
@@ -191,7 +191,7 @@ class Component<P extends Principal> implements HttpComponent<P>, Handler {
 		const finished = Promise.withResolvers<void>();
 		const running: Running = { controller, done: finished.promise };
 		this.#running.add(running);
-		request.cancelled((reason) => controller.abort(reason));
+		request.cancelled(reason => controller.abort(reason));
 		let answer: Answer;
 		try {
 			const served = await this.#serve(request, connection, controller, finished.promise);
@@ -259,7 +259,7 @@ class Component<P extends Principal> implements HttpComponent<P>, Handler {
 		const answered = Promise.withResolvers<Answer>();
 		const scope = this.#host
 			.root(
-				async (ctx) => {
+				async ctx => {
 					answered.resolve(await this.#run(request, webRequest, match, admission, router, foreign, ctx));
 					// The scope lasts until the body is written or abandoned (a `bytes` body reads in it).
 					await finished;
@@ -358,7 +358,7 @@ class Component<P extends Principal> implements HttpComponent<P>, Handler {
 		if (this.#closing.signal.aborted) return;
 		const watch = await router.watch(withAbortSignal(this.#closing.signal, this.#base));
 		if (this.#closing.signal.aborted) return;
-		watch.start(async (call) => {
+		watch.start(async call => {
 			if (call.kind === "value") this.#upgrades.revoke(call.value);
 		});
 	}
@@ -460,7 +460,7 @@ class Component<P extends Principal> implements HttpComponent<P>, Handler {
 		const signal = context.abortSignal;
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		let aborted: (() => void) | undefined;
-		const deadline = new Promise<void>((resolve) => {
+		const deadline = new Promise<void>(resolve => {
 			// Already aborted: no wait at all (Sol's recheck N9).
 			if (signal?.aborted) return resolve();
 			timer = setTimeout(resolve, timeout);
@@ -486,7 +486,7 @@ function tracked(stream: ReadableStream<Uint8Array>, finished: () => void): Read
 	reader.closed.then(finished, finished);
 	return new ReadableStream<Uint8Array>(
 		{
-			pull: async (controller) => {
+			pull: async controller => {
 				try {
 					const next = await reader.read();
 					if (next.done) {
@@ -500,7 +500,7 @@ function tracked(stream: ReadableStream<Uint8Array>, finished: () => void): Read
 					finished();
 				}
 			},
-			cancel: async (reason) => {
+			cancel: async reason => {
 				finished();
 				await reader.cancel(reason);
 			},
@@ -541,7 +541,7 @@ function chainOf(match: RouteMatch, ctx: Ctx): (request: HttpRequest) => Promise
 	for (let index = match.wraps.length - 1; index >= 0; index--) {
 		const { wrap, plugin } = match.wraps[index]!;
 		const inner = next;
-		next = async (request) => {
+		next = async request => {
 			try {
 				return await wrap.wrap(request, inner, ctx);
 			} catch (error) {
@@ -555,7 +555,7 @@ function chainOf(match: RouteMatch, ctx: Ctx): (request: HttpRequest) => Promise
 
 /** `route` with its throws tagged as the route's. */
 function tagged(route: HttpRoute, plugin: string, ctx: Ctx): (request: HttpRequest) => Promise<HttpResponse> {
-	return async (request) => {
+	return async request => {
 		try {
 			return await route(request, ctx);
 		} catch (error) {

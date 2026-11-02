@@ -11,15 +11,15 @@ export default defineFacet((_host, self) =>
 			// A page: a link from another site may open it. Its inline script carries the server's nonce (the CSP).
 			"GET /": {
 				page: true,
-				handler: async (request) => ({
+				handler: async request => ({
 					kind: "html",
 					body: `<h1>Notes</h1><script nonce="${request.nonce}">console.log("hi")</script>`,
 				}),
 			},
 			// `:name` is one path segment, decoded.
-			"GET /notes/:name": async (request) => ({ kind: "json", value: { note: request.params.name } }),
+			"GET /notes/:name": async request => ({ kind: "json", value: { note: request.params.name } }),
 			// A file of this plugin, saved under its name, with ranges.
-			"GET /notes/:name/download": async (request) =>
+			"GET /notes/:name/download": async request =>
 				fileResponse(pluginFile(`files/${request.params.name}.md`), {
 					download: `${request.params.name}.md`,
 					ranges: true,

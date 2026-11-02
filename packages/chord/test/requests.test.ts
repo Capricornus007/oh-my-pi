@@ -21,8 +21,8 @@ import {
 	type StateEvent,
 } from "../src/index.ts";
 
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 100): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -30,7 +30,7 @@ async function until(check: () => boolean, attempts = 100): Promise<void> {
 
 function latch() {
 	let open = () => {};
-	const promise = new Promise<void>((resolve) => {
+	const promise = new Promise<void>(resolve => {
 		open = resolve;
 	});
 	return { promise, open };
@@ -70,7 +70,7 @@ describe("application requests", () => {
 		});
 		const chat = server.hold(Chat, {});
 		const values: unknown[] = [];
-		chat.view.subscribe((value) => values.push(value));
+		chat.view.subscribe(value => values.push(value));
 		await chat.ready;
 		await server.hold(Conv, {}).set("hi");
 		await tick();
@@ -104,7 +104,7 @@ describe("application requests", () => {
 		const captured: FacetApi[] = [];
 		const facet = (value: string): Facet => ({
 			name: "config",
-			...defineFacet((api) => {
+			...defineFacet(api => {
 				captured.push(api);
 				api.serve(
 					Settings,
@@ -125,11 +125,11 @@ describe("application requests", () => {
 		const api = captured[0]!;
 		assert.equal(api.name, "worker");
 		// A callback outside Chord (a Durable tool, say) starts its own root.
-		assert.equal(await api.root(async (ctx) => (await ctx.get(Reader, {})).read(ctx)), "v1");
+		assert.equal(await api.root(async ctx => (await ctx.get(Reader, {})).read(ctx)), "v1");
 		await host.reload([facet("v2")]);
 		await sleep(5);
 		assert.equal(captured[1]!.registry(Config).get("greeting"), "v2");
-		assert.equal(await api.root(async (ctx) => (await ctx.get(Reader, {})).read(ctx)), "v2");
+		assert.equal(await api.root(async ctx => (await ctx.get(Reader, {})).read(ctx)), "v2");
 	});
 
 	it("#3 a listener keeps its subscription across reloads when resource and select are unchanged", async () => {
@@ -153,7 +153,7 @@ describe("application requests", () => {
 		};
 		const facet = (tag: string): Facet => ({
 			name: "watcher",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Watcher, (_input, _principal, self) => {
 					const seen = self.state("seen", arr(str()), []);
 					const watchResource = self.resource("watch", { version: 1, open: () => single });
@@ -161,8 +161,8 @@ describe("application requests", () => {
 					self.on(
 						"events",
 						watchResource,
-						(watch) => ({ subscribe: (fn: (event: string) => void) => watch.start(fn) }),
-						(event, ctx) => seen.change(ctx, (draft) => void draft.push(`${tag}:${event}`)),
+						watch => ({ subscribe: (fn: (event: string) => void) => watch.start(fn) }),
+						(event, ctx) => seen.change(ctx, draft => void draft.push(`${tag}:${event}`)),
 					);
 					return { seen };
 				}),
@@ -191,10 +191,10 @@ describe("application requests", () => {
 		};
 		const facet = (selectText: boolean): Facet => ({
 			name: "watcher2",
-			setup: (api) =>
+			setup: api =>
 				api.serve(Watcher, (_input, _principal, self) => {
 					const sResource = self.resource("s", { version: 1, open: () => source });
-					self.on("s", sResource, selectText ? (s) => s : (value) => value, () => {});
+					self.on("s", sResource, selectText ? s => s : value => value, () => {});
 					return {};
 				}),
 		});
@@ -229,7 +229,7 @@ describe("application requests", () => {
 		await ref.ready;
 		const events: StateEvent<unknown>[] = [];
 		let replica: unknown;
-		ref.doc.events((event) => {
+		ref.doc.events(event => {
 			replica = event.type === "ops" ? applyImmutable(replica, event.ops) : event.value;
 			events.push(event);
 		});
@@ -263,7 +263,7 @@ describe("application requests", () => {
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 		const echoFacet: Facet = {
 			name: "echo",
-			setup: (api) => api.serve(Echo, () => ({ variant: "main", codeVersion: (ctx: Ctx) => ctx.codeVersion })),
+			setup: api => api.serve(Echo, () => ({ variant: "main", codeVersion: (ctx: Ctx) => ctx.codeVersion })),
 		};
 		server.install(echoFacet);
 		await server.reload([echoFacet]);
@@ -273,7 +273,7 @@ describe("application requests", () => {
 		const worker = createHost({ self: { kind: "host" }, name: "session:S1", loader, onError: () => {} });
 		const go = latch();
 		// A worker root of code version 1 (an eager object's listener, say) calls the server after connecting.
-		const call = worker.root(async (ctx) => {
+		const call = worker.root(async ctx => {
 			await go.promise;
 			return (await ctx.get(Echo, {})).codeVersion(ctx);
 		});
@@ -286,7 +286,7 @@ describe("application requests", () => {
 		// Unknown code versions from in-step peers stay superseded.
 		await assert.rejects(
 			server.root(() => 0, { codeVersion: 1 }),
-			(error) => isChordError(error, "superseded"),
+			error => isChordError(error, "superseded"),
 		);
 	});
 
@@ -332,10 +332,10 @@ describe("application requests", () => {
 		});
 		const greeter = (text: string): Facet => ({
 			name: "greeter",
-			setup: (api) => api.serve(Greeter, () => ({ variant: "main", greet: (name: string) => `${text} ${name}` })),
+			setup: api => api.serve(Greeter, () => ({ variant: "main", greet: (name: string) => `${text} ${name}` })),
 		});
 		const modules = new Map([["greeter", greeter("v1")]]);
-		const loader: FacetLoader = async (names) => names.map((name) => modules.get(String(name))!);
+		const loader: FacetLoader = async names => names.map(name => modules.get(String(name))!);
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 		const [down, up] = memoryLinkPair();
 		server.accept(down, { principal: { worker: "S1" }, kind: "host", name: "session:S1" });
@@ -396,7 +396,7 @@ describe("application requests", () => {
 		await counter.set(2);
 		await until(() => counter.n.value === 2);
 		const seen: unknown[] = [];
-		const again = counter.n.subscribe((value) => seen.push(value));
+		const again = counter.n.subscribe(value => seen.push(value));
 		assert.deepEqual(seen, [2]);
 		again();
 	});
@@ -432,7 +432,7 @@ describe("application requests", () => {
 		});
 		const remoteThing = browser.hold(Thing, {});
 		const remoteStatus: string[] = [];
-		remoteThing.onStatus((status) => remoteStatus.push(status));
+		remoteThing.onStatus(status => remoteStatus.push(status));
 		await remoteThing.ready;
 		up.close();
 		await until(() => remoteStatus.length === 2);
@@ -456,7 +456,7 @@ describe("application requests", () => {
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
 		server.serve(Remote, () => ({
 			variant: "main",
-			note: (text) => {
+			note: text => {
 				log.push(`server: ${text}`);
 			},
 		}));
@@ -472,7 +472,7 @@ describe("application requests", () => {
 			self: { kind: "host" },
 			name: "w",
 			upstream: { link: up, principal: { kind: "server" } },
-			onError: (error) => log.push(`error: ${String(error)}`),
+			onError: error => log.push(`error: ${String(error)}`),
 		});
 		// Eager: activated (and registered with the host) before the object that holds it.
 		worker.serve(

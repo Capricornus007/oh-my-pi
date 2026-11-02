@@ -24,7 +24,7 @@ import { CodingTools, createReadTool } from "../../src/tools/index.ts";
 
 const context = BACKGROUND_CONTEXT;
 const textOf = (message: AssistantMessage) =>
-	message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+	message.content.flatMap(part => (part.type === "text" ? [part.text] : [])).join("");
 
 // ─── Product code: the reviewer extension ───────────────────────────────────
 
@@ -35,7 +35,7 @@ const Reviewer = defineExtension({
 	sections: [section("role", () => `You review diffs. Report problems as a list. Never edit files.`)],
 	hooks: [
 		hook(GenerationTask, {
-			onYield: (answer) =>
+			onYield: answer =>
 				textOf(answer).includes(DONE)
 					? undefined
 					: { continue: `Look again for anything you missed. Say "${DONE}" when there is nothing left.` },
@@ -92,8 +92,8 @@ const agent = await reviewer.agent(context);
 console.log(
 	"reviewer:",
 	agent.model?.modelId,
-	agent.extensions.map((extension) => extension.name),
-	agent.tools.map((tool) => tool.name),
+	agent.extensions.map(extension => extension.name),
+	agent.tools.map(tool => tool.name),
 	agent.cwd === worktree,
 );
 

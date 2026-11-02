@@ -119,7 +119,7 @@ function optionalString(value: unknown, name: string): string | undefined {
 
 function optionalStrings(value: unknown, name: string): string[] | undefined {
 	if (value === undefined || value === null) return undefined;
-	if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(`Invalid ${name}`);
+	if (!Array.isArray(value) || value.some(item => typeof item !== "string")) throw new Error(`Invalid ${name}`);
 	return [...value];
 }
 
@@ -147,7 +147,7 @@ export function parseProtectedResourceMetadata(value: unknown): OAuthProtectedRe
 	return compact({
 		...input,
 		resource: safeUrl(input.resource, "OAuth protected resource metadata resource"),
-		authorization_servers: optionalStrings(input.authorization_servers, "authorization_servers")?.map((url) =>
+		authorization_servers: optionalStrings(input.authorization_servers, "authorization_servers")?.map(url =>
 			safeUrl(url, "authorization server URL"),
 		),
 		scopes_supported: optionalStrings(input.scopes_supported, "scopes_supported"),

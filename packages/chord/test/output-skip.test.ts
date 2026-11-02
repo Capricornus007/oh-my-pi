@@ -65,7 +65,7 @@ function checkSeed(seed: number): void {
 	let skips = 0;
 	const flush = (): void => {
 		if (pending === "") return;
-		const cuts = boundaries(pending).filter((cut) => cut > 0 && exceedsWindow(pending.slice(cut), limits));
+		const cuts = boundaries(pending).filter(cut => cut > 0 && exceedsWindow(pending.slice(cut), limits));
 		if (cuts.length > 0 && next() < 0.7) {
 			const cut = cuts[Math.floor(next() * cuts.length)]!;
 			skipping.push(pending.slice(cut), measure(pending.slice(0, cut)));

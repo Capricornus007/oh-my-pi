@@ -49,7 +49,7 @@ const sshd =
 		: (which("sshd") ?? (existsSync("/usr/sbin/sshd") ? "/usr/sbin/sshd" : undefined));
 
 async function freePort(): Promise<number> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const server = createServer().listen(0, "127.0.0.1", () => {
 			const { port } = server.address() as { port: number };
 			server.close(() => resolve(port));
@@ -59,13 +59,13 @@ async function freePort(): Promise<number> {
 
 async function waitForPort(port: number): Promise<void> {
 	for (let attempt = 0; attempt < 100; attempt++) {
-		const open = await new Promise<boolean>((resolve) => {
+		const open = await new Promise<boolean>(resolve => {
 			const socket = new Socket();
 			socket.once("connect", () => resolve(true)).once("error", () => resolve(false));
 			socket.connect(port, "127.0.0.1");
 		}).finally(() => undefined);
 		if (open) return;
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 	}
 	throw new Error("sshd did not start");
 }
@@ -135,7 +135,7 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 			const deployed = readFileSync(join(home, ".pi/mobile/tools", deployedName));
 			expect(deployed.equals(readFileSync(daemon))).toBe(true);
 			// Daemons of other contents are removed.
-			expect(readdirSync(join(home, ".pi/mobile/tools")).filter((name) => name.startsWith("pi-env-"))).toEqual([
+			expect(readdirSync(join(home, ".pi/mobile/tools")).filter(name => name.startsWith("pi-env-"))).toEqual([
 				deployedName,
 			]);
 			const env = new RemoteExecutionEnv({ connection, id: "pi-env:test", cwd: home });
@@ -143,7 +143,7 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 			expect(getOrThrow(await env.readTextFile("over-ssh.txt", context))).toBe("hello");
 			const output: string[] = [];
 			const result = getOrThrow(
-				await env.exec(["sh", "-c", 'printf "%s" "$HOME"'], { onOutput: (text) => output.push(text) }, context),
+				await env.exec(["sh", "-c", 'printf "%s" "$HOME"'], { onOutput: text => output.push(text) }, context),
 			);
 			expect(result.exitCode).toBe(0);
 			expect(output.join("")).toBe(home);
@@ -174,7 +174,7 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 		try {
 			const { pid } = await connection.info();
 			process.kill(pid, "SIGKILL");
-			await new Promise((done) => setTimeout(done, 300));
+			await new Promise(done => setTimeout(done, 300));
 			// Linux refuses to write a running program's file.
 			writeFileSync(file, "tampered");
 			// The next start redeploys the verified binary instead of running whatever is there.
@@ -230,7 +230,7 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 				getOrThrow(
 					await env.exec(
 						["sh", "-c", 'printf "%s" "$PI_ENV_LOGIN"'],
-						{ onOutput: (text) => output.push(text) },
+						{ onOutput: text => output.push(text) },
 						context,
 					),
 				);

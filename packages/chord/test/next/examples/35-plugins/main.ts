@@ -26,7 +26,7 @@ await cp(fileURLToPath(new URL("./plugins/", import.meta.url)), root, { recursiv
 
 /** Waits until `ready()` holds (the watcher's events arrive on their own time). */
 async function until(ready: () => boolean): Promise<void> {
-	while (!ready()) await new Promise((resolve) => setTimeout(resolve, 10));
+	while (!ready()) await new Promise(resolve => setTimeout(resolve, 10));
 }
 
 // 1. The component: the roots, and the facet kinds, each built for Node with Chord as a host package (kept external in
@@ -38,7 +38,7 @@ const plugins = createPlugins(
 	{
 		roots: [root],
 		kinds: { server: node, worker: node },
-		onError: (error) => console.log("plugins:", error.kind),
+		onError: error => console.log("plugins:", error.kind),
 	},
 	context,
 );
@@ -68,7 +68,7 @@ await notes.add(context);
 const evaluatedAt = clock.evaluatedAt.value;
 console.log("   notes:", notes.label.value, "count", notes.count.value, "| index:", index.label.value);
 const watch = await notes.label.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("   a frame on the server's reference:", JSON.stringify(call.value));
 });
 

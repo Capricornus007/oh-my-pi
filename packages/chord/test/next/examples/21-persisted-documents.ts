@@ -42,7 +42,7 @@ const Notebook = local("example.notebook", {
 	},
 });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	// Persisted documents need a stable identity, as tables do: a local type with empty params.
 	host.serve(Notebook, (_, self) => {
 		const tags = self.state(Tags);
@@ -51,7 +51,7 @@ const facet = defineFacet((host) => {
 			tags,
 			write: async ({ id, body, tag }, ctx) => {
 				// Both documents commit in one store step, or neither does.
-				await self.tx(async (tx) => {
+				await self.tx(async tx => {
 					(await tx.draft(notes, id)).body = body;
 					const draft = await tx.draft(tags);
 					if (!draft.tags.includes(tag)) draft.tags.push(tag);
@@ -66,7 +66,7 @@ const facet = defineFacet((host) => {
 /** A host on the store at `path`, run until `work` is done with the notebook. */
 async function session(path: string, work: (notebook: Reference<typeof Notebook>) => Promise<void>) {
 	const store = await openStore(sqliteBackend(await openNodeSqliteDatabase(path)), context);
-	const host = createHost({ store, onError: (error) => console.error("background error:", error) });
+	const host = createHost({ store, onError: error => console.error("background error:", error) });
 	await host.load([{ name: "@example/notebook", facet }], context);
 	await work(await host.get(Notebook, {}, context));
 	await host.close(context);
@@ -76,13 +76,13 @@ async function session(path: string, work: (notebook: Reference<typeof Notebook>
 const directory = await mkdtemp(join(tmpdir(), "chord-example-"));
 const path = join(directory, "notebook.db");
 try {
-	await session(path, async (notebook) => {
+	await session(path, async notebook => {
 		await notebook.write({ id: "groceries", body: "oat milk", tag: "home" }, context);
 		await notebook.write({ id: "standup", body: "demo the store", tag: "work" }, context);
 		console.log("first host, tags:", notebook.tags.value.tags);
 	});
 	// A new host on the same file: the documents come back from the store.
-	await session(path, async (notebook) => {
+	await session(path, async notebook => {
 		console.log("second host, tags:", notebook.tags.value.tags);
 		console.log("second host, standup:", await notebook.read("standup", context));
 	});

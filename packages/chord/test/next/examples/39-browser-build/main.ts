@@ -22,7 +22,7 @@ const plugins = createPlugins(
 		roots: [root],
 		kinds: { web: { platform: "browser", hostPackages: Object.keys(hostPackages) } },
 		publicPath: "/plugin-assets/",
-		onError: (error) => console.log("plugins:", error.kind),
+		onError: error => console.log("plugins:", error.kind),
 	},
 	context,
 );

@@ -64,7 +64,7 @@ function serveStore(self: Self) {
 	return {
 		count: self.derive([list], ([l]) => l.items.length),
 		add: async ({ text }: { text: string }, ctx: Context) => {
-			await list.change((draft) => draft.items.push(text), ctx);
+			await list.change(draft => draft.items.push(text), ctx);
 			return null;
 		},
 		clear: async (ctx: Context) => {
@@ -108,7 +108,7 @@ describe("identity and lifetime", () => {
 				slow: async () => null,
 			};
 		});
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Store, (_, self) => serveStore(self));
 			h.serve(Page, factory);
 		});
@@ -130,7 +130,7 @@ describe("identity and lifetime", () => {
 
 	it("keeps a type with empty params across releases", async () => {
 		const factory = vi.fn((_: object, self: Self) => serveStore(self));
-		const { host } = await loaded((h) => h.serve(Store, factory));
+		const { host } = await loaded(h => h.serve(Store, factory));
 		const first = await host.get(Store, {}, context);
 		await first.add({ text: "milk" }, context);
 		first.release();
@@ -142,7 +142,7 @@ describe("identity and lifetime", () => {
 	it("drops an ended object's documents and detaches its derives from other objects' members", async () => {
 		const telemetry = await metered();
 		const { host } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Store, (_, self) => serveStore(self));
 				h.serve(Page, ({ id }, self) => ({
 					label: self.derive([self.get(Store, {}).count], ([count]) => `${id}: ${count}`),
@@ -166,8 +166,8 @@ describe("retries", () => {
 	fakeTimers();
 
 	it("retry a transient failure after 1 s, doubling up to 60 s, and start over after a success", async () => {
-		const { times, factory } = flaky((attempt) => attempt <= 8 || attempt === 10);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { times, factory } = flaky(attempt => attempt <= 8 || attempt === 10);
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const got = host.get(Svc, { id: 1 }, context, { readyTimeout: 1_000_000 });
 		await vi.advanceTimersByTimeAsync(183_000);
 		(await got).release();
@@ -181,7 +181,7 @@ describe("retries", () => {
 
 	it("share one attempt among concurrent gets", async () => {
 		const { times, factory } = flaky(() => false);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const refs = await Promise.all([1, 2, 3].map(() => host.get(Svc, { id: 1 }, context)));
 		expect([times, refs.map(({ n }) => n.value)]).toEqual([[0], [1, 1, 1]]);
 	});
@@ -190,7 +190,7 @@ describe("retries", () => {
 		const bug = vi.fn(() => {
 			throw new Error("bug");
 		});
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Svc, bug);
 			h.serve(Core, bug);
 		});
@@ -207,7 +207,7 @@ describe("retries", () => {
 
 	it("end a failed object with its last reference; its backoff entry expires on its own", async () => {
 		const { times, factory } = flaky(() => true);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const first = rejection(host.get(Svc, { id: 1 }, context, { readyTimeout: 500 }));
 		await vi.advanceTimersByTimeAsync(500);
 		expect(await first).toEqual({ code: "unavailable", message: "app.svc(1): offline" });
@@ -221,8 +221,8 @@ describe("retries", () => {
 	});
 
 	it("make a get right after a failure wait for the scheduled retry", async () => {
-		const { times, factory } = flaky((attempt) => attempt === 1);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { times, factory } = flaky(attempt => attempt === 1);
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const first = rejection(host.get(Svc, { id: 1 }, context, { readyTimeout: 500 }));
 		await vi.advanceTimersByTimeAsync(500);
 		await first;
@@ -243,7 +243,7 @@ describe("retries", () => {
 			);
 			return { n: constant(factory.mock.calls.length) };
 		});
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		(await host.get(Svc, { id: 1 }, context)).release();
 		const again = host.get(Svc, { id: 1 }, context);
 		await flushed();
@@ -268,9 +268,9 @@ describe("parked on dependencies (dependency model §3)", () => {
 	}
 
 	it("parks a dependent of a failed dependency failed { waiting } naming it, with no timer; it goes on when the dependency is live", async () => {
-		const core = flaky((attempt) => attempt === 1);
+		const core = flaky(attempt => attempt === 1);
 		const viewer = view(Core);
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Core, core.factory);
 			h.serve(View, viewer.factory);
 		});
@@ -299,7 +299,7 @@ describe("parked on dependencies (dependency model §3)", () => {
 	it("keeps its references while parked; a getter rejects with the waiting cause at its deadline; releasing ends the wait", async () => {
 		const svc = flaky(() => true);
 		const viewer = view(Svc);
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Svc, svc.factory);
 			h.serve(View, viewer.factory);
 		});
@@ -318,7 +318,7 @@ describe("parked on dependencies (dependency model §3)", () => {
 	it("shows every change of a dependency: loading, failed, a new cause, loading again, live", async () => {
 		let cores = 0;
 		const viewer = view(Core);
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Core, (_, self) => {
 				const attempt = ++cores;
 				self.open(
@@ -349,7 +349,7 @@ describe("parked on dependencies (dependency model §3)", () => {
 		const Top = local("app.top", { version: 1, params: {}, members: { n: int() } });
 		const Left = local("app.left", { version: 1, params: { id: int() }, members: { n: int() } });
 		let cores = 0;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Core, () => {
 				if (++cores === 1) throw new Error("bug");
 				return { n: constant(cores) };
@@ -383,7 +383,7 @@ describe("parked on dependencies (dependency model §3)", () => {
 		const Left = local("app.left", { version: 1, params: { id: int() }, members: { n: int() } });
 		const Mid = local("app.mid", { version: 1, params: {}, members: { n: int() } });
 		let cores = 0;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Core, () => {
 				if (++cores === 1) throw new Error("bug");
 				return { n: constant(cores) };
@@ -415,7 +415,7 @@ describe("parked on dependencies (dependency model §3)", () => {
 		const Ping = local("app.ping", { version: 1, params: {}, members: { n: int() } });
 		const Pong = local("app.pong", { version: 1, params: {}, members: { n: int() } });
 		const factories = { ping: vi.fn(), pong: vi.fn() };
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Ping, (_, self) => {
 				factories.ping();
 				return { n: self.get(Pong, {}).n };
@@ -444,10 +444,10 @@ describe("cycle checks", () => {
 			members: { depth: int() },
 		});
 		const layers = 28;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Layer, ({ layer }, self) => {
 				if (layer === layers) return { depth: constant(0) };
-				const next = [0, 1].map((index) => self.get(Layer, { layer: layer + 1, index }).depth);
+				const next = [0, 1].map(index => self.get(Layer, { layer: layer + 1, index }).depth);
 				return { depth: self.derive(next, ([a]) => (a as number) + 1) };
 			}),
 		);
@@ -462,7 +462,7 @@ describe("cycle checks", () => {
 describe("GC", () => {
 	it("collects an ended object with its documents, derives and watches", async () => {
 		const refs: WeakRef<object>[] = [];
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Store, (_, self) => serveStore(self));
 			h.serve(Page, (_, self) => {
 				const list = self.state(List);
@@ -484,7 +484,7 @@ describe("GC", () => {
 	});
 
 	it("keeps nothing in a released reference or a stopped watch", async () => {
-		const { host } = await loaded((h) => h.serve(Store, (_, self) => serveStore(self)));
+		const { host } = await loaded(h => h.serve(Store, (_, self) => serveStore(self)));
 		const store = await host.get(Store, {}, context);
 		const held = await host.get(Store, {}, context);
 		const refs = await (async () => {
@@ -506,7 +506,7 @@ describe("GC of released references", () => {
 		const { reference, refs } = await (async () => {
 			const refs: WeakRef<object>[] = [];
 			let declared: unknown;
-			const { host } = await loaded((h) => {
+			const { host } = await loaded(h => {
 				h.serve(Store, (_, self) => serveStore(self));
 				h.serve(Page, (_, self) => {
 					declared = self.get(Store, {});
@@ -529,7 +529,7 @@ describe("GC of failed objects", () => {
 
 	it("collects one after its last reference while its backoff entry exists; the entry expires on its own", async () => {
 		const refs: WeakRef<object>[] = [];
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Store, (_, self) => serveStore(self));
 			h.serve(Page, (_, self) => {
 				const list = self.state(List);
@@ -567,7 +567,7 @@ describe("GC of a parked chain", () => {
 		const Mid = local("app.mid", { version: 1, params: { id: int() }, members: { n: int() } });
 		const Missing = local("app.missing", { version: 1, params: {}, members: { n: int() } });
 		const refs: WeakRef<object>[] = [];
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Mid, (_, self) => {
 				refs.push(new WeakRef(self));
 				return { n: self.get(Missing, {}).n };
@@ -598,8 +598,8 @@ describe("ref.retry()", () => {
 	fakeTimers();
 
 	it("skips a transient failure's backoff window: an attempt now", async () => {
-		const { times, factory } = flaky((attempt) => attempt === 1);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { times, factory } = flaky(attempt => attempt === 1);
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const svc = host.hold(Svc, { id: 1 }, context);
 		await flushed();
 		expect(svc.state.value.kind).toBe("failed");
@@ -610,8 +610,8 @@ describe("ref.retry()", () => {
 	});
 
 	it("starts an object waiting for its identity's backoff window at once", async () => {
-		const { times, factory } = flaky((attempt) => attempt === 1);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { times, factory } = flaky(attempt => attempt === 1);
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const first = host.hold(Svc, { id: 1 }, context);
 		await flushed();
 		// The failed object ends with its reference; its identity's window (1 s) still runs.
@@ -627,8 +627,8 @@ describe("ref.retry()", () => {
 
 	it("is ignored while an attempt runs and once live (race 11)", async () => {
 		const gate = Promise.withResolvers<void>();
-		const { times, factory } = flaky((attempt) => attempt === 1, gate.promise);
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { times, factory } = flaky(attempt => attempt === 1, gate.promise);
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const svc = host.hold(Svc, { id: 1 }, context);
 		await flushed();
 		svc.retry();
@@ -653,7 +653,7 @@ describe("ref.retry()", () => {
 			);
 			return { n: constant(1) };
 		});
-		const { host } = await loaded((h) => h.serve(Svc, factory));
+		const { host } = await loaded(h => h.serve(Svc, factory));
 		const one = host.hold(Svc, { id: 1 }, context);
 		const two = host.hold(Svc, { id: 1 }, context);
 		await vi.advanceTimersByTimeAsync(120_000);
@@ -683,14 +683,14 @@ describe("linger", () => {
 					return n;
 				}),
 				bump: async (ctx: Context) => {
-					await doc.change((draft) => {
+					await doc.change(draft => {
 						draft.n++;
 					}, ctx);
 					return null;
 				},
 			};
 		});
-		const { host } = await loaded((h) => h.serve(Tally, factory, { linger }));
+		const { host } = await loaded(h => h.serve(Tally, factory, { linger }));
 		return { host, factory, closes };
 	}
 
@@ -764,7 +764,7 @@ describe("linger", () => {
 
 	it("a lingering object is collected after its expiry", async () => {
 		const refs: WeakRef<object>[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(
 				Svc,
 				({ id }, self) => {
@@ -823,7 +823,7 @@ const Loop = remote("app.loop", {
 async function cyclic(back: "near" | "middle" = "near", trusted = true) {
 	return relayed({
 		trusted,
-		server: (h) => {
+		server: h => {
 			h.serve(Near, ({ session }, _principal, self) => ({
 				variant: "v",
 				members: { n: self.get(Far, { session }).n },
@@ -834,7 +834,7 @@ async function cyclic(back: "near" | "middle" = "near", trusted = true) {
 			}));
 			h.serve(Hub, ({ session }, self) => ({ n: self.get(Far, { session }).n }));
 		},
-		worker: (h) => {
+		worker: h => {
 			h.serve(Far, ({ session }, _principal, self) => ({
 				variant: "v",
 				members: { n: back === "near" ? self.get(Near, { session }).n : self.get(Middle, { session }).n },
@@ -917,7 +917,7 @@ describe("cycles across hosts (Q5)", () => {
 			cause: { kind: "broken", error: { kind: "chord", error: { reason: "cycle" } } },
 		});
 		await transported();
-		expect(worker.received.filter((message) => message.kind === "failed")).toEqual([]);
+		expect(worker.received.filter(message => message.kind === "failed")).toEqual([]);
 	});
 
 	it("keep the last 32 entries of a longer chain: the oldest is dropped (a longer cycle goes undetected)", async () => {
@@ -942,7 +942,7 @@ describe("cycles across hosts (Q5)", () => {
 		worker.send({ ...nearHold(0), chain: ["0190f5a2-7c3e-7d4a-9b1c-000000000001"] });
 		await transported();
 		expect(chain).toHaveLength(1);
-		expect(worker.received.filter((message) => message.kind === "failed")).toEqual([]);
+		expect(worker.received.filter(message => message.kind === "failed")).toEqual([]);
 		expect(await getting).toMatchObject({ code: "unavailable" });
 	});
 
@@ -970,7 +970,7 @@ async function nearBehindRawWorker() {
 	const workers: RawPeer[] = [];
 	const relay = await relayed({
 		resolve: rawWorkers(workers, { trusted: true }),
-		server: (h) =>
+		server: h =>
 			h.serve(Near, ({ session }, _principal, self) => ({
 				variant: "v",
 				members: { n: self.get(Far, { session }).n },
@@ -1010,7 +1010,7 @@ describe("a failed activation's cleanup (audit)", () => {
 	it("closes the natives that opened before it releases its references: a close may use them", async () => {
 		const Dependent = local("app.dependent", { version: 1, params: { id: int() }, members: { n: int() } });
 		const seen: unknown[] = [];
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Core, () => ({ n: constant(5) }));
 			h.serve(Dependent, (_, self) => {
 				const core = self.get(Core, {});
@@ -1057,10 +1057,10 @@ describe("a live object failing (slice 6a §1.4)", () => {
 					},
 				);
 			},
-			{ serve: (h) => h.serve(Core, () => ({ n: constant(1) })) },
+			{ serve: h => h.serve(Core, () => ({ n: constant(1) })) },
 		);
 		const states: string[] = [];
-		(await reference.state.watch(context)).start(async (call) => {
+		(await reference.state.watch(context)).start(async call => {
 			if (call.kind === "value") states.push(call.value.kind);
 		});
 		fail();
@@ -1080,7 +1080,7 @@ describe("a live object failing (slice 6a §1.4)", () => {
 	it("keeps its state members' last values for same-host reads; a live dependent's derive over them stays live", async () => {
 		const Viewer = local("app.count-viewer", { version: 1, params: {}, members: { tens: int() } });
 		let store: Self | undefined;
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Store, (_, self) => {
 				store = self;
 				return serveStore(self);
@@ -1116,7 +1116,7 @@ describe("a live object failing (slice 6a §1.4)", () => {
 		let self: Self | undefined;
 		let counter: SingletonHandle<{ n: number }> | undefined;
 		const { host } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Doubled, (_, s) => {
 					self = s;
 					counter = s.state(Counter);
@@ -1131,7 +1131,7 @@ describe("a live object failing (slice 6a §1.4)", () => {
 		const doubles = changesOf(await ref.double.watch(context));
 		const tens = changesOf(await viewer.tens.watch(context));
 		const held = holdNextCommit(store);
-		const change = counter!.change((draft) => {
+		const change = counter!.change(draft => {
 			draft.n = 1;
 		}, context);
 		await held.entered;
@@ -1155,7 +1155,7 @@ describe("a live object failing (slice 6a §1.4)", () => {
 			schema: obj({ m: int() }),
 			version: 2,
 			initial: () => ({ m: 0 }),
-			migrate: (old) => ({ m: (old as { n: number }).n }),
+			migrate: old => ({ m: (old as { n: number }).n }),
 			persist: true,
 			checkpointWhen: () => false,
 		});
@@ -1167,19 +1167,19 @@ describe("a live object failing (slice 6a §1.4)", () => {
 			{ store, closeTimeout: 5 },
 		);
 		const v1 = counters[0] as SingletonHandle<{ n: number }>;
-		await v1.change((draft) => {
+		await v1.change(draft => {
 			draft.n = 1;
 		}, context);
 		const held = holdNextCommit(store);
-		const change = v1.change((draft) => {
+		const change = v1.change(draft => {
 			draft.n = 2;
 		}, context);
 		await held.entered;
 		failLive(attempted, attempts[0]!, new ChordError({ code: "unavailable", message: "boom" }));
 		// Past the drain: only the admitted step holds the retry.
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		reference.retry();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(counters).toHaveLength(1);
 		held.release();
 		await change;
@@ -1194,7 +1194,7 @@ describe("a live object failing (slice 6a §1.4)", () => {
 		const { restart } = await restartable(attempted, (_, self) => {
 			lists.push(self.state(List));
 		});
-		await lists[0]!.change((draft) => void draft.items.push("a"), context);
+		await lists[0]!.change(draft => void draft.items.push("a"), context);
 		await restart();
 		expect(lists[1]!.value).toEqual({ items: ["a"] });
 	});
@@ -1221,7 +1221,7 @@ function servePure(h: FacetHost, label: string, by: number, gates: Promise<void>
 			label: constant(label),
 			bump: async (ctx: Context) => {
 				await gates.shift();
-				await doc.change((draft) => {
+				await doc.change(draft => {
 					draft.n += by;
 				}, ctx);
 				return doc.value.n;
@@ -1232,11 +1232,11 @@ function servePure(h: FacetHost, label: string, by: number, gates: Promise<void>
 
 describe("reload: fates (slice 7b §4)", () => {
 	it("swaps a pure object in place: same documents and instance id, new code for new calls", async () => {
-		const { host } = await loaded((h) => servePure(h, "v1", 1));
+		const { host } = await loaded(h => servePure(h, "v1", 1));
 		const pure = await host.get(Pure, {}, context);
 		await pure.bump(context);
 		const objects = instancesOf(ChordObject, "reloadFate");
-		const report = await reloadApp(host, (h) => servePure(h, "v2", 10));
+		const report = await reloadApp(host, h => servePure(h, "v2", 10));
 		expect(report.objects).toEqual([{ object: "app.pure", kind: "swapped" }]);
 		expect(objects).toHaveLength(1);
 		await flushed();
@@ -1260,7 +1260,7 @@ describe("reload: fates (slice 7b §4)", () => {
 					label: constant(label),
 					bump: async (ctx: Context) => {
 						await gates.shift();
-						await doc.change((draft) => {
+						await doc.change(draft => {
 							draft.n += 1;
 						}, ctx);
 						closes.push(`bump done on ${label}`);
@@ -1269,11 +1269,11 @@ describe("reload: fates (slice 7b §4)", () => {
 				};
 			});
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => serve(h, "v1", [gate.promise]));
+		const { host } = await loaded(h => serve(h, "v1", [gate.promise]));
 		const pure = await host.get(Pure, {}, context);
 		const running = pure.bump(context);
 		await flushed();
-		const report = await reloadApp(host, (h) => serve(h, "v2"));
+		const report = await reloadApp(host, h => serve(h, "v2"));
 		expect(report.objects).toEqual([{ object: "app.pure", kind: "restarted" }]);
 		expect(pure.state.value).toEqual({ kind: "loading" });
 		// A new call parks until the new attempt is live.
@@ -1289,7 +1289,7 @@ describe("reload: fates (slice 7b §4)", () => {
 	});
 
 	it("ends the objects of a removed type: its holders wait not_served, and bind again when it is served again", async () => {
-		const { host, errors } = await loaded((h) => servePure(h, "v1", 1));
+		const { host, errors } = await loaded(h => servePure(h, "v1", 1));
 		const pure = host.hold(Pure, {}, context);
 		await flushed();
 		await pure.bump(context);
@@ -1307,7 +1307,7 @@ describe("reload: fates (slice 7b §4)", () => {
 		});
 		// The member keeps its last value while waiting.
 		expect(pure.label.value).toBe("v1");
-		await host.reload([{ name: "@test/app", facet: defineFacet((h) => servePure(h, "v2", 1)) }], context);
+		await host.reload([{ name: "@test/app", facet: defineFacet(h => servePure(h, "v2", 1)) }], context);
 		await flushed();
 		expect(pure.state.value).toEqual({ kind: "live" });
 		// A new object: in-memory documents went with the old one.
@@ -1321,7 +1321,7 @@ describe("reload: fates (slice 7b §4)", () => {
 
 	it("a live local dependent of a removed type keeps its last value; served again, its derive heals (one frame)", async () => {
 		const Panel = local("app.panel", { version: 1, params: {}, members: { text: str() } });
-		const panel = defineFacet((h) =>
+		const panel = defineFacet(h =>
 			h.serve(Panel, (_, self) => {
 				const pure = self.get(Pure, {});
 				return { text: self.derive([pure.label], ([label]) => `panel ${label}`) };
@@ -1330,7 +1330,7 @@ describe("reload: fates (slice 7b §4)", () => {
 		const host = createHost({ onError: () => {} });
 		await host.load(
 			[
-				{ name: "@test/app", facet: defineFacet((h) => servePure(h, "v1", 1)) },
+				{ name: "@test/app", facet: defineFacet(h => servePure(h, "v1", 1)) },
 				{ name: "@test/panel", facet: panel },
 			],
 			context,
@@ -1342,7 +1342,7 @@ describe("reload: fates (slice 7b §4)", () => {
 		expect(view.text.value).toBe("panel v1");
 		await host.reload(
 			[
-				{ name: "@test/app", facet: defineFacet((h) => servePure(h, "v2", 1)) },
+				{ name: "@test/app", facet: defineFacet(h => servePure(h, "v2", 1)) },
 				{ name: "@test/panel", facet: panel },
 			],
 			context,
@@ -1355,7 +1355,7 @@ describe("reload: fates (slice 7b §4)", () => {
 	});
 
 	it("retries a failed object on the new code", async () => {
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Pure, () => {
 				throw new Error("bug");
 			}),
@@ -1363,7 +1363,7 @@ describe("reload: fates (slice 7b §4)", () => {
 		const pure = host.hold(Pure, {}, context);
 		await flushed();
 		expect(pure.state.value).toMatchObject({ kind: "failed", cause: { kind: "broken" } });
-		const report = await reloadApp(host, (h) => servePure(h, "fixed", 1));
+		const report = await reloadApp(host, h => servePure(h, "fixed", 1));
 		expect(report.objects).toEqual([{ object: "app.pure", kind: "retried" }]);
 		await flushed();
 		expect(pure.state.value).toEqual({ kind: "live" });
@@ -1373,7 +1373,7 @@ describe("reload: fates (slice 7b §4)", () => {
 
 	it("parks a swap whose new factory needs a missing dependency; it goes live when the dependency is served", async () => {
 		const Dep = local("app.dep", { version: 1, params: {}, members: { name: str() } });
-		const { host } = await loaded((h) => servePure(h, "v1", 1));
+		const { host } = await loaded(h => servePure(h, "v1", 1));
 		const pure = await host.get(Pure, {}, context);
 		const needsDep = (h: FacetHost) =>
 			h.serve(Pure, (_, self) => {
@@ -1397,7 +1397,7 @@ describe("reload: fates (slice 7b §4)", () => {
 		await host.reload(
 			[
 				{ name: "@test/app", facet: defineFacet(needsDep) },
-				{ name: "@test/dep", facet: defineFacet((h) => h.serve(Dep, () => ({ name: constant("dep") }))) },
+				{ name: "@test/dep", facet: defineFacet(h => h.serve(Dep, () => ({ name: constant("dep") }))) },
 			],
 			context,
 		);
@@ -1411,11 +1411,11 @@ describe("reload: fates (slice 7b §4)", () => {
 describe("reload: the pure swap (slice 7b §5)", () => {
 	it("lets a running call finish on the old attempt's handles; a new call waits at the gate for the new code", async () => {
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => servePure(h, "v1", 1, [gate.promise]));
+		const { host } = await loaded(h => servePure(h, "v1", 1, [gate.promise]));
 		const pure = await host.get(Pure, {}, context);
 		const old = pure.bump(context);
 		await flushed();
-		await reloadApp(host, (h) => servePure(h, "v2", 10));
+		await reloadApp(host, h => servePure(h, "v2", 10));
 		// The old call commits through its old handle after the swap.
 		gate.resolve();
 		expect(await old).toBe(1);
@@ -1429,7 +1429,7 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 			schema: obj({ n: int(), unit: str() }),
 			version: 2,
 			initial: () => ({ n: 0, unit: "" }),
-			migrate: (old) => ({ n: old.n as number, unit: "pcs" }),
+			migrate: old => ({ n: old.n as number, unit: "pcs" }),
 		});
 		const gate = Promise.withResolvers<void>();
 		const serve = (h: FacetHost, definition: typeof V1 | typeof V2, gates: Promise<void>[]) =>
@@ -1440,19 +1440,19 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 					label: self.derive([doc], ([d]) => JSON.stringify(d)),
 					bump: async (ctx: Context) => {
 						await gates.shift();
-						await doc.change((draft) => {
+						await doc.change(draft => {
 							draft.n += 1;
 						}, ctx);
 						return doc.value.n;
 					},
 				};
 			});
-		const { host } = await loaded((h) => serve(h, V1, [Promise.resolve(), gate.promise]));
+		const { host } = await loaded(h => serve(h, V1, [Promise.resolve(), gate.promise]));
 		const pure = await host.get(Pure, {}, context);
 		await pure.bump(context);
 		const old = pure.bump(context);
 		await flushed();
-		await reloadApp(host, (h) => serve(h, V2, []));
+		await reloadApp(host, h => serve(h, V2, []));
 		await flushed();
 		expect(pure.label.value).toBe('{"n":1,"unit":"pcs"}');
 		gate.resolve();
@@ -1467,13 +1467,13 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 			params: { id: int() },
 			members: { n: int(), set: method(obj({ n: int() })) },
 		});
-		const dep = defineFacet((h) =>
+		const dep = defineFacet(h =>
 			h.serve(Dep, (_, self) => {
 				const doc = self.state(defineState("dep", COUNTER));
 				return {
 					n: self.derive([doc], ([d]) => d.n),
 					set: async ({ n }: { n: number }, ctx: Context) => {
-						await doc.change((draft) => {
+						await doc.change(draft => {
 							draft.n = n;
 						}, ctx);
 						return null;
@@ -1482,7 +1482,7 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 			}),
 		);
 		const app = (label: string) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Pure, (_, self) => {
 					const held = self.get(Dep, { id: 1 });
 					return {
@@ -1520,12 +1520,12 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 	});
 
 	it("re-binds members by name (one frame from the last value) and rebuilds internal derives", async () => {
-		const { host } = await loaded((h) => servePure(h, "v1", 1));
+		const { host } = await loaded(h => servePure(h, "v1", 1));
 		const pure = await host.get(Pure, {}, context);
 		const label = changesOf(await pure.label.watch(context));
 		const n = changesOf(await pure.n.watch(context));
 		await pure.bump(context);
-		await reloadApp(host, (h) => servePure(h, "v2", 1));
+		await reloadApp(host, h => servePure(h, "v2", 1));
 		await delivered();
 		expect(label).toEqual([{ kind: "value", value: "v2", ops: [["r", "v2"]], retired: false }]);
 		// Its derive over the same document gave the same value: no frame besides the commit's.
@@ -1538,7 +1538,7 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 		const release = Promise.withResolvers<void>();
 		const serve = (h: FacetHost, label: string) =>
 			h.serve(Pure, (_, self) => {
-				self.onLive(async (ctx) => {
+				self.onLive(async ctx => {
 					events.push(`${label} started`);
 					await untilAborted(ctx);
 					if (label === "v1") await release.promise;
@@ -1546,10 +1546,10 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 				});
 				return { n: constant(0), label: constant(label), bump: async () => 0 };
 			});
-		const { host } = await loaded((h) => serve(h, "v1"));
+		const { host } = await loaded(h => serve(h, "v1"));
 		await host.get(Pure, {}, context);
 		await flushed();
-		await reloadApp(host, (h) => serve(h, "v2"));
+		await reloadApp(host, h => serve(h, "v2"));
 		await flushed();
 		expect(events).toEqual(["v1 started"]);
 		release.resolve();
@@ -1561,17 +1561,17 @@ describe("reload: the pure swap (slice 7b §5)", () => {
 	it("starts a writable at its new initial value and replaces the contributions in one batch", async () => {
 		const Tools = defineRegistry<string[], string[]>("app.tools", { version: 1 });
 		const compositions: string[][] = [];
-		const registry = defineFacet((h) =>
+		const registry = defineFacet(h =>
 			h.serve(Tools, {
-				compose: (table) => {
-					const value = table.flatMap((entry) => entry.value);
+				compose: table => {
+					const value = table.flatMap(entry => entry.value);
 					compositions.push(value);
 					return value;
 				},
 			}),
 		);
 		const app = (tool: string) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Pure, (_, own) => {
 					const tools = own.writable([tool]);
 					(own as unknown as StoreSelf).contribute(Tools, tools);
@@ -1614,21 +1614,21 @@ describe("reload: a stuck routine call past the handover", () => {
 		const serve = (h: FacetHost, label: string) =>
 			h.serve(Pure, (_, self) => {
 				const doc = self.state(defineState("pure", COUNTER));
-				self.onLive(async (ctx) => {
+				self.onLive(async ctx => {
 					if (label !== "v1") return;
 					await stuck.promise;
 					late = rejection(
-						self.tx(async (tx) => {
+						self.tx(async tx => {
 							(await tx.draft(doc)).n = 99;
 						}, ctx),
 					);
 				});
 				return { n: self.derive([doc], ([d]) => d.n), label: constant(label), bump: async () => 0 };
 			});
-		const host = createHost({ closeTimeout: 1_000, onError: (error) => errors.push(error) });
-		await host.load([{ name: "@test/app", facet: defineFacet((h) => serve(h, "v1")) }], context);
+		const host = createHost({ closeTimeout: 1_000, onError: error => errors.push(error) });
+		await host.load([{ name: "@test/app", facet: defineFacet(h => serve(h, "v1")) }], context);
 		const pure = await host.get(Pure, {}, context);
-		await reloadApp(host, (h) => serve(h, "v2"));
+		await reloadApp(host, h => serve(h, "v2"));
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(errors.map(({ kind }) => kind)).toContain("drain_timeout");
 		stuck.resolve();
@@ -1644,11 +1644,11 @@ describe("reload: GC", () => {
 
 	it("collects a swapped-out attempt and its closures once its calls settled", async () => {
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => servePure(h, "v1", 1, [gate.promise]));
+		const { host } = await loaded(h => servePure(h, "v1", 1, [gate.promise]));
 		const pure = await host.get(Pure, {}, context);
 		const old = pure.bump(context);
 		const from = attempts.length - 1;
-		await reloadApp(host, (h) => servePure(h, "v2", 1));
+		await reloadApp(host, h => servePure(h, "v2", 1));
 		gate.resolve();
 		await old;
 		await flushed();
@@ -1665,14 +1665,14 @@ describe("reload: GC", () => {
 		const load = (): [WeakRef<object>, Promise<unknown>] => {
 			const made = defineFacet((h, self) => {
 				servePure(h, "v1", 1);
-				h.serve(Names, { compose: (table) => table.map(({ value }) => value) });
+				h.serve(Names, { compose: table => table.map(({ value }) => value) });
 				self.contribute(Names, "x");
 			});
 			return [new WeakRef(made), host.load([{ name: "@test/app", facet: made }], context)];
 		};
 		const [facet, loading] = load();
 		await loading;
-		await host.get(Pure, {}, context).then((pure) => pure.release());
+		await host.get(Pure, {}, context).then(pure => pure.release());
 		await host.reload([], context);
 		await flushed();
 		expect(objects).toHaveLength(1);
@@ -1689,7 +1689,7 @@ describe("reload: a parked attempt's handover (fix round 1)", () => {
 		let opens = 0;
 		let closes = 0;
 		const host = createHost({ onError: () => {} });
-		const depFacet = defineFacet((h) =>
+		const depFacet = defineFacet(h =>
 			h.serve(Dep, (_, self) => {
 				self.open(
 					async () => {
@@ -1703,7 +1703,7 @@ describe("reload: a parked attempt's handover (fix round 1)", () => {
 			}),
 		);
 		const aFacet = () =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(A, (_, self) => {
 					self.get(Dep, { id: 1 });
 					self.get(Missing, {});
@@ -1738,7 +1738,7 @@ describe("reload: a parked attempt's handover (fix round 1)", () => {
 		const Missing = local("sol.missing", { version: 1, params: {}, members: {} });
 		let opens = 0;
 		let closes = 0;
-		const b = defineFacet((h) =>
+		const b = defineFacet(h =>
 			h.serve(B, (_, self) => {
 				self.open(
 					async () => ++opens,
@@ -1750,7 +1750,7 @@ describe("reload: a parked attempt's handover (fix round 1)", () => {
 			}),
 		);
 		const a = () =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(A, (_, self) => {
 					self.get(B, { id: 1 });
 					self.get(Missing, {});
@@ -1785,13 +1785,13 @@ describe("reload: a parked attempt's handover (fix round 1)", () => {
 describe("reload: swaps one after another (fix round 1)", () => {
 	it("a second swap does not wait for the first swap's old call; that call still finishes on its old code", async () => {
 		const gate = Promise.withResolvers<void>();
-		const { host, errors } = await loaded((h) => servePure(h, "v1", 1, [gate.promise]), { closeTimeout: 60_000 });
+		const { host, errors } = await loaded(h => servePure(h, "v1", 1, [gate.promise]), { closeTimeout: 60_000 });
 		const pure = await host.get(Pure, {}, context);
 		const old = pure.bump(context);
 		await flushed();
-		await reloadApp(host, (h) => servePure(h, "v2", 10));
+		await reloadApp(host, h => servePure(h, "v2", 10));
 		let resolved = false;
-		const second = reloadApp(host, (h) => servePure(h, "v3", 100)).then(() => {
+		const second = reloadApp(host, h => servePure(h, "v3", 100)).then(() => {
 			resolved = true;
 		});
 		await flushed();
@@ -1811,12 +1811,12 @@ describe("reload: a reference detaching from a parked swap's old instance (Opus 
 	it("follows the old instance while its call drains, then keeps its last value with the failure once", async () => {
 		const Missing = local("app.missing", { version: 1, params: {}, members: {} });
 		const gate = Promise.withResolvers<void>();
-		const { host } = await loaded((h) => servePure(h, "v1", 1, [gate.promise]), { closeTimeout: 60_000 });
+		const { host } = await loaded(h => servePure(h, "v1", 1, [gate.promise]), { closeTimeout: 60_000 });
 		const pure = await host.get(Pure, {}, context);
 		const calls = changesOf(await pure.n.watch(context));
 		const bumping = pure.bump(context);
 		await flushed();
-		const parked = defineFacet((h) =>
+		const parked = defineFacet(h =>
 			h.serve(Pure, (_, self) => {
 				self.get(Missing, {});
 				return { n: constant(9), label: constant("v2"), bump: async () => 0 };
@@ -1829,7 +1829,7 @@ describe("reload: a reference detaching from a parked swap's old instance (Opus 
 		gate.resolve();
 		expect(await bumping).toBe(1);
 		await delivered();
-		expect([pure.n.value, calls.map((call) => call.kind), valuesOf(calls)[0]]).toEqual([1, ["value", "failed"], 1]);
+		expect([pure.n.value, calls.map(call => call.kind), valuesOf(calls)[0]]).toEqual([1, ["value", "failed"], 1]);
 		await host.close(context);
 	});
 });
@@ -1837,7 +1837,7 @@ describe("reload: a reference detaching from a parked swap's old instance (Opus 
 describe("a live failure: an older version's mapping follows the admitted commits (final review)", () => {
 	it("stops an older reference after its instance's admitted final commit published (Astra, G1)", async () => {
 		const V1 = local("app.admitted", { version: 1, params: {}, members: { n: int() } });
-		const V2 = evolve(V1, (e) => e.state("n", obj({ n: int() })));
+		const V2 = evolve(V1, e => e.state("n", obj({ n: int() })));
 		const State = defineState("state", {
 			version: 1,
 			schema: obj({ n: int() }),
@@ -1848,7 +1848,7 @@ describe("a live failure: an older version's mapping follows the admitted commit
 		const store = await memoryStore();
 		let own: SingletonHandle<{ n: number }> | undefined;
 		let self: StoreSelf | undefined;
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(
 				V2,
 				(_, declared) => {
@@ -1856,7 +1856,7 @@ describe("a live failure: an older version's mapping follows the admitted commit
 					own = declared.state(State);
 					return { n: own };
 				},
-				{ accepts: { 1: { state: { n: (value) => value.n } } } },
+				{ accepts: { 1: { state: { n: value => value.n } } } },
 			),
 		);
 		const host = createHost({ store, onError: () => {} });
@@ -1866,7 +1866,7 @@ describe("a live failure: an older version's mapping follows the admitted commit
 		const calls = changesOf(await old.n.watch(context));
 		// A commit admitted before the failure: v1's mapping and v2's member both get it, then the failure.
 		const held = holdNextCommit(store);
-		const change = own!.change((draft) => {
+		const change = own!.change(draft => {
 			draft.n = 5;
 		}, context);
 		await held.entered;
@@ -1897,7 +1897,7 @@ describe("a native restart: references take their last values after the admitted
 			checkpointWhen: () => false,
 		});
 		const facet = (open: () => Promise<number>) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Type, (_, self) => {
 					counter = self.state(Doc);
 					self.open(open, () => {});
@@ -1913,7 +1913,7 @@ describe("a native restart: references take their last values after the admitted
 		// A commit admitted to the store (no running call's promise), then a restart whose new native stays opening.
 		const held = holdNextCommit(store);
 		const outgoing = counter!;
-		const change = outgoing.change((draft) => {
+		const change = outgoing.change(draft => {
 			draft.n = 1;
 		}, context);
 		await held.entered;

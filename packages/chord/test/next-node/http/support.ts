@@ -61,13 +61,13 @@ export async function served(
 	const hostErrors: HostError[] = [];
 	const host = createHost<TestPrincipal>({
 		principal: { kind: "server" },
-		onError: (error) => hostErrors.push(error),
+		onError: error => hostErrors.push(error),
 		...(options.readyTimeout === undefined ? {} : { readyTimeout: options.readyTimeout }),
 		...(options.address === undefined ? {} : { address: options.address }),
 	});
 	const config: Omit<HttpOptions, "onError"> = { listen: { host: "127.0.0.1", port: 0 }, ...options.config };
-	const http = createHttp(host, { ...config, onError: (error) => errors.push(error) }, context);
-	const authenticate = options.authenticate ?? ((request) => principalOf(request.headers));
+	const http = createHttp(host, { ...config, onError: error => errors.push(error) }, context);
+	const authenticate = options.authenticate ?? (request => principalOf(request.headers));
 	const core = [
 		{ name: "chord.http", facet: http.facet },
 		{
@@ -133,7 +133,7 @@ export function send(
 				agent: false,
 				headers: { host: `127.0.0.1:${port}`, ...options.headers },
 			},
-			(response) => {
+			response => {
 				const chunks: Buffer[] = [];
 				response.on("data", (chunk: Buffer) => chunks.push(chunk));
 				response.on("end", () =>
@@ -179,7 +179,7 @@ export function nextMessage(socket: WebSocket): Promise<string> {
 export function messagesOf(socket: WebSocket): { next(): Promise<string> } {
 	const queued: string[] = [];
 	const waiting: ((text: string) => void)[] = [];
-	socket.on("message", (data) => {
+	socket.on("message", data => {
 		const text = String(data);
 		const waiter = waiting.shift();
 		if (waiter === undefined) queued.push(text);
@@ -188,14 +188,14 @@ export function messagesOf(socket: WebSocket): { next(): Promise<string> } {
 	return {
 		next: () => {
 			const text = queued.shift();
-			return text === undefined ? new Promise((resolve) => waiting.push(resolve)) : Promise.resolve(text);
+			return text === undefined ? new Promise(resolve => waiting.push(resolve)) : Promise.resolve(text);
 		},
 	};
 }
 
 /** The close code and reason of `socket`'s close. */
 export function closeOf(socket: WebSocket): Promise<{ readonly code: number; readonly reason: string }> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		if (socket.readyState === socket.CLOSED) resolve({ code: 1006, reason: "" });
 		socket.once("close", (code, reason) => resolve({ code, reason: reason.toString() }));
 	});

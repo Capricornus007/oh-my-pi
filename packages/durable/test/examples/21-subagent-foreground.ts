@@ -33,9 +33,9 @@ const context = BACKGROUND_CONTEXT;
 // ─── Product code: the subagent extension ───────────────────────────────────
 
 async function answerText(api: ToolExecutionApi, answer: EntryId, callContext: Context): Promise<string> {
-	const entry = await api.commit((tx) => tx.entry(AssistantEntry, answer), callContext);
+	const entry = await api.commit(tx => tx.entry(AssistantEntry, answer), callContext);
 	const message = entry?.model?.[0] as AssistantMessage;
-	return message.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
+	return message.content.flatMap(c => (c.type === "text" ? [c.text] : [])).join("");
 }
 
 const Subagent: Extension = defineExtension({
@@ -51,7 +51,7 @@ const Subagent: Extension = defineExtension({
 				const { task } = args;
 				// The child is owned by this tool call's task, so aborting the call aborts the child, and the call
 				// finishes only once the child's work is done.
-				const child = await api.commit(async (tx) => {
+				const child = await api.commit(async tx => {
 					// Ownership records the child: a rerun of this call finds it instead of creating another.
 					const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
 					if (existing !== undefined) return existing.id;
@@ -117,7 +117,7 @@ const attach = async (id: ConversationId, indent: string): Promise<void> => {
 	attached.add(id);
 	const watch = await (await harness.conversation(id, context))!.watch(context);
 	let newest = watch.value.entries.at(-1)?.id ?? 0;
-	watch.start(async (call) => {
+	watch.start(async call => {
 		if (call.kind !== "value") return;
 		const { value } = call;
 		for (const entry of value.entries) if (entry.id > newest) print(indent, entry);
@@ -138,5 +138,5 @@ const submission = await root.submit(
 await submission.wait(context);
 await harness.waitForIdle(context);
 // Watch callbacks run after their commit; let the last ones print.
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 await harness.close(context);

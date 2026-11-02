@@ -17,13 +17,13 @@ const Notes = defineDoc<{ text: string }>({
 	initial: () => ({ text: "" }),
 });
 
-const chat = await session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
-const firstEntry = await session.commit(async (tx) => {
+const chat = await session.commit(tx => tx.createConversation({ ownership: { kind: "ownerless" } }), context);
+const firstEntry = await session.commit(async tx => {
 	const entry = await tx.appendEntry(chat.id, { kind: "note", data: "hello" });
 	(await tx.doc(Notes, chat.id)).text = "after hello";
 	return entry;
 }, context);
-await session.commit(async (tx) => {
+await session.commit(async tx => {
 	await tx.appendEntry(chat.id, { kind: "note", data: "goodbye" });
 	(await tx.doc(Notes, chat.id)).text = "after goodbye";
 }, context);
@@ -33,21 +33,21 @@ await session.commit(async (tx) => {
 // own `fork` setting. Notes uses "asOf", so the fork starts with the notes
 // value from the fork entry.
 const branch = await session.commit(
-	(tx) => tx.forkConversation(chat.id, firstEntry.id, { ownership: { kind: "ownerless" } }),
+	tx => tx.forkConversation(chat.id, firstEntry.id, { ownership: { kind: "ownerless" } }),
 	context,
 );
 
 // scanEntries() pages through visible entries, newest first. The fork sees
 // "hello" (inherited from the parent) but not "goodbye", which came later.
-const branchEntries = await session.commit((tx) => tx.scanEntries({ conversationId: branch.id }, 10), context);
+const branchEntries = await session.commit(tx => tx.scanEntries({ conversationId: branch.id }, 10), context);
 console.log(
 	"fork transcript:",
-	branchEntries.items.map((entry) => entry.data),
+	branchEntries.items.map(entry => entry.data),
 );
 console.log("fork notes:", await session.snapshot(Notes, branch.id, context));
 
 // The fork's copy is independent: editing it leaves the parent unchanged.
-await session.commit(async (tx) => {
+await session.commit(async tx => {
 	(await tx.doc(Notes, branch.id)).text = "changed only in the fork";
 }, context);
 console.log("fork notes after edit:", await session.snapshot(Notes, branch.id, context));

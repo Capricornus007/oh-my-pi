@@ -36,10 +36,10 @@ export async function importStore(
 		context.abortSignal?.throwIfAborted();
 		const existing = await db.get(`SELECT name FROM sqlite_master WHERE name = ?`, TABLES.meta);
 		if (existing !== undefined) throw invalid("args", "import: the backend holds a store already");
-		const meta = await db.transaction(async (executor) => {
+		const meta = await db.transaction(async executor => {
 			const meta = await applyStoreSchema(inTransaction(executor));
 			const archive = new ArchiveImport(executor, context);
-			await each(parts, context, (part) => archive.take(part));
+			await each(parts, context, part => archive.take(part));
 			return archive.finish(meta, options.outbox === true);
 		});
 		return new ChordStore(db, meta, await readCatalog(db));
@@ -56,12 +56,12 @@ export async function importStore(
 /** The store's schema migrations run inside the import's backend transaction (they open none of their own). */
 function inTransaction(executor: SqliteExecutor): SqliteDatabase {
 	return {
-		exec: (sql) => executor.exec(sql),
+		exec: sql => executor.exec(sql),
 		run: (sql, ...params) => executor.run(sql, ...params),
 		runCounted: (sql, ...params) => executor.runCounted(sql, ...params),
 		get: (sql, ...params) => executor.get(sql, ...params),
 		all: (sql, ...params) => executor.all(sql, ...params),
-		transaction: (callback) => callback(executor),
+		transaction: callback => callback(executor),
 		close: () => Promise.reject(new Error("import: the backend closes after the import")),
 	};
 }

@@ -138,7 +138,7 @@ describe("RemoteExecutionEnv", () => {
 			}
 		};
 		const deadline = Date.now() + 5000;
-		while (alive() && Date.now() < deadline) await new Promise((done) => setTimeout(done, 50));
+		while (alive() && Date.now() < deadline) await new Promise(done => setTimeout(done, 50));
 		expect(alive()).toBe(false);
 	});
 
@@ -149,7 +149,7 @@ describe("RemoteExecutionEnv", () => {
 		const a = getOrThrow(await env.openBinaryReader("a.txt", undefined, context));
 		const { pid } = await connection.info();
 		process.kill(pid, "SIGKILL");
-		await new Promise((done) => setTimeout(done, 300));
+		await new Promise(done => setTimeout(done, 300));
 		// The new daemon numbers its handles from 1 again.
 		const b = getOrThrow(await env.openBinaryReader("b.txt", undefined, context));
 		expect((await connection.info()).pid).not.toBe(pid);

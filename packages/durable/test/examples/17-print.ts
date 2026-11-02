@@ -43,9 +43,9 @@ const root = await harness.root(context, { agent: { model } });
 const submission = await root.submit({ type: "input", content: prompt }, context);
 const settled = await submission.wait(context);
 if (settled.status === "done" && settled.type === "input") {
-	const entry = await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+	const entry = await root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 	const answer = entry?.model?.[0] as AssistantMessage;
-	console.log(answer.content.flatMap((content) => (content.type === "text" ? [content.text] : [])).join(""));
+	console.log(answer.content.flatMap(content => (content.type === "text" ? [content.text] : [])).join(""));
 } else {
 	console.error(`unanswered: ${settled.status === "unanswered" ? settled.reason : settled.status}`);
 	process.exitCode = 1;

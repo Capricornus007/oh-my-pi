@@ -32,8 +32,8 @@ const NotesV1 = remote("notes", {
 		reader: { state: { notes: arr(Note) } },
 	},
 });
-const NotesV2 = evolve(NotesV1, (e) => e.args("add", NoteV2).result("add", int()));
-const NotesV3 = evolve(NotesV2, (e) => e.removeMethod("attach"));
+const NotesV2 = evolve(NotesV1, e => e.args("add", NoteV2).result("add", int()));
+const NotesV3 = evolve(NotesV2, e => e.removeMethod("attach"));
 
 const toV2 = vi.fn((old: { text: string }) => ({ ...old, tag: "v1" }));
 const resultToOld = (current: number) => String(current);
@@ -188,8 +188,8 @@ describe("checkArgs", () => {
 
 	it("compiles lazily, once per accepted version and method; equal schema objects share a validator", async () => {
 		const v1 = local("lazy", { version: 1, params: {}, members: { m: method(obj({ a: str() })), clear: method() } });
-		const v2 = evolve(v1, (e) => e.args("m", obj({ a: str(), b: str() })));
-		const fresh = bindProvider(v2, { 1: { methods: { m: { args: (old) => ({ ...old, b: "" }) } } } });
+		const v2 = evolve(v1, e => e.args("m", obj({ a: str(), b: str() })));
+		const fresh = bindProvider(v2, { 1: { methods: { m: { args: old => ({ ...old, b: "" }) } } } });
 		const calls = [
 			(context: Context) => checkArgs(fresh, "clear", null, 2, context),
 			(context: Context) => checkArgs(fresh, "clear", null, 2, context),
@@ -205,7 +205,7 @@ describe("checkArgs", () => {
 	});
 
 	it("counts one validation per call and no walk", async () => {
-		const counts = await counted((context) => checkArgs(provider, "add", { text: "t" }, 1, context));
+		const counts = await counted(context => checkArgs(provider, "add", { text: "t" }, 1, context));
 		expect(counts).toEqual({ walks: 0, validations: 1, compilations: 0 });
 	});
 
@@ -221,7 +221,7 @@ describe("memory", () => {
 		const refs = await (async () => {
 			const contract = evolve(
 				local("gc", { version: 1, params: {}, members: { m: method(obj({ a: str() })) } }),
-				(e) => e.args("m", obj({ a: str(), b: str() })),
+				e => e.args("m", obj({ a: str(), b: str() })),
 			);
 			const mapping = (old: { a: string }) => ({ ...old, b: "" });
 			const bound = bindProvider(contract, { 1: { methods: { m: { args: mapping } } } });

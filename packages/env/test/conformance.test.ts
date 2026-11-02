@@ -17,7 +17,7 @@ const gitBash = join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "bi
 registerEnvConformance(
 	{ describe, expect, it },
 	"RemoteExecutionEnv over a pipe",
-	async (use) => {
+	async use => {
 		const cwd = mkdtempSync(join(tmpdir(), "pi-env-conformance-"));
 		try {
 			await use(new RemoteExecutionEnv({ connection, id: "pi-env:test", cwd, watch: { pollIntervalMs: 100 } }));
@@ -33,7 +33,7 @@ registerEnvConformance(
 registerEnvConformance(
 	{ describe, expect, it },
 	"LocalExecutionEnv",
-	async (use) => {
+	async use => {
 		const cwd = mkdtempSync(join(tmpdir(), "pi-env-local-conformance-"));
 		try {
 			await use(new LocalExecutionEnv({ connection, cwd, watch: { pollIntervalMs: 100 } }));

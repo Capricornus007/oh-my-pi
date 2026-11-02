@@ -17,7 +17,7 @@ const Clock = local("example.clock", {
 });
 const Leaky = local("example.leaky", { version: 1, params: {}, members: { n: int() } });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Clock, ({ zone }, self) => {
 		// `self.open(open, close)` declares a native; it opens after the references are live, in declaration order.
 		const config = self.open(
@@ -69,7 +69,7 @@ const facet = defineFacet((host) => {
 
 // onError gets what fails in the background: here a close past its closeTimeout.
 const host = createHost({
-	onError: (error) => console.log("reported:", error.kind, "object" in error ? error.object : ""),
+	onError: error => console.log("reported:", error.kind, "object" in error ? error.object : ""),
 });
 await host.load([{ name: "@example/natives", facet }], context);
 

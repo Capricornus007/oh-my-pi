@@ -10,7 +10,7 @@ import type { Compression } from "../next/link/index.ts";
  * limit `too_large`, data that is no raw deflate stream `corrupt`.
  */
 export const nodeCompression: Compression = {
-	deflate: (bytes) => deflateRawSync(bytes, { level: 1 }),
+	deflate: bytes => deflateRawSync(bytes, { level: 1 }),
 	inflate: (bytes, limit) => {
 		try {
 			// zlib refuses a bound of 0: inflate at most one byte, and one byte is past a limit of 0.

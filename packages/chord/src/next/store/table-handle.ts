@@ -75,12 +75,12 @@ export class TableHandle implements Table<Columns, readonly string[]> {
 			options.after === undefined ? undefined : decodeCursor(this.definition, this.sql.table, order, options.after);
 		const statement = this.sql.select(q.condition, order, after, limit + 1);
 		const stored = await this.store.read(
-			(executor) => executor.all<{ [column: string]: SqliteValue }>(statement.sql, ...statement.params),
+			executor => executor.all<{ [column: string]: SqliteValue }>(statement.sql, ...statement.params),
 			context,
 		);
 		const more = stored.length > limit;
 		if (more) stored.length = limit;
-		const items = stored.map((row) => this.decode(row, context));
+		const items = stored.map(row => this.decode(row, context));
 		if (!more) return { items };
 		const last = stored[limit - 1]!;
 		return {
@@ -88,7 +88,7 @@ export class TableHandle implements Table<Columns, readonly string[]> {
 			next: encodeCursor(
 				this.sql.table,
 				order,
-				order.columns.map((column) => last[column]!),
+				order.columns.map(column => last[column]!),
 			),
 		};
 	}
@@ -107,7 +107,7 @@ export class TableHandle implements Table<Columns, readonly string[]> {
 		this.assertVersion();
 		const encoded = this.definition.rows.key(key, "get");
 		const stored = await this.store.read(
-			(executor) => executor.get<{ [column: string]: SqliteValue }>(this.sql.get, ...encoded.params),
+			executor => executor.get<{ [column: string]: SqliteValue }>(this.sql.get, ...encoded.params),
 			context,
 		);
 		return stored === undefined ? undefined : this.decode(stored, context);
@@ -119,7 +119,7 @@ export class TableHandle implements Table<Columns, readonly string[]> {
 		this.#assertQuery(q);
 		const statement = this.sql.count(q.condition);
 		const row = await this.store.read(
-			(executor) => executor.get<{ readonly count: number }>(statement.sql, ...statement.params),
+			executor => executor.get<{ readonly count: number }>(statement.sql, ...statement.params),
 			context,
 		);
 		return row?.count ?? 0;

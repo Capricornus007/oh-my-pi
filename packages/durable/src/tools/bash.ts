@@ -187,7 +187,7 @@ export function createPowerShellTool(options?: PowerShellToolOptions): ToolRegis
 			validateTimeout(args.timeout);
 			const execution = await prepareExecution(args.command, options, api, context);
 			const script = `${UTF8_OUTPUT}\n${execution.command}`;
-			const commands = programs.map((program) => [program, ...POWERSHELL_ARGS, script]);
+			const commands = programs.map(program => [program, ...POWERSHELL_ARGS, script]);
 			return runCommand(commands, execution, args.timeout, api, context);
 		},
 	});

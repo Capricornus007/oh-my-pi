@@ -151,7 +151,7 @@ async function* puts(
 ): AsyncGenerator<Extract<ArchivePart, { readonly kind: "put" }>> {
 	const { table, columns, key } = record;
 	const select = recordedPut(table, columns)
-		.physical.map((name) => quote(name))
+		.physical.map(name => quote(name))
 		.join(", ");
 	const order = key.map(quote).join(", ");
 	let after: SqliteValue[] | undefined;
@@ -160,11 +160,11 @@ async function* puts(
 		const from = page === undefined ? "" : ` WHERE (${order}) > (${page.map(() => "?").join(", ")})`;
 		const sql = `SELECT ${select} FROM ${quote(table)}${from} ORDER BY ${order} LIMIT ?`;
 		const rows = await store.read(
-			(executor) => executor.all<{ readonly [column: string]: SqliteValue }>(sql, ...(page ?? []), EXPORT_PAGE),
+			executor => executor.all<{ readonly [column: string]: SqliteValue }>(sql, ...(page ?? []), EXPORT_PAGE),
 			context,
 		);
 		for (const stored of rows) yield putOf(record, stored);
-		after = rows.length < EXPORT_PAGE ? undefined : key.map((name) => rows.at(-1)![name]!);
+		after = rows.length < EXPORT_PAGE ? undefined : key.map(name => rows.at(-1)![name]!);
 	} while (after !== undefined);
 }
 
@@ -198,7 +198,7 @@ async function* documents(
 ): AsyncGenerator<Extract<ArchivePart, { readonly kind: "document.create" | "document.revision" }>> {
 	let after = 0;
 	for (;;) {
-		const records = await store.read((executor) => listRecords(executor, after, EXPORT_PAGE), context);
+		const records = await store.read(executor => listRecords(executor, after, EXPORT_PAGE), context);
 		for (const record of records) {
 			yield { kind: "document.create", record };
 			yield* revisions(store, record.id, context);
@@ -216,7 +216,7 @@ async function* revisions(
 ): AsyncGenerator<Extract<ArchivePart, { readonly kind: "document.revision" }>> {
 	let after = 0;
 	for (;;) {
-		const page = await store.read((executor) => listRevisions(executor, id, after, EXPORT_PAGE), context);
+		const page = await store.read(executor => listRevisions(executor, id, after, EXPORT_PAGE), context);
 		for (const revision of page) yield { kind: "document.revision", ...revision };
 		if (page.length < EXPORT_PAGE) return;
 		after = page.at(-1)!.seq;

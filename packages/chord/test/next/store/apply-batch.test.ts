@@ -39,7 +39,7 @@ const CountsV1 = defineTable("counts", {
 	indexes: { by_tag: ["tag"] },
 });
 
-const CountsV2 = evolveTable(CountsV1, (t) => t.add("extra", int({ default: 0 })).dropIndex("by_tag"));
+const CountsV2 = evolveTable(CountsV1, t => t.add("extra", int({ default: 0 })).dropIndex("by_tag"));
 
 /** A store with an outbox from its first commit holding every write kind: an archive store, then counted writes. */
 async function everyKind(): Promise<ChordStore> {
@@ -95,7 +95,7 @@ async function durableShaped(store: ChordStore): Promise<void> {
 	});
 	const create = (key: string, retired: boolean): StagedWrite => ({
 		order: "write",
-		apply: async (step) => {
+		apply: async step => {
 			const record = made(step.ids.mint(), key, step.seq, retired);
 			await insertDocument(step, record, '{"n":0}');
 			return [{ kind: "document.create", record, base }];
@@ -103,13 +103,13 @@ async function durableShaped(store: ChordStore): Promise<void> {
 	});
 	await store.commit([create("empty", true), create("kept", false)], OPEN, context);
 	const kept = (await store.read(
-		(executor) => executor.get<{ id: number }>("SELECT id FROM chord_documents WHERE key = 'kept'"),
+		executor => executor.get<{ id: number }>("SELECT id FROM chord_documents WHERE key = 'kept'"),
 		context,
 	))!.id;
 	const ops = [["s", ["n"], 1]] as const;
 	const changeAndRetire: StagedWrite = {
 		order: "write",
-		apply: async (step) => {
+		apply: async step => {
 			const record = (await readDocument(step, kept))!;
 			const content = { kind: "delta", version: 1, ops } as const;
 			await writeContent(step, kept, "rewindable", 1, content, JSON.stringify(ops));

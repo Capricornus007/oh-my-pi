@@ -87,9 +87,9 @@ describe("failed checks", () => {
 describe("validators", () => {
 	it("compile once per schema owner (counted), then validate (counted); a failure adds one walk", async () => {
 		const owner = snapshotArguments(obj({ a: str() }), "m");
-		const first = await counted((context) => check(validatorFor(owner, context), { a: "x" }, "args", context));
-		const second = await counted((context) => check(validatorFor(owner, context), { a: "y" }, "args", context));
-		const failed = await counted((context) => {
+		const first = await counted(context => check(validatorFor(owner, context), { a: "x" }, "args", context));
+		const second = await counted(context => check(validatorFor(owner, context), { a: "y" }, "args", context));
+		const failed = await counted(context => {
 			expect(() => check(validatorFor(owner, context), {}, "args", context)).toThrow();
 		});
 		expect([first, second, failed]).toEqual([

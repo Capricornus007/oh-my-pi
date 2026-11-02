@@ -60,11 +60,11 @@ async function store(
 	options: { readonly closeTimeout?: number } = {},
 ) {
 	const loadedHost = await loaded(
-		(h) =>
+		h =>
 			h.serve(Store, (_, self) => {
 				const doc = self.state(Doc);
 				declare(doc, self);
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		options,
 	);
@@ -74,7 +74,7 @@ async function store(
 
 /** Counts one up in one transaction. */
 async function bump(doc: SingletonHandle<{ n: number }>, ctx: Context): Promise<null> {
-	await doc.change((d) => {
+	await doc.change(d => {
 		d.n++;
 	}, ctx);
 	return null;
@@ -82,12 +82,12 @@ async function bump(doc: SingletonHandle<{ n: number }>, ctx: Context): Promise<
 
 /** Waits one macrotask and a little: a call after a busy one waits for one (`settling`). */
 function settled(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 5));
+	return new Promise(resolve => setTimeout(resolve, 5));
 }
 
 /** The routine reports among `errors`, as `kind #position: message`. */
 function reports(errors: readonly HostError[]): string[] {
-	return errors.flatMap((error) =>
+	return errors.flatMap(error =>
 		error.kind === "routine_failed"
 			? [`${error.routine.kind} #${error.routine.position}: ${(error.error as Error).message}`]
 			: [],
@@ -251,7 +251,7 @@ describe("on", () => {
 
 		it("makes one retry per throw; a change during a failing retry waits for its backoff; no timer left", async () => {
 			const calls: [unknown, number][] = [];
-			const { host, errors } = await loaded((h) =>
+			const { host, errors } = await loaded(h =>
 				h.serve(Item, (_, self) => {
 					const doc = self.state(Doc);
 					self.on(doc, async ({ value }) => {
@@ -260,7 +260,7 @@ describe("on", () => {
 						if (calls.length === 2) await bump(doc, context);
 						if (calls.length <= 2) throw new Error(`fail ${calls.length}`);
 					});
-					return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+					return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 				}),
 			);
 			const item = await host.get(Item, { id: 1 }, context);
@@ -346,8 +346,8 @@ describe("on", () => {
 					if (d.n < 0) throw new Error("compute");
 					return d.n;
 				});
-				set = (n) =>
-					doc.change((d) => {
+				set = n =>
+					doc.change(d => {
 						d.n = n;
 					}, context);
 				self.on(failing, async ({ value }) => {
@@ -369,13 +369,13 @@ describe("on", () => {
 		});
 
 		it("clears its retry timer when its object ends during the backoff", async () => {
-			const { host } = await loaded((h) =>
+			const { host } = await loaded(h =>
 				h.serve(Item, (_, self) => {
 					const doc = self.state(Doc);
 					self.on(doc, async () => {
 						throw new Error("always");
 					});
-					return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+					return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 				}),
 			);
 			const item = await host.get(Item, { id: 1 }, context);
@@ -390,7 +390,7 @@ describe("on", () => {
 			const { source, advance } = jsonSource({ n: 0 });
 			const calls: WatchValueCall<{ n: number }>[] = [];
 			await store((_, self) => {
-				self.on(source, async (call) => {
+				self.on(source, async call => {
 					calls.push(call);
 					if (calls.length === 2) throw new Error("retirement not handled");
 				});
@@ -471,7 +471,7 @@ describe("on", () => {
 		const { source, advance } = jsonSource({ n: 0 });
 		const calls: WatchValueCall<{ n: number }>[] = [];
 		await store((_, self) => {
-			self.on(source, async (call) => {
+			self.on(source, async call => {
 				calls.push(call);
 				if (calls.length === 1) await gate.promise;
 			});
@@ -571,7 +571,7 @@ describe("on", () => {
 		const Other = local("app.other", { version: 1, params: { id: int() }, members: { n: int() } });
 		let otherDoc: SingletonHandle<{ n: number }> | undefined;
 		const calls: unknown[] = [];
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Other, (_, self) => {
 				otherDoc = self.state(Doc);
 				return { n: self.derive([otherDoc], ([d]) => d.n) };
@@ -580,7 +580,7 @@ describe("on", () => {
 				const doc = self.state(Doc);
 				// Another object's document: it ends with that object.
 				self.on(otherDoc!, async ({ value }) => void calls.push(value));
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			});
 		});
 		const other = await host.get(Other, { id: 1 }, context);
@@ -626,8 +626,8 @@ describe("on", () => {
 				if (d.n < 0) throw new Error("compute");
 				return d.n;
 			});
-			set = (n) =>
-				doc.change((d) => {
+			set = n =>
+				doc.change(d => {
 					d.n = n;
 				}, context);
 			self.on(failing, async ({ value }) => {
@@ -657,7 +657,7 @@ describe("on", () => {
 		const Failing = local("app.failing", { version: 1, params: {}, members: { t: int(), set: method(int()) } });
 		const Viewer = local("app.on-viewer", { version: 1, params: { id: int() }, members: { m: method() } });
 		const calls: unknown[] = [];
-		const { host, errors } = await loaded((h) => {
+		const { host, errors } = await loaded(h => {
 			h.serve(Failing, (_, self) => {
 				const doc = self.state(Doc);
 				return {
@@ -666,7 +666,7 @@ describe("on", () => {
 						return d.n;
 					}),
 					set: async (n, ctx) => {
-						await doc.change((d) => {
+						await doc.change(d => {
 							d.n = n;
 						}, ctx);
 						return null;
@@ -694,17 +694,17 @@ describe("on", () => {
 	it("follows a reference member: the provider's value first, then its changes", async () => {
 		const calls: [unknown, readonly Op[]][] = [];
 		let bumper: (() => Promise<null>) | undefined;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Store, (_, self) => {
 				const doc = self.state(Doc);
 				bumper = () => bump(doc, context);
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			});
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				const store = self.get(Store, {});
 				self.on(store.n, async ({ value, ops }) => void calls.push([value, ops]));
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			});
 		});
 		await host.get(Item, { id: 1 }, context);
@@ -722,14 +722,14 @@ describe("on", () => {
 		await store((doc, self) => {
 			self.on(doc, async ({ value }, ctx) => {
 				calls++;
-				await doc.change((d) => {
+				await doc.change(d => {
 					d.n = Math.min(value.n + 1, 3);
 				}, ctx);
 			});
 		});
 		// 0 → 1 → 2 → 3, then the write of 3 changes nothing and nothing calls again (waited for, not timed: Opus F3).
 		await vi.waitFor(() => expect(calls).toBe(4), { timeout: 2_000 });
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(calls).toBe(4);
 	});
 
@@ -737,7 +737,7 @@ describe("on", () => {
 		const { source, watches } = writable("a");
 		const calls: unknown[] = [];
 		const { errors } = await store((_, self) => {
-			self.on(source, async (call) => void calls.push(call));
+			self.on(source, async call => void calls.push(call));
 		});
 		await flushed();
 		source.set("b");
@@ -757,7 +757,7 @@ describe("on", () => {
 		const Viewer = local("app.viewer", { version: 1, params: { id: int() }, members: {} });
 		const calls: unknown[] = [];
 		const client = createHost<TestPrincipal>({ onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(Viewer, (_, self) => {
 				self.on(self.get(Notes, { session: "S1" }).count, async ({ value }) => void calls.push(value));
 				return {};
@@ -795,7 +795,7 @@ describe("on", () => {
 			variants: { v: { state: { half: int() }, methods: { set: method(int()) } } },
 		});
 		const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		const serve = defineFacet<TestPrincipal>((h) =>
+		const serve = defineFacet<TestPrincipal>(h =>
 			h.serve(Halves, (_, _principal, self) => {
 				const doc = self.state(Doc);
 				return {
@@ -806,7 +806,7 @@ describe("on", () => {
 							return n / 2;
 						}),
 						set: async (n, ctx) => {
-							await doc.change((d) => {
+							await doc.change(d => {
 								d.n = n;
 							}, ctx);
 							return null;
@@ -822,8 +822,8 @@ describe("on", () => {
 		const Viewer = local("app.viewer", { version: 1, params: { id: int() }, members: {} });
 		const calls: unknown[] = [];
 		const errors: HostError[] = [];
-		const client = createHost<TestPrincipal>({ onError: (error) => errors.push(error) });
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const client = createHost<TestPrincipal>({ onError: error => errors.push(error) });
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(Viewer, (_, self) => {
 				self.on(self.get(Halves, {}).half, async ({ value, ops }) => void calls.push([value, ops]));
 				return {};
@@ -848,11 +848,11 @@ describe("on", () => {
 
 	it("follows ref.state: a reference over a link going loading and live again", async () => {
 		const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>((h) => void serveNotes(h)) }], context);
+		await server.load([{ name: "@test/app", facet: defineFacet<TestPrincipal>(h => void serveNotes(h)) }], context);
 		const Viewer = local("app.viewer", { version: 1, params: { id: int() }, members: {} });
 		const states: string[] = [];
 		const client = createHost<TestPrincipal>({ onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(Viewer, (_, self) => {
 				const notes = self.get(Notes, { session: "S1" });
 				self.on(notes.state, async ({ value: state }: { value: RefState }) => void states.push(state.kind));
@@ -881,14 +881,14 @@ describe("on", () => {
 
 	it("releases its watch when its object ends; a call that throws as it ends is not reported", async () => {
 		const { source, watches } = writable(0);
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				self.on(source, async (_change, ctx) => {
 					await untilAborted(ctx);
 					throw new Error("stopping");
 				});
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		);
 		const item = await host.get(Item, { id: 1 }, context);
@@ -918,7 +918,7 @@ describe("onLive", () => {
 	it("restarts after a throw with the backoff, reset after a run of at least a minute", async () => {
 		const starts: number[] = [];
 		const { errors } = await store((_, self) => {
-			self.onLive(async (ctx) => {
+			self.onLive(async ctx => {
 				starts.push(Date.now());
 				if (starts.length === 3) await sleep(60_000, ctx);
 				throw new Error(`run ${starts.length}`);
@@ -934,14 +934,14 @@ describe("onLive", () => {
 
 	it("is aborted by its object's end: no report, no restart", async () => {
 		let calls = 0;
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
-				self.onLive(async (ctx) => {
+				self.onLive(async ctx => {
 					calls++;
 					await sleep(1_000_000, ctx);
 				});
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		);
 		const item = await host.get(Item, { id: 1 }, context);
@@ -955,14 +955,14 @@ describe("onLive", () => {
 describe("routines and the end", () => {
 	it("start in the turn their object went live, next to a method call admitted in that turn", async () => {
 		const order: string[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				self.on(doc, async ({ value }) => void order.push(`on ${value.n}`));
 				self.onLive(async () => void order.push("onLive"));
 				return {
 					n: self.derive([doc], ([d]) => d.n),
-					bump: async (ctx) => {
+					bump: async ctx => {
 						order.push("bump");
 						return bump(doc, ctx);
 					},
@@ -973,7 +973,7 @@ describe("routines and the end", () => {
 		const bumped = item.bump(context);
 		// The parked call runs as the object goes live, then `onLive` in that turn, the first `on` call after its watch;
 		// the call's commit may land while `on 0` runs, and a call after a busy one waits for the settling turn.
-		await item.state.watch(context).then((watch) => watch.stop());
+		await item.state.watch(context).then(watch => watch.stop());
 		await bumped;
 		await settled();
 		expect(order).toEqual(["bump", "onLive", "on 0", "on 1"]);
@@ -981,7 +981,7 @@ describe("routines and the end", () => {
 
 	it("never start a routine call once the object ended in its first turn: no call, no report, no rejection", async () => {
 		const calls: string[] = [];
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				self.on(doc, async () => void calls.push("on"));
@@ -990,18 +990,18 @@ describe("routines and the end", () => {
 					held!.release();
 				});
 				self.onLive(async () => void calls.push("onLive #2"));
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		);
 		const held = host.hold(Item, { id: 1 }, context);
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 		expect({ calls, errors }).toEqual({ calls: ["onLive #1"], errors: [] });
 	});
 
 	it("are in the drain before their handler runs: a handler releasing the last reference keeps natives open", async () => {
 		const gate = Promise.withResolvers<void>();
 		const events: string[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				self.open(
@@ -1015,7 +1015,7 @@ describe("routines and the end", () => {
 					await gate.promise;
 					events.push("handler done");
 				});
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		);
 		const item = await host.get(Item, { id: 1 }, context);
@@ -1033,14 +1033,14 @@ describe("routines and the end", () => {
 	it("make no call queued behind a busy one once the object ended", async () => {
 		const gate = Promise.withResolvers<void>();
 		const calls: unknown[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				self.on(doc, async ({ value }) => {
 					calls.push(value);
 					await gate.promise;
 				});
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		);
 		const item = await host.get(Item, { id: 1 }, context);
@@ -1055,14 +1055,14 @@ describe("routines and the end", () => {
 
 	it("release their calls' ctx.get references when each call settles", async () => {
 		const Other = local("app.other", { version: 1, params: { id: int() }, members: { n: int() } });
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Other, (_, self) => ({ n: self.derive([self.state(Doc)], ([d]) => d.n) }));
 			h.serve(Store, (_, self) => {
 				const doc = self.state(Doc);
-				self.onLive(async (ctx) => {
+				self.onLive(async ctx => {
 					await ctx.get(Other, { id: 1 });
 				});
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			});
 		});
 		await flushed();
@@ -1078,9 +1078,9 @@ describe("routines and the end", () => {
 		});
 		const seen: unknown[] = [];
 		const { client } = await linked(
-			(h) =>
+			h =>
 				h.serve(Watcher, (_, _principal, self) => {
-					self.onLive(async (ctx) => void seen.push(ctx.principal));
+					self.onLive(async ctx => void seen.push(ctx.principal));
 					return { variant: "v", members: {} };
 				}),
 			{ child: { kind: "guest", session: "S1" } },
@@ -1109,19 +1109,19 @@ describe("routines and the end", () => {
 	it("are aborted by host.close, which drains their running calls (bounded by closeTimeout)", async () => {
 		const ended: string[] = [];
 		const { host, errors } = await loaded(
-			(h) => {
+			h => {
 				h.serve(Store, (_, self) => {
 					const doc = self.state(Doc);
-					self.onLive(async (ctx) => {
-						await new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", resolve));
-						await new Promise((resolve) => setTimeout(resolve, 10));
+					self.onLive(async ctx => {
+						await new Promise(resolve => ctx.abortSignal?.addEventListener("abort", resolve));
+						await new Promise(resolve => setTimeout(resolve, 10));
 						ended.push("object");
 					});
 					self.onLive(async () => {
 						// Never stops: the drain gives up at closeTimeout.
 						await new Promise(() => {});
 					});
-					return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+					return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 				});
 			},
 			{ closeTimeout: 50 },
@@ -1135,12 +1135,12 @@ describe("routines and the end", () => {
 	it("leave nothing of an ended object: its routines' watches and contexts are collected", async () => {
 		const { source, watches } = writable(0);
 		let refs: WeakRef<object>[] = [];
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
 				self.on(source, async (_change, ctx) => void refs.push(new WeakRef(ctx)));
 				self.on(doc, async (_change, ctx) => void refs.push(new WeakRef(ctx)));
-				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
+				return { n: self.derive([doc], ([d]) => d.n), bump: async ctx => bump(doc, ctx) };
 			}),
 		);
 		const item = await host.get(Item, { id: 1 }, context);

@@ -304,10 +304,10 @@ export class SessionImpl implements Session {
 		// A read-only Session shows a Storage another process writes, so nothing it reads stays current.
 		this.#cached = readOnly ? undefined : new CachedStorage(storage);
 		this.#storage = new GuardedStorage(this.#cached ?? storage, this);
-		this.#gated = new GatedStorage(this.#storage, (key) => this.touch(key));
+		this.#gated = new GatedStorage(this.#storage, key => this.touch(key));
 		this.#writer = new Writer({
 			commit: (batches, receive, context) => this.#storage.commit(batches, receive, context),
-			stored: (writes) => {
+			stored: writes => {
 				this.#cached?.published(writes);
 				this.#tails?.apply(writes);
 			},
@@ -317,7 +317,7 @@ export class SessionImpl implements Session {
 			report: (error, context) => this.report(error, LISTENER, context),
 		});
 		this.#tails = readOnly ? undefined : new ConversationTails();
-		this.#timers = hostTimers(setTimer, (error) => this.report(error, { kind: "host_error", callback: "setTimer" }));
+		this.#timers = hostTimers(setTimer, error => this.report(error, { kind: "host_error", callback: "setTimer" }));
 		// Cache bookkeeping must never change the outcome of the operation it follows: a clock or a retention setting
 		// that throws counts as now, and as the default.
 		this.#clock = () => {
@@ -343,15 +343,15 @@ export class SessionImpl implements Session {
 		};
 		this.#host = {
 			storage: this.#gated,
-			touch: (key) => this.touch(key),
+			touch: key => this.touch(key),
 			now,
-			cached: (id) => {
+			cached: id => {
 				const cached = this.#documents.get(id);
 				if (cached !== undefined) this.#touchDocument(id);
 				return cached;
 			},
 			load: (definition, addressId, address, context) => this.#loadDocument(definition, addressId, address, context),
-			install: (document) => {
+			install: document => {
 				this.#documents.set(document.addressId, document);
 				this.#touchDocument(document.addressId);
 			},
@@ -359,7 +359,7 @@ export class SessionImpl implements Session {
 				if (this.#documents.get(id)?.record.id === recordId) this.#dropDocument(id);
 			},
 			conversationCreated: (tx, record) => this.conversationCreated(tx, record),
-			taskDocuments: (taskId) => this.#taskDocuments.get(taskId)?.values(),
+			taskDocuments: taskId => this.#taskDocuments.get(taskId)?.values(),
 			latestEntryId: (conversationId, context) => this.latestEntryId(conversationId, context),
 			latestHeadMarker: (conversationId, context) => this.latestHeadMarker(conversationId, undefined, context),
 		};
@@ -474,7 +474,7 @@ export class SessionImpl implements Session {
 		} catch (error) {
 			return Promise.reject(error);
 		}
-		return this.#enqueue((index) => this.#runCommit(change, context, scope, withinMs, index));
+		return this.#enqueue(index => this.#runCommit(change, context, scope, withinMs, index));
 	}
 
 	/**
@@ -489,7 +489,7 @@ export class SessionImpl implements Session {
 		} catch (error) {
 			return Promise.reject(error);
 		}
-		return this.#enqueue((index) => this.#runCommit(change, context, undefined, undefined, index), true);
+		return this.#enqueue(index => this.#runCommit(change, context, undefined, undefined, index), true);
 	}
 
 	/**
@@ -651,7 +651,7 @@ export class SessionImpl implements Session {
 				definition,
 				resolved,
 				context,
-				(loaded) => {
+				loaded => {
 					const watch = this.#observeDocument(definition, loaded, createWatch, endWatch);
 					if (signal !== undefined) watch.observeAbort(signal);
 					return watch;
@@ -712,7 +712,7 @@ export class SessionImpl implements Session {
 				definition,
 				resolved,
 				context,
-				(loaded) => {
+				loaded => {
 					const guarded = this.#observeDocument(
 						definition,
 						loaded,
@@ -837,7 +837,7 @@ export class SessionImpl implements Session {
 		this.#holdTimer = undefined;
 		const listeners = [...this.#closeListeners];
 		this.#closeListeners.clear();
-		for (const listener of listeners) contained(listener, (error) => this.report(error));
+		for (const listener of listeners) contained(listener, error => this.report(error));
 	}
 
 	/**
@@ -860,7 +860,7 @@ export class SessionImpl implements Session {
 	 * writes nothing.
 	 */
 	protected writeAtClose(writes: () => readonly StorageWrite[]): Promise<void> {
-		return this.#maintain(async (index) => {
+		return this.#maintain(async index => {
 			await this.#drained();
 			if (this.#failure !== undefined) return;
 			const batch = writes();
@@ -1144,7 +1144,7 @@ export class SessionImpl implements Session {
 		// Logical admission. Held changes leave their queue only here, once nothing but Storage can fail; a commit never
 		// stores a hold adopted after it in line order. Taken before the keys, so the documents it stores held changes of
 		// are its writes too: a later job that reads one waits for it instead of storing them again.
-		const taken = this.#holds.size === 0 ? NO_HOLDS : tx.takeHeld((id) => this.#holds.get(id));
+		const taken = this.#holds.size === 0 ? NO_HOLDS : tx.takeHeld(id => this.#holds.get(id));
 		const keys = tx.writeKeys();
 		for (const key of membership as readonly string[]) keys.push(key);
 		const part = this.#writer.admit({
@@ -1152,7 +1152,7 @@ export class SessionImpl implements Session {
 			writes,
 			keys,
 			context,
-			publish: (seq) => this.#adopt(tx, writes, taken, seq!, context),
+			publish: seq => this.#adopt(tx, writes, taken, seq!, context),
 			discard,
 		});
 		this.#sweepDocuments();
@@ -1482,7 +1482,7 @@ export class SessionImpl implements Session {
 			unsubscribeClose();
 			unpin();
 		};
-		const observer = create(loaded.tracker.value, detach, (error) => this.report(error));
+		const observer = create(loaded.tracker.value, detach, error => this.report(error));
 		unsubscribeCommit = this.followCommits((publication, context) => {
 			// Listeners run from a copy of the set: another observer's call may have detached this one.
 			if (!attached) return;
@@ -1604,7 +1604,7 @@ export class SessionImpl implements Session {
 		});
 		this.#tail = ran.then(ignore, ignore);
 		const outcome = ran.then(
-			(result) => {
+			result => {
 				if (result.after === undefined) {
 					this.#ended(job);
 					return result.value;
@@ -1632,7 +1632,7 @@ export class SessionImpl implements Session {
 		const index = job.index;
 		const deliver = (fenced: boolean) =>
 			(fenced ? fence.then(() => outcome) : outcome).then(
-				(value) => {
+				value => {
 					this.#delivered(index, fenced);
 					if (this.#poisoned(index)) throw new SessionFailed(this.#failure!.error);
 					return value;
@@ -1645,7 +1645,7 @@ export class SessionImpl implements Session {
 		// Only a job without writes is exempt: one with writes waits for its own publication and the outcomes before it.
 		return exempt
 			? ran.then(
-					(result) => deliver(job.hit || result.after !== undefined),
+					result => deliver(job.hit || result.after !== undefined),
 					() => deliver(job.hit),
 				)
 			: deliver(true);
@@ -1807,7 +1807,7 @@ export function guardObserver<A>(
 				fault(current, error, context);
 			}
 		},
-		end: (end) => {
+		end: end => {
 			const ending = release();
 			if (ending !== undefined) contained(() => ending.observer.end(end), ending.report);
 		},

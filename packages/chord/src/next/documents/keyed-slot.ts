@@ -243,8 +243,8 @@ export class KeyedSlot implements DocumentSlot, PersistedSlot {
 		const from = this.definition.hydrated;
 		this.definition.hydrate(definition);
 		if (from === undefined || from.version === definition.version) return;
-		const pinned = [...this.#sources.keys()].flatMap((key) => this.#residents.get(key) ?? []);
-		const migrated = pinned.map((resident) => [resident, this.#migrated(resident, context)] as const);
+		const pinned = [...this.#sources.keys()].flatMap(key => this.#residents.get(key) ?? []);
+		const migrated = pinned.map(resident => [resident, this.#migrated(resident, context)] as const);
 		for (const [resident, tracker] of migrated) {
 			resident.tracker = tracker;
 			resident.version = definition.version;

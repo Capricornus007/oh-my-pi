@@ -302,7 +302,7 @@ class AttachedReplicatedStateImpl<T> implements AttachedReplicatedState<T> {
 		this.#attachment = attachment;
 		this.#cursor = snapshot.cursor;
 		this.#reportError = options.onError ?? reportErrorAsync;
-		this.#publisher = new ReplicatedStatePublisher(snapshot.value, (error) => this.#report(error));
+		this.#publisher = new ReplicatedStatePublisher(snapshot.value, error => this.#report(error));
 	}
 
 	get value(): T {
@@ -314,7 +314,7 @@ class AttachedReplicatedStateImpl<T> implements AttachedReplicatedState<T> {
 	}
 
 	activate(): void {
-		this.#attachment.activate((frame) => this.#receive(frame));
+		this.#attachment.activate(frame => this.#receive(frame));
 	}
 
 	dispose(): void {

@@ -73,10 +73,10 @@ export const PLUGINS_SPECIFIER = "@earendil-works/chord/next/plugins";
 function requireFor(plugin: Plugin, hostPackages: HostPackages, where: string): (specifier: string) => unknown {
 	let fromPlugin: NodeJS.Require | undefined;
 	let plugins: { readonly pluginFile: (path: string) => string } | undefined;
-	return (specifier) => {
+	return specifier => {
 		if (Object.hasOwn(hostPackages, specifier)) return interop(hostPackages[specifier]);
 		if (specifier === PLUGINS_SPECIFIER) {
-			plugins ??= { pluginFile: (path) => fileOf(plugin, path) };
+			plugins ??= { pluginFile: path => fileOf(plugin, path) };
 			return plugins;
 		}
 		if (isBuiltin(specifier) || plugin.external.includes(packageName(specifier))) {

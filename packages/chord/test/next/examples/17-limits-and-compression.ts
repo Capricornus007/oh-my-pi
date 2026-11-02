@@ -46,13 +46,13 @@ const Entries = defineState("entries", {
 	initial: () => ({ list: [] }),
 });
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(Store, (_, self) => {
 		const doc = self.state(Entries);
 		return {
 			entries: self.derive([doc], ([d]) => d.list),
 			append: async (entry, ctx) => {
-				await doc.change((draft) => void draft.list.push(entry), ctx);
+				await doc.change(draft => void draft.list.push(entry), ctx);
 				return null;
 			},
 		};
@@ -66,14 +66,14 @@ const facet = defineFacet<P>((host) => {
 /** A link end counting the bytes its host receives. */
 function counted(link: Link, bytes: { received: number }): Link {
 	return {
-		send: (message) => link.send(message),
-		onMessage: (listener) =>
-			link.onMessage((message) => {
+		send: message => link.send(message),
+		onMessage: listener =>
+			link.onMessage(message => {
 				bytes.received += message.byteLength;
 				listener(message);
 			}),
 		close: () => link.close(),
-		onClose: (listener) => link.onClose(listener),
+		onClose: listener => link.onClose(listener),
 	};
 }
 

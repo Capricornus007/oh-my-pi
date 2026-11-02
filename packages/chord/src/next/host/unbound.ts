@@ -40,7 +40,7 @@ export class UnboundIndex {
 
 	/** The host's publication: every request indexed (by any name) runs its check again, out of the index first. */
 	wakeAll(): void {
-		const all = [...this.#byName.values()].flatMap((requests) => [...requests]);
+		const all = [...this.#byName.values()].flatMap(requests => [...requests]);
 		this.#byName.clear();
 		for (const request of all) request.wake();
 	}
@@ -71,7 +71,7 @@ export class UnboundIndex {
 
 	/** The host closed: every indexed request ends with `error`. */
 	close(error: ChordError): void {
-		const all = [...this.#byName.values()].flatMap((requests) => [...requests]);
+		const all = [...this.#byName.values()].flatMap(requests => [...requests]);
 		this.#byName.clear();
 		for (const request of all) request.end(error);
 	}

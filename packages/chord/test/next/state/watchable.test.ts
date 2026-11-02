@@ -16,13 +16,13 @@ const Counter = local("app.counter", {
 
 /** A counter exposing its document, with background errors collected. */
 async function counter() {
-	const { host, errors } = await loaded((h) =>
+	const { host, errors } = await loaded(h =>
 		h.serve(Counter, (_, self) => {
 			const num = self.state(Num);
 			return {
 				num,
 				set: async (n, ctx) => {
-					await num.change((draft) => {
+					await num.change(draft => {
 						draft.n = n;
 					}, ctx);
 					return null;
@@ -54,12 +54,12 @@ describe("watches", () => {
 		const watch = await c.num.watch(context);
 		const frames: [unknown, unknown][] = [];
 		let release: () => void = () => {};
-		watch.start(async (call) => {
+		watch.start(async call => {
 			if (call.kind !== "value") return;
 			frames.push([call.value, call.ops]);
 			// The first call stays busy until the test lets it return.
 			if (frames.length === 1)
-				await new Promise<void>((resolve) => {
+				await new Promise<void>(resolve => {
 					release = resolve;
 				});
 		});
@@ -117,7 +117,7 @@ describe("subscribers", () => {
 		const source = resolveWatchable(c.num) as Source;
 		const frames: unknown[] = [];
 		const subscriber: Subscriber = {
-			advance: (call) => void (call.kind === "value" && frames.push([call.value, call.ops])),
+			advance: call => void (call.kind === "value" && frames.push([call.value, call.ops])),
 			end: () => {},
 			endAfterDelivery: () => {},
 		};

@@ -38,5 +38,5 @@ function IsLabel(value: string): boolean {
 export function IsHostname(value: string): boolean {
 	if (value.length === 0 || value.length > 253) return false;
 	if (value.charCodeAt(value.length - 1) === 46) return false;
-	return value.split(".").every((label) => IsLabel(label));
+	return value.split(".").every(label => IsLabel(label));
 }

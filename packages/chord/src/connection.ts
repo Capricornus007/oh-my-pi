@@ -426,8 +426,8 @@ export class Connection implements RemoteChannel {
 		this.#pendingCap = config.pendingCap ?? this.#window * PENDING_WINDOWS;
 		this.#maxCalls = config.maxCalls ?? Number.POSITIVE_INFINITY;
 		this.#onProtocolMismatch = config.onProtocolMismatch;
-		link.onClose((reason) => this.#closed(reason));
-		link.receive((frame) => this.#receive(frame));
+		link.onClose(reason => this.#closed(reason));
+		link.receive(frame => this.#receive(frame));
 		this.send({
 			t: "hello",
 			protocol: PROTOCOL_VERSION,
@@ -712,11 +712,11 @@ export class Connection implements RemoteChannel {
 			signal.addEventListener("abort", onAbort, { once: true });
 			const done = (): void => signal.removeEventListener("abort", onAbort);
 			this.calls.set(id, {
-				resolve: (value) => {
+				resolve: value => {
 					done();
 					resolve(value);
 				},
-				reject: (error) => {
+				reject: error => {
 					done();
 					reject(error);
 				},
@@ -920,7 +920,7 @@ export class Connection implements RemoteChannel {
 		};
 		this.served.set(frame.id, served);
 		ref.onShape(() => this.#unit(served));
-		ref.goneListeners.add((error) => {
+		ref.goneListeners.add(error => {
 			if (this.served.get(frame.id) !== served) return;
 			this.#dropServed(frame.id, false);
 			this.send({ t: "gone", id: frame.id, error: toWireError(error) });
@@ -930,7 +930,7 @@ export class Connection implements RemoteChannel {
 
 	/** The state members of `shape` the consumer's contract knows. */
 	#stateMembers(ref: RefImpl, shape: Shape): string[] {
-		return shape.members.filter((name) => ref.describe(shape.variant, name)?.kind === "state");
+		return shape.members.filter(name => ref.describe(shape.variant, name)?.kind === "state");
 	}
 
 	/**
@@ -961,7 +961,7 @@ export class Connection implements RemoteChannel {
 		if (shape === undefined) return;
 		served.unitSent = true;
 		const members = served.wantsState ? this.#stateMembers(served.ref, shape) : [];
-		const listed = members.filter((name) => !served.feeds.has(name));
+		const listed = members.filter(name => !served.feeds.has(name));
 		const snaps: StateFrame[] = [];
 		const attached: (readonly [string, Feed])[] = [];
 		for (const name of listed) {
@@ -976,7 +976,7 @@ export class Connection implements RemoteChannel {
 			...(shape.variant === undefined ? {} : { variant: shape.variant }),
 			members: shape.members,
 			contract: shape.contract,
-			state: snaps.map((frame) => frame.m),
+			state: snaps.map(frame => frame.m),
 		});
 		for (const frame of snaps) this.send(frame);
 		for (const [name, feed] of attached) this.#replay(served, name, feed);
@@ -995,7 +995,7 @@ export class Connection implements RemoteChannel {
 		if (readable === undefined || typeof readable.events !== "function") return undefined;
 		const feed: Feed = { unsubscribe: () => {}, encoder: encoder(), buffer: [] };
 		let first: StateEvent<unknown> | undefined;
-		feed.unsubscribe = readable.events((event) => {
+		feed.unsubscribe = readable.events(event => {
 			if (first === undefined) first = event;
 			else if (feed.buffer !== undefined) feed.buffer.push(event);
 			else this.#feedEvent(served, name, feed, event);
@@ -1140,7 +1140,7 @@ export class Connection implements RemoteChannel {
 				: this.host.joinRoot(root.rootId, root.codeVersion, run, { ...options, from: this });
 		result
 			.then(
-				(value) => this.send({ t: "result", id: frame.id, value }),
+				value => this.send({ t: "result", id: frame.id, value }),
 				(error: unknown) => this.send({ t: "result", id: frame.id, error: toWireError(error) }),
 			)
 			.finally(() => this.incoming.delete(frame.id));

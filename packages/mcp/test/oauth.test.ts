@@ -312,7 +312,7 @@ describe("MCP OAuth", () => {
 					response.end(JSON.stringify({ error: "invalid_grant" }));
 					return;
 				}
-				await new Promise((resolve) => setTimeout(resolve, 20));
+				await new Promise(resolve => setTimeout(resolve, 20));
 				response.end(
 					JSON.stringify({ access_token: "a2", refresh_token: "r2", token_type: "Bearer", expires_in: 3600 }),
 				);
@@ -427,7 +427,7 @@ describe("MCP OAuth", () => {
 		await register(["com.example.app:/callback"]);
 		await register(["https://app.example/callback"]);
 		await register(["http://localhost/callback"], "web");
-		expect(bodies.map((body) => body.application_type)).toEqual(["native", "native", "native", "web", "web"]);
+		expect(bodies.map(body => body.application_type)).toEqual(["native", "native", "native", "web", "web"]);
 	});
 
 	it("rejects authorization metadata whose issuer does not match discovery", async () => {
@@ -645,7 +645,7 @@ describe("OAuthCallbackServer pages", () => {
 	it("renders pages through renderPage", async () => {
 		const pages: OAuthCallbackPage[] = [];
 		const callback = await OAuthCallbackServer.listen({
-			renderPage: (page) => {
+			renderPage: page => {
 				pages.push(page);
 				return page.ok ? "<p>ok</p>" : `<p>${page.message}</p>`;
 			},

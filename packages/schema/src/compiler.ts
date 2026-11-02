@@ -169,7 +169,7 @@ export class Compiler {
 	private inPlace(node: SchemaObject, base: string, parts: Check[]): void {
 		if (Array.isArray(node.enum)) parts.push(enumCheck(node.enum));
 		if (Object.hasOwn(node, "const")) parts.push(constCheck(node.const));
-		if (Array.isArray(node.allOf)) parts.push(and(node.allOf.map((s) => this.check(s, base))));
+		if (Array.isArray(node.allOf)) parts.push(and(node.allOf.map(s => this.check(s, base))));
 		if (Array.isArray(node.anyOf)) parts.push(this.union(node.anyOf, base, false));
 		if (Array.isArray(node.oneOf)) parts.push(this.union(node.oneOf, base, true));
 		if (node.not !== undefined) parts.push(notCheck(this.check(node.not, base)));
@@ -185,7 +185,7 @@ export class Compiler {
 	}
 
 	private union(branches: readonly unknown[], base: string, exactlyOne: boolean): Check {
-		const checks = () => branches.map((s) => this.check(s, base));
+		const checks = () => branches.map(s => this.check(s, base));
 		return (
 			constUnion(branches, exactlyOne) ??
 			this.tagged(branches, base) ??
@@ -206,7 +206,7 @@ export class Compiler {
 		const fallback = this.check(initial.node, initial.base);
 		const lookup = this.dynamicLookup(name, (node, b) => this.check(node, b));
 		const scope = this.scope;
-		return (v) => {
+		return v => {
 			for (let i = 0; i < scope.length; i++) {
 				const check = lookup(scope[i]);
 				if (check !== null) return check(v);
@@ -232,7 +232,7 @@ export class Compiler {
 	// Resolved at run time against the dynamic scope, so a schema with a bookended $dynamicRef keeps its compiler.
 	private dynamicLookup<T>(name: string, compile: (node: SchemaObject, base: string) => T): (uri: string) => T | null {
 		const found = new Map<string, T | null>();
-		return (uri) => {
+		return uri => {
 			const key = `${uri}#${name}`;
 			let check = found.get(key);
 			if (check === undefined) {
@@ -258,12 +258,12 @@ export class Compiler {
 		const first = resolved[0].properties;
 		if (!isSchemaObject(first)) return undefined;
 		for (const key of Object.keys(first)) {
-			const tags = resolved.map((s) => tagOf(s, key));
-			if (tags.some((t) => t === undefined) || new Set(tags).size !== tags.length) continue;
+			const tags = resolved.map(s => tagOf(s, key));
+			if (tags.some(t => t === undefined) || new Set(tags).size !== tags.length) continue;
 			return taggedCheck(
 				key,
 				tags,
-				branches.map((s) => this.check(s, base)),
+				branches.map(s => this.check(s, base)),
 			);
 		}
 		return undefined;
@@ -287,13 +287,13 @@ export class Compiler {
 		const xmin = number(node.exclusiveMinimum);
 		const xmax = number(node.exclusiveMaximum);
 		const multipleOf = number(node.multipleOf);
-		if ([min, max, xmin, xmax, multipleOf].every((x) => x === undefined)) return undefined;
+		if ([min, max, xmin, xmax, multipleOf].every(x => x === undefined)) return undefined;
 		const inf = Number.POSITIVE_INFINITY;
 		return numberCheck(mode, min ?? -inf, max ?? inf, xmin ?? -inf, xmax ?? inf, multipleOf);
 	}
 
 	private objectGroup(node: SchemaObject, base: string, strict: boolean): Check | undefined {
-		const onlyCore = OBJECT_EXTRAS.every((k) => node[k] === undefined);
+		const onlyCore = OBJECT_EXTRAS.every(k => node[k] === undefined);
 		// A schema with only the core object keywords gets one closure that also does the type guard.
 		const core = this.objectCore(node, base, onlyCore ? (strict ? GUARD_STRICT : GUARD_LOOSE) : GUARD_NONE);
 		if (core !== undefined && onlyCore) return core;
@@ -323,7 +323,7 @@ export class Compiler {
 
 	private objectCore(node: SchemaObject, base: string, guard: Guard): Check | undefined {
 		const properties = isSchemaObject(node.properties) ? node.properties : {};
-		const required = Array.isArray(node.required) ? node.required.filter((k) => typeof k === "string") : [];
+		const required = Array.isArray(node.required) ? node.required.filter(k => typeof k === "string") : [];
 		const patterns = isSchemaObject(node.patternProperties) ? node.patternProperties : {};
 		const additional = node.additionalProperties;
 		const keys = Object.keys(properties);
@@ -344,11 +344,11 @@ export class Compiler {
 				(k in Object.prototype ? INHERITED : 0);
 			entries.push(k, check, flags);
 		}
-		const extraRequired = required.filter((k) => !Object.hasOwn(properties, k));
-		const pats = patternKeys.map((p) => [sharedRegex(p), this.check(patterns[p], base)] as const);
+		const extraRequired = required.filter(k => !Object.hasOwn(properties, k));
+		const pats = patternKeys.map(p => [sharedRegex(p), this.check(patterns[p], base)] as const);
 		const extra = additional === undefined || additional === true ? undefined : this.check(additional, base);
 		if (pats.length === 0 && extraRequired.length === 0 && (extra === undefined || additional === false)) {
-			const requiredCount = keys.filter((k) => required.includes(k)).length;
+			const requiredCount = keys.filter(k => required.includes(k)).length;
 			return declaredObject(entries, requiredCount, additional === false, guard);
 		}
 		return openObject(entries, keys, extraRequired, pats, extra, guard);
@@ -364,7 +364,7 @@ export class Compiler {
 			if (this.draft !== "7" && Array.isArray(node.prefixItems)) prefix = node.prefixItems;
 			rest = node.items;
 		}
-		const prefixChecks = prefix.map((s) => this.check(s, base));
+		const prefixChecks = prefix.map(s => this.check(s, base));
 		const restCheck = rest === undefined || rest === true ? undefined : this.check(rest, base);
 		const minItems = number(node.minItems);
 		const maxItems = number(node.maxItems);
@@ -448,7 +448,7 @@ export class Compiler {
 			const rest = Array.isArray(node.items) ? node.additionalItems : node.items;
 			parts.push(
 				annotateArray(
-					prefix.map((s) => this.check(s, base)),
+					prefix.map(s => this.check(s, base)),
 					rest === undefined ? undefined : this.check(rest, base),
 					node.contains === undefined ? undefined : this.check(node.contains, base),
 					number(node.minContains) ?? 1,
@@ -460,14 +460,14 @@ export class Compiler {
 		if (Array.isArray(node.anyOf))
 			parts.push(
 				annotateAny(
-					node.anyOf.map((s) => this.annotating(s, base)),
+					node.anyOf.map(s => this.annotating(s, base)),
 					false,
 				),
 			);
 		if (Array.isArray(node.oneOf))
 			parts.push(
 				annotateAny(
-					node.oneOf.map((s) => this.annotating(s, base)),
+					node.oneOf.map(s => this.annotating(s, base)),
 					true,
 				),
 			);

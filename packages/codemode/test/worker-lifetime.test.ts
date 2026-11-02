@@ -69,12 +69,12 @@ describe("worker lifetime", () => {
 	});
 
 	// #10748: Bun can leave terminate() pending while a non-interruptible built-in runs.
-	it.each(["abort", "timeout", "close"] as const)("settles %s without waiting for worker exit", async (how) => {
+	it.each(["abort", "timeout", "close"] as const)("settles %s without waiting for worker exit", async how => {
 		vi.useFakeTimers();
 		const terminate = Worker.prototype.terminate;
 		let worker: Worker | undefined;
 		let releaseTermination: (code: number) => void = () => {};
-		const termination = new Promise<number>((resolve) => {
+		const termination = new Promise<number>(resolve => {
 			releaseTermination = resolve;
 		});
 		const terminateSpy = vi.spyOn(Worker.prototype, "terminate").mockImplementation(function (this: Worker) {
@@ -86,7 +86,7 @@ describe("worker lifetime", () => {
 		const refSpy = vi.spyOn(Worker.prototype, "ref");
 		const unrefSpy = vi.spyOn(Worker.prototype, "unref");
 		let ready: () => void = () => {};
-		const called = new Promise<void>((resolve) => {
+		const called = new Promise<void>(resolve => {
 			ready = resolve;
 		});
 		let toolSignal: AbortSignal | undefined;
@@ -94,7 +94,7 @@ describe("worker lifetime", () => {
 		let didExit = false;
 		const sandbox = new CodemodeSandbox({
 			timeoutMs: 100,
-			onWorkerStarted: (promise) => {
+			onWorkerStarted: promise => {
 				exited = promise;
 				void promise.then(() => {
 					didExit = true;
@@ -115,7 +115,7 @@ describe("worker lifetime", () => {
 		let result: CodemodeResult | undefined;
 		let didClose = false;
 		const pending = sandbox.execute('text("partial"); await tools.hang()', { signal: controller.signal });
-		void pending.then((value) => {
+		void pending.then(value => {
 			result = value;
 		});
 		try {
@@ -162,7 +162,7 @@ describe("worker lifetime", () => {
 		const exits: Promise<void>[] = [];
 		const releaseWorker = vi.fn();
 		const acquireWorker = vi.fn(() => releaseWorker);
-		const sandbox = new CodemodeSandbox({ acquireWorker, onWorkerStarted: (exited) => void exits.push(exited) });
+		const sandbox = new CodemodeSandbox({ acquireWorker, onWorkerStarted: exited => void exits.push(exited) });
 		try {
 			expect(await sandbox.execute("return 1")).toMatchObject({ ok: true, value: 1 });
 			const run = sandbox.start("return 2", { startedAt: 0, seed: 0, onCall: () => {} });
@@ -183,7 +183,7 @@ describe("worker lifetime", () => {
 		const releaseWorker = vi.fn();
 		const sandbox = new CodemodeSandbox({
 			acquireWorker: () => releaseWorker,
-			onWorkerStarted: (promise) => {
+			onWorkerStarted: promise => {
 				exited = promise;
 				throw new Error("lifetime hook failed");
 			},
@@ -212,7 +212,7 @@ describe.each(runtimes)("$name process lifetime", ({ name, command, available })
 	// Bun 1.4.0's pending terminate() keeps the process alive even after unref(), independently of codemode.
 	it.skipIf(!available).each(["abort", "timeout", "close"] as const)(
 		name === "Node" ? "exits promptly after %s with a real worker" : "settles %s promptly with a real worker",
-		async (how) => {
+		async how => {
 			const fixture = fileURLToPath(new URL("./fixtures/worker-process-exit.ts", import.meta.url));
 			const { stdout } = await promisify(execFile)(command, [fixture, how], { timeout: 20000 });
 			const lines = stdout.trim().split(/\r?\n/);

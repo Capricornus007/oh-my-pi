@@ -102,7 +102,7 @@ function encodeWithin(
 	const scaled = same ? image : resize(image, size.width, size.height, SamplingFilter.Lanczos3);
 	try {
 		const png = { mimeType: "image/png", encode: () => scaled.get_bytes() };
-		const jpegs = JPEG_QUALITIES.map((quality) => ({
+		const jpegs = JPEG_QUALITIES.map(quality => ({
 			mimeType: "image/jpeg",
 			encode: () => scaled.get_bytes_jpeg(quality),
 		}));

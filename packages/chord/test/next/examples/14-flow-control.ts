@@ -34,13 +34,13 @@ const View = remote("example.view", {
 
 const ReplyDoc = defineState("reply", { schema: obj({ text: str() }), version: 1, initial: () => ({ text: "" }) });
 
-const workerFacet = defineFacet<P>((host) => {
+const workerFacet = defineFacet<P>(host => {
 	host.serve(Reply, (_, self) => {
 		const doc = self.state(ReplyDoc);
 		return {
 			reply: doc,
 			append: async (token, ctx) => {
-				await doc.change((draft) => {
+				await doc.change(draft => {
 					draft.text += token;
 				}, ctx);
 				return null;
@@ -67,16 +67,16 @@ async function worker(id: string): Promise<Host<P>> {
 /** A link end that logs, as `label`, every `bound`, `state` and `ack` its host receives. */
 function tap(link: Link, label: string): Link {
 	return {
-		send: (message) => link.send(message),
-		onMessage: (listener) =>
-			link.onMessage((message) => {
+		send: message => link.send(message),
+		onMessage: listener =>
+			link.onMessage(message => {
 				const decoded = binaryCodec.decode(message);
 				const shown = decoded.kind === "ack" || decoded.kind === "bound" || decoded.kind === "state";
 				if (shown) console.log(`  ${label} ←`, describeMessage(decoded).slice(0, 110));
 				listener(message);
 			}),
 		close: () => link.close(),
-		onClose: (listener) => link.onClose(listener),
+		onClose: listener => link.onClose(listener),
 	};
 }
 
@@ -89,7 +89,7 @@ class Pausable implements Link {
 
 	constructor(link: Link) {
 		this.#link = link;
-		link.onMessage((message) => {
+		link.onMessage(message => {
 			if (this.paused) this.#waiting.push(message);
 			else this.#listener(message);
 		});
@@ -125,7 +125,7 @@ async function tab(link: Link): Promise<Host<P>> {
 	return host;
 }
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+const settle = () => new Promise(resolve => setTimeout(resolve, 10));
 
 // 1. Folding at the provider: a tab directly on a worker. Paused, it acknowledges nothing; the worker sends two
 // `state` messages (the window), then folds 1,000 appends into its pending queue.
@@ -162,7 +162,7 @@ server.route(
 	Session,
 	{
 		authorize: () => true,
-		resolve: async (address) => {
+		resolve: async address => {
 			const [a, b] = memoryLinkPair();
 			w2 = await worker(address.params.id);
 			w2.connect(tap(b, "worker"), { principal: { kind: "server" }, trusted: true }, context);

@@ -21,7 +21,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function parseDiscoveredCases(value: unknown): DiscoveredEvalCase[] {
 	if (!Array.isArray(value)) throw new TypeError("Discovered eval cases must be an array.");
 	const identities = new Set<string>();
-	return value.map((item) => {
+	return value.map(item => {
 		if (!isRecord(item) || typeof item.name !== "string" || typeof item.file !== "string") {
 			throw new TypeError("Discovered eval case is invalid.");
 		}

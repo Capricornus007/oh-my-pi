@@ -35,7 +35,7 @@ describe("SQLite migrations", () => {
 				await expect(
 					applySqliteMigrations(
 						database,
-						versions.map((version) => ({ version, statements: [] })),
+						versions.map(version => ({ version, statements: [] })),
 						{ table: "app_schema" },
 					),
 				).rejects.toThrow("contiguous versions starting at 1");

@@ -15,7 +15,7 @@ import {
 	remote,
 } from "../src/index.ts";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Lives on the worker `w`; its value is set by `set`. */
 const Source = remote("t.e8-source", {
@@ -87,7 +87,7 @@ describe("local hydration", () => {
 		const held = c.server.hold(Source, {});
 		c.server.serve(Forward, ({ how }, _principal, self) => {
 			const source = how === "declared" ? self.get(Source, {}) : held;
-			return { variant: "main", v: source.v, size: self.derive([source.v], (text) => text.length) };
+			return { variant: "main", v: source.v, size: self.derive([source.v], text => text.length) };
 		});
 		const browser = c.browser();
 		for (const how of ["held", "declared"]) {
@@ -116,7 +116,7 @@ describe("local hydration", () => {
 			} catch (error) {
 				seen.push(isChordError(error, "not_ready") ? "not_ready" : error);
 			}
-			return { m: self.derive([inner.n], (n) => n * 2) };
+			return { m: self.derive([inner.n], n => n * 2) };
 		});
 		const outer = host.hold(Outer, {});
 		await outer.ready;
@@ -140,7 +140,7 @@ describe("local hydration", () => {
 		await c.worker.install(
 			{
 				name: "boot",
-				setup: (api) =>
+				setup: api =>
 					api.serve(
 						Local,
 						(_input, _principal, self) => {
@@ -185,8 +185,7 @@ describe("local hydration", () => {
 		const a = c.server.hold(A, {});
 		await assert.rejects(
 			a.ready,
-			(error) =>
-				isChordError(error, "unavailable") && error.reason === "ready_timeout" && /cycle/.test(error.message),
+			error => isChordError(error, "unavailable") && error.reason === "ready_timeout" && /cycle/.test(error.message),
 		);
 		await sleep(10);
 		await c.server.close();

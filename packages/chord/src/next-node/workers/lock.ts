@@ -42,7 +42,7 @@ export async function lockAt(lock: LockAddress, context: Context): Promise<Proce
 	const file = lock.kind === "file";
 	// Connections are kept open, never answered: a waiter learns of the release when its connection closes.
 	const waiters = new Set<Socket>();
-	const server = createServer((socket) => {
+	const server = createServer(socket => {
 		waiters.add(socket);
 		socket.on("error", () => {});
 		socket.once("close", () => waiters.delete(socket));
@@ -67,7 +67,7 @@ export async function lockAt(lock: LockAddress, context: Context): Promise<Proce
 		release: () =>
 			new Promise<void>((resolve, reject) => {
 				if (file) process.removeListener("exit", removeFile);
-				server.close((error) => (error ? reject(error) : resolve()));
+				server.close(error => (error ? reject(error) : resolve()));
 				// Waiters see their connections close (and `close` waits for them).
 				for (const socket of waiters) socket.destroy();
 			}),

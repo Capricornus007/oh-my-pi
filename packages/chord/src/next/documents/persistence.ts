@@ -72,7 +72,7 @@ export class Persistence {
 	 */
 	async read(key: string, context: Context): Promise<StoredDocument | undefined> {
 		const address = this.at(key);
-		const document = await this.store.read(async (executor) => {
+		const document = await this.store.read(async executor => {
 			const record = await findDocument(executor, address);
 			return record === undefined ? undefined : loadDocument(executor, record);
 		}, context);
@@ -103,7 +103,7 @@ export class Persistence {
 	 * it was stored with (`checkReadable` takes both), `undefined` when absent.
 	 */
 	async find(key: string, context: Context): Promise<FoundDocument | undefined> {
-		const record = await this.store.read((executor) => findDocument(executor, this.at(key)), context);
+		const record = await this.store.read(executor => findDocument(executor, this.at(key)), context);
 		if (record === undefined) return undefined;
 		// The change counter is all a retirement needs; `deltasSinceBase` is not read for one.
 		const stored = { id: record.id, revision: record.revision, version: record.version, deltasSinceBase: 0 };
@@ -112,7 +112,7 @@ export class Persistence {
 
 	/** Up to `limit` keys of live documents after `after`, in code point order. */
 	keys(after: string | undefined, limit: number, context: Context): Promise<string[]> {
-		return this.store.read((executor) => listDocumentKeys(executor, this.#address, after, limit), context);
+		return this.store.read(executor => listDocumentKeys(executor, this.#address, after, limit), context);
 	}
 
 	/**
@@ -136,7 +136,7 @@ export class Persistence {
 		if (retires || stored === undefined) {
 			const base = { version, fingerprint, value: prepared.value };
 			const created = { id: 0 };
-			const write = createDocument(this.at(key), base, JSON.stringify(prepared.value), (id) => {
+			const write = createDocument(this.at(key), base, JSON.stringify(prepared.value), id => {
 				created.id = id;
 			});
 			writes.push(write);

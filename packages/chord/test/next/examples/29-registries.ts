@@ -30,8 +30,8 @@ const Server = local("example.server", {
 const Mounts = local("example.mounts", { version: 1, params: {}, members: { mount: method(obj({ path: str() })) } });
 
 // 2. The defining plugin serves the registry: the first route by plugin name wins, a duplicate is reported.
-const httpPlugin = defineFacet((host) => {
-	host.serve(Http, { compose: (table, { report }) => keyedEntries(table, (entry) => entry.routes, report) });
+const httpPlugin = defineFacet(host => {
+	host.serve(Http, { compose: (table, { report }) => keyedEntries(table, entry => entry.routes, report) });
 	host.serve(Server, (_, self) => {
 		const router = self.registry(Http);
 		return {
@@ -59,7 +59,7 @@ const searchPlugin = defineFacet((_, self) => {
 });
 
 // 4. A host-lifetime object contributes a writable: its changes recompose the router.
-const mountsPlugin = defineFacet((host) => {
+const mountsPlugin = defineFacet(host => {
 	host.serve(Mounts, (_, self) => {
 		const routes = self.writable<Routes>({ routes: {} });
 		self.contribute(Http, routes);
@@ -73,7 +73,7 @@ const mountsPlugin = defineFacet((host) => {
 });
 
 const host = createHost({
-	onError: (error) => {
+	onError: error => {
 		if (error.kind === "registry_conflict") console.log("conflict:", error.message, error.plugins);
 		else console.log("onError:", error.kind);
 	},
@@ -103,12 +103,12 @@ console.log("/broken ->", await server.request({ path: "/broken" }, context));
 
 // 7. A watch of the composed value gets each new router; mounting recomposes it.
 const watch = await router.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("router now has:", [...call.value.keys()]);
 });
 const mounts = await host.get(Mounts, {}, context);
 await mounts.mount({ path: "/files" }, context);
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 console.log("/files ->", await server.request({ path: "/files" }, context));
 
 await watch.stop();

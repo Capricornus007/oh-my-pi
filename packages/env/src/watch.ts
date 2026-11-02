@@ -88,7 +88,7 @@ export class RemoteWatcher implements FileWatcher {
 			const request = this.#connection.request(
 				"watch",
 				{
-					targets: this.#targets.map((target) => ({
+					targets: this.#targets.map(target => ({
 						path: target.path,
 						recursive: target.recursive === true,
 						exclude: { hidden: target.exclude?.hidden === true, names: [...(target.exclude?.names ?? [])] },
@@ -97,7 +97,7 @@ export class RemoteWatcher implements FileWatcher {
 				},
 				{
 					signal: controller.signal,
-					onEvent: (event) => {
+					onEvent: event => {
 						if (event.kind === "ready") {
 							ready = true;
 							this.#mode = event.mode === "polling" ? "polling" : "native";
@@ -136,7 +136,7 @@ export class RemoteWatcher implements FileWatcher {
 
 	async #reconnect(): Promise<void> {
 		for (let delay = RECONNECT_FIRST_MS; !this.#stopped; delay = Math.min(delay * 2, RECONNECT_MAX_MS)) {
-			await new Promise<void>((resolve) => {
+			await new Promise<void>(resolve => {
 				const timer = setTimeout(resolve, delay);
 				timer.unref();
 				this.#wake = () => {

@@ -31,7 +31,7 @@ describe("resolveModelSelection", () => {
 
 	it.each([{}, { PI_PROVIDER: "openai-codex" }, { PI_MODEL: "gpt-5.6-sol" }])(
 		"rejects incomplete model selection",
-		(environment) => {
+		environment => {
 			expect(() => resolveModelSelection(undefined, environment)).toThrow("Select a harness model explicitly");
 		},
 	);
@@ -61,11 +61,11 @@ describe("isolateProcessEnvironment", () => {
 });
 
 describe("documentation variant", () => {
-	it.each(["without_docs", "with_docs"] as const)("accepts %s", (variant) => {
+	it.each(["without_docs", "with_docs"] as const)("accepts %s", variant => {
 		expect(resolveDocumentationVariant(variant)).toBe(variant);
 	});
 
-	it.each([undefined, "", "other"])("rejects invalid variant %s", (variant) => {
+	it.each([undefined, "", "other"])("rejects invalid variant %s", variant => {
 		expect(() => resolveDocumentationVariant(variant)).toThrow("PI_EVAL_VARIANT");
 	});
 

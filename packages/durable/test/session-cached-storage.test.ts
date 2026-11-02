@@ -90,7 +90,7 @@ describe("cached storage", () => {
 		]);
 		const batch: StorageWrite[] = [{ type: "task", value: task(2, "running") }];
 		const receipts: number[] = [];
-		expect(await storage.commit([batch], (index) => receipts.push(index), context)).toEqual({ stored: 1 });
+		expect(await storage.commit([batch], index => receipts.push(index), context)).toEqual({ stored: 1 });
 		expect(receipts).toEqual([0]);
 		// Stored, not yet published: the cache still shows what was published.
 		expect((await storage.task(idFromNumber<TaskId>(2), context))?.state.status).toBe("pending");
@@ -134,7 +134,7 @@ describe("cached storage", () => {
 			}) as TaskRecord<JsonValue, JsonValue, JsonValue>;
 		const waiting = (state: TaskRecord<JsonValue, JsonValue, JsonValue>["state"]) =>
 			({ ...task(2), state }) as TaskRecord<JsonValue, JsonValue, JsonValue>;
-		const on = [3, 4].map((id) => idFromNumber<TaskId>(id));
+		const on = [3, 4].map(id => idFromNumber<TaskId>(id));
 		await commit(storage, [
 			{
 				type: "task",

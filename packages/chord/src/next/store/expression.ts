@@ -218,7 +218,7 @@ export function compileWhere(table: TableDefinition, condition: unknown, what: s
 	switch (op) {
 		case "and":
 		case "or": {
-			const nodes = args.map((each) => compileWhere(table, each, what));
+			const nodes = args.map(each => compileWhere(table, each, what));
 			return op === "and" ? { and: nodes } : { or: nodes };
 		}
 		case "not":
@@ -234,7 +234,7 @@ export function compileWhere(table: TableDefinition, condition: unknown, what: s
 			const column = scalarColumn(table, args[0], what);
 			const values = args[1];
 			if (!Array.isArray(values)) throw invalid("args", `${table.name}: ${what}: inArray needs an array`);
-			return { inArray: [column.name, values.map((value) => operand(column, value, what))] };
+			return { inArray: [column.name, values.map(value => operand(column, value, what))] };
 		}
 		default: {
 			const column = scalarColumn(table, args[0], what);
@@ -323,7 +323,7 @@ function compileExpr(table: TableDefinition, value: unknown, type: ScalarType, w
 			if (type !== "str") refuse(`replacePrefix gives str, the column is ${type}`);
 			const subject = compileExpr(table, args[0], type, what);
 			const [from, to] = [args[1], args[2]].map(
-				(each) => checkScalar("str", each, `${table.name}: ${what}`) as string,
+				each => checkScalar("str", each, `${table.name}: ${what}`) as string,
 			);
 			return { node: { replacePrefix: [subject.node, from!, to!] }, nullable: subject.nullable };
 		}

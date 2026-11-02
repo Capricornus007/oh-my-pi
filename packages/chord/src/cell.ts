@@ -296,7 +296,7 @@ function computeDependents(changed: Source<unknown>, value: unknown, validate = 
 	const values = new Map<Readable<unknown>, unknown>([[changed, value]]);
 	const result = new Map<Derived<unknown>, unknown>();
 	for (const derived of [...pending].sort((a, b) => a.seq - b.seq)) {
-		const next = derived.compute((source) => (values.has(source) ? values.get(source) : source.value));
+		const next = derived.compute(source => (values.has(source) ? values.get(source) : source.value));
 		if (validate) derived.validate(next);
 		values.set(derived, next);
 		result.set(derived, next);
@@ -325,7 +325,7 @@ export class Derived<T> extends Source<T> {
 
 	constructor(key: string, sources: Sources, fn: (...values: never[]) => unknown, options: SourceOptions) {
 		super(key, options);
-		this.sources = sources.map((source) => {
+		this.sources = sources.map(source => {
 			if (!isReadable(source)) throw new TypeError(`derive ${key}: sources must be readables`);
 			return source;
 		});
@@ -343,7 +343,7 @@ export class Derived<T> extends Source<T> {
 		if (pending.length === 0) return undefined;
 		return {
 			hydrated: false,
-			whenHydrated: () => Promise.all(pending.map((hydration) => hydration.whenHydrated())).then(() => {}),
+			whenHydrated: () => Promise.all(pending.map(hydration => hydration.whenHydrated())).then(() => {}),
 		};
 	}
 
@@ -352,7 +352,7 @@ export class Derived<T> extends Source<T> {
 	 * the sources (at install, never inside a factory).
 	 */
 	attach(precomputed?: ReadonlyMap<unknown, unknown>): void {
-		this.#value = precomputed?.has(this) ? (precomputed.get(this) as T) : this.compute((source) => source.value);
+		this.#value = precomputed?.has(this) ? (precomputed.get(this) as T) : this.compute(source => source.value);
 		for (const source of this.sources) {
 			if (source instanceof Source) source.dependents.add(this as Derived<unknown>);
 			else this.#external.push(source.subscribe(() => this.refresh()));
@@ -374,7 +374,7 @@ export class Derived<T> extends Source<T> {
 	/** Recomputes and republishes, including dependents. Errors are reported (the source write already happened). */
 	refresh(): void {
 		try {
-			const next = this.compute((source) => source.value);
+			const next = this.compute(source => source.value);
 			const dependents = computeDependents(this as Derived<unknown>, next);
 			holdPublications(() => {
 				this.install(next);

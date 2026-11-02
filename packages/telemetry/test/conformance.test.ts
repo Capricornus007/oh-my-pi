@@ -15,9 +15,9 @@ const conformance = createTelemetryAdapterConformance(() => {
 });
 
 describe("InMemoryTelemetryContext conformance", () => {
-	for (const group of new Set(conformance.map((testCase) => testCase.group))) {
+	for (const group of new Set(conformance.map(testCase => testCase.group))) {
 		describe(group, () => {
-			for (const testCase of conformance.filter((candidate) => candidate.group === group)) {
+			for (const testCase of conformance.filter(candidate => candidate.group === group)) {
 				it(testCase.name, () => testCase.run());
 			}
 		});
@@ -27,7 +27,7 @@ describe("InMemoryTelemetryContext conformance", () => {
 		const context = new InMemoryTelemetryContext();
 		let openSettled: boolean | undefined;
 		let openEndSequence: number | undefined;
-		await context.startSpan({ name: "snapshot", attributes: { tags: ["initial"] } }, (span) => {
+		await context.startSpan({ name: "snapshot", attributes: { tags: ["initial"] } }, span => {
 			span.addEvent("event", { value: 1 });
 			const [open] = context.getSpans();
 			openSettled = open?.settled;

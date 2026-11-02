@@ -5,4 +5,4 @@ import { constant, defineFacet, local, str } from "@earendil-works/chord/next";
 
 const Extra = local("example.label.extra", { version: 1, params: {}, members: { text: str() } });
 
-export default defineFacet((host) => host.serve(Extra, () => ({ text: constant("extra on the server") })));
+export default defineFacet(host => host.serve(Extra, () => ({ text: constant("extra on the server") })));

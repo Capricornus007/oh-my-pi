@@ -29,14 +29,14 @@ const Directory = local("example.directory", {
 // A badge per user: its own object, showing one profile.
 const Badge = local("example.badge", { version: 1, params: { user: str() }, members: { label: str() } });
 
-const facet = defineFacet((host) => {
+const facet = defineFacet(host => {
 	host.serve(Directory, (_, self) => {
 		const profiles = self.state(Profiles);
 		return {
 			// The keyed handle is the member as it is.
 			profiles,
 			set: async ({ user, name, status }, ctx) => {
-				await profiles.change(user, (draft) => Object.assign(draft, { name, status }), ctx);
+				await profiles.change(user, draft => Object.assign(draft, { name, status }), ctx);
 				return null;
 			},
 		};
@@ -48,7 +48,7 @@ const facet = defineFacet((host) => {
 	});
 });
 
-const host = createHost({ onError: (error) => console.error("background error:", error) });
+const host = createHost({ onError: error => console.error("background error:", error) });
 await host.load([{ name: "@example/directory", facet }], context);
 const directory = await host.get(Directory, {}, context);
 await directory.set({ user: "ana", name: "Ana", status: "online" }, context);

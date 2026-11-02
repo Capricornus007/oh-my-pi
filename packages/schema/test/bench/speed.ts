@@ -61,12 +61,12 @@ for (const c of cases) {
 	}
 }
 
-const names = candidates.map((c) => c.name);
+const names = candidates.map(c => c.name);
 console.log(`| case | input | ${names.join(" | ")} |`);
 console.log(`|---|---|${names.map(() => "---:").join("|")}|`);
 for (const [name, inputs] of Object.entries(results)) {
 	for (const [input, ns] of Object.entries(inputs)) {
-		console.log(`| ${name} | ${input} | ${names.map((n) => format(ns[n])).join(" | ")} |`);
+		console.log(`| ${name} | ${input} | ${names.map(n => format(ns[n])).join(" | ")} |`);
 	}
 }
 const out = process.argv.indexOf("--json");

@@ -84,7 +84,7 @@ const workers = createWorkers(
 		authorize: () => true,
 		principal: () => ({ kind: "worker" }),
 		start: () => ({}),
-		lock: (address) => `bench:${process.pid}:${address.key}`,
+		lock: address => `bench:${process.pid}:${address.key}`,
 		plugins,
 		onOutput: () => {},
 		onError: () => {},

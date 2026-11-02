@@ -42,7 +42,7 @@ export class PersistedRuns {
 		if (stored === undefined) {
 			const created = { id: 0 };
 			writes.push(
-				createDocument(this.#records.at(id), { version, fingerprint, value }, text, (made) => {
+				createDocument(this.#records.at(id), { version, fingerprint, value }, text, made => {
 					created.id = made;
 				}),
 			);

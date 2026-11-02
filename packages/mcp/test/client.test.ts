@@ -20,7 +20,7 @@ async function createServer(): Promise<{ clientTransport: InMemoryTransport; ser
 	const pair = createInMemoryTransportPair();
 	const handlers = new Map<string, (request: JsonRpcRequest) => unknown | Promise<unknown>>();
 	const messages: JsonRpcMessage[] = [];
-	pair.server.onMessage((message) => {
+	pair.server.onMessage(message => {
 		messages.push(message);
 		if (!("id" in message) || !("method" in message)) return;
 		const request = message as JsonRpcRequest;
@@ -93,7 +93,7 @@ describe("McpClient", () => {
 
 	it("paginates tools and preserves protocol tool definitions", async () => {
 		const { client, server } = await connect();
-		server.setHandler("tools/list", (request) => {
+		server.setHandler("tools/list", request => {
 			const cursor = (request.params as { cursor?: string } | undefined)?.cursor;
 			return cursor === undefined
 				? {
@@ -127,7 +127,7 @@ describe("McpClient", () => {
 
 	it("lists and reads resources", async () => {
 		const { client, server } = await connect();
-		server.setHandler("resources/list", (request) =>
+		server.setHandler("resources/list", request =>
 			(request.params as { cursor?: string } | undefined)?.cursor === undefined
 				? { resources: [{ uri: "file:///a", name: "a", mimeType: "text/plain" }], nextCursor: "2" }
 				: { resources: [{ uri: "file:///b" }] },
@@ -135,7 +135,7 @@ describe("McpClient", () => {
 		server.setHandler("resources/templates/list", () => ({
 			resourceTemplates: [{ uriTemplate: "repo://{owner}/{repo}", name: "repo" }],
 		}));
-		server.setHandler("resources/read", (request) => ({
+		server.setHandler("resources/read", request => ({
 			contents: [{ uri: (request.params as { uri: string }).uri, text: "hello" }],
 		}));
 		// A missing name falls back to the URI.
@@ -161,7 +161,7 @@ describe("McpClient", () => {
 
 	it("returns structured tool content and surfaces JSON-RPC errors", async () => {
 		const { client, server } = await connect();
-		server.setHandler("tools/call", (request) => {
+		server.setHandler("tools/call", request => {
 			const params = request.params as { name: string; arguments?: Record<string, unknown> };
 			if (params.name === "fail") throw new McpError(1234, "tool failed", { retryable: false });
 			return {
@@ -185,7 +185,7 @@ describe("McpClient", () => {
 	it("renews the timeout on progress", async () => {
 		vi.useFakeTimers();
 		const { client, server } = await connect();
-		server.setHandler("tools/call", async (request) => {
+		server.setHandler("tools/call", async request => {
 			const token = ((request.params as Record<string, unknown>)._meta as Record<string, unknown>)
 				.progressToken as number;
 			setTimeout(() => {
@@ -195,7 +195,7 @@ describe("McpClient", () => {
 					params: { progressToken: token, progress: 1, total: 2 },
 				});
 			}, 40);
-			await new Promise((resolve) => setTimeout(resolve, 80));
+			await new Promise(resolve => setTimeout(resolve, 80));
 			return { content: [{ type: "text", text: "done" }] };
 		});
 		const progress = vi.fn();
@@ -214,7 +214,7 @@ describe("McpClient", () => {
 		const aborted = client.callTool("wait", {}, { signal: controller.signal });
 		controller.abort("stop");
 		await expect(aborted).rejects.toBeInstanceOf(McpAbortError);
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(server.messages).toContainEqual({
 			jsonrpc: "2.0",
 			method: "notifications/cancelled",
@@ -230,21 +230,21 @@ describe("McpClient", () => {
 		const client = new McpClient({ name: "test-client", version: "1.0.0" });
 		await client.connect(clientTransport);
 		const errors: Error[] = [];
-		client.onError((error) => errors.push(error));
+		client.onError(error => errors.push(error));
 		let respond = () => {};
 		server.setHandler(
 			"tools/call",
 			() =>
-				new Promise((resolve) => {
+				new Promise(resolve => {
 					respond = () => resolve({ content: [] });
 				}),
 		);
 		const call = client.callTool("wait");
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		clientTransport.emitError(new Error("stray log line"));
 		respond();
 		expect(await call).toEqual({ content: [] });
-		expect(errors.map((error) => error.message)).toEqual(["stray log line"]);
+		expect(errors.map(error => error.message)).toEqual(["stray log line"]);
 		await client.close();
 	});
 
@@ -295,10 +295,10 @@ describe("McpClient", () => {
 		server.setHandler("initialize", () => new Promise(() => {}));
 		const client = new McpClient({ name: "test-client", version: "1.0.0", requestTimeoutMs: 5 });
 		await expect(client.connect(clientTransport)).rejects.toBeInstanceOf(McpTimeoutError);
-		await new Promise((resolve) => setTimeout(resolve, 0));
-		expect(
-			server.messages.some((message) => "method" in message && message.method === "notifications/cancelled"),
-		).toBe(false);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(server.messages.some(message => "method" in message && message.method === "notifications/cancelled")).toBe(
+			false,
+		);
 	});
 
 	it("notifies close listeners once when the transport drops", async () => {
@@ -307,7 +307,7 @@ describe("McpClient", () => {
 		client.onClose(closed);
 		server.setHandler("tools/call", () => new Promise(() => {}));
 		const pending = client.callTool("wait");
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		await server.transport.close();
 		await expect(pending).rejects.toThrow("MCP connection closed");
 		expect(client.connectionState).toBe("closed");
@@ -327,7 +327,7 @@ describe("McpClient", () => {
 		client.onNotification("notifications/tools/list_changed", changed);
 		await server.transport.send({ jsonrpc: "2.0", id: "roots", method: "roots/list" });
 		await server.transport.send({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(server.messages).toContainEqual({
 			jsonrpc: "2.0",
 			id: "roots",

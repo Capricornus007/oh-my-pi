@@ -5,14 +5,14 @@ import type { Check } from "./types.ts";
 
 export const ALWAYS: Check = () => true;
 export const NEVER: Check = () => false;
-const IS_STRING: Check = (v) => typeof v === "string";
-const IS_NUMBER: Check = (v) => typeof v === "number";
-const IS_INTEGER: Check = (v) => Number.isInteger(v);
-const IS_BOOLEAN: Check = (v) => typeof v === "boolean";
-const IS_NULL: Check = (v) => v === null;
-export const IS_ARRAY: Check = (v) => Array.isArray(v);
-const IS_BYTES: Check = (v) => v instanceof Uint8Array;
-export const IS_OBJECT: Check = (v) => isObject(v);
+const IS_STRING: Check = v => typeof v === "string";
+const IS_NUMBER: Check = v => typeof v === "number";
+const IS_INTEGER: Check = v => Number.isInteger(v);
+const IS_BOOLEAN: Check = v => typeof v === "boolean";
+const IS_NULL: Check = v => v === null;
+export const IS_ARRAY: Check = v => Array.isArray(v);
+const IS_BYTES: Check = v => v instanceof Uint8Array;
+export const IS_OBJECT: Check = v => isObject(v);
 
 /** Whether `v` is a JSON object: not null, an array or bytes. */
 export function isObject(v: unknown): v is Record<string, unknown> {
@@ -78,14 +78,14 @@ export function and(parts: readonly Check[]): Check {
 			return parts[0];
 		case 2: {
 			const [a, b] = parts;
-			return (v) => a(v) && b(v);
+			return v => a(v) && b(v);
 		}
 		case 3: {
 			const [a, b, c] = parts;
-			return (v) => a(v) && b(v) && c(v);
+			return v => a(v) && b(v) && c(v);
 		}
 		default:
-			return (v) => {
+			return v => {
 				for (let i = 0; i < parts.length; i++) if (!parts[i](v)) return false;
 				return true;
 			};
@@ -94,12 +94,12 @@ export function and(parts: readonly Check[]): Check {
 
 /** A check whose implementation is set later: the indirection a recursive reference goes through. */
 export function indirect(slot: { check: Check | undefined }): Check {
-	return (v) => (slot.check as Check)(v);
+	return v => (slot.check as Check)(v);
 }
 
 /** `check` with `uri` pushed onto the dynamic scope while it runs (only for schemas with `$dynamicRef`). */
 export function scopedCheck(scope: string[], uri: string, check: Check): Check {
-	return (v) => {
+	return v => {
 		scope.push(uri);
 		const ok = check(v);
 		scope.pop();
@@ -109,9 +109,9 @@ export function scopedCheck(scope: string[], uri: string, check: Check): Check {
 
 /** Any of the named types. */
 export function typeCheck(types: readonly unknown[]): Check {
-	const checks = types.map((t) => (typeof t === "string" ? TYPE_CHECKS.get(t) : undefined) ?? NEVER);
+	const checks = types.map(t => (typeof t === "string" ? TYPE_CHECKS.get(t) : undefined) ?? NEVER);
 	if (checks.length === 1) return checks[0];
-	return (v) => {
+	return v => {
 		for (let i = 0; i < checks.length; i++) if (checks[i](v)) return true;
 		return false;
 	};
@@ -119,7 +119,7 @@ export function typeCheck(types: readonly unknown[]): Check {
 
 /** A Uint8Array within the length bounds. */
 export function bytesCheck(min: number, max: number): Check {
-	return (v) => v instanceof Uint8Array && v.length >= min && v.length <= max;
+	return v => v instanceof Uint8Array && v.length >= min && v.length <= max;
 }
 
 /** The number of Unicode code points of `s`: JSON Schema string lengths count code points, not UTF-16 units. */
@@ -153,14 +153,14 @@ export function stringCheck(
 	format: ((value: string) => boolean) | undefined,
 ): Check {
 	if (re !== undefined && min === 0 && max === Number.POSITIVE_INFINITY && format === undefined) {
-		return strict ? (v) => typeof v === "string" && re.test(v) : (v) => typeof v !== "string" || re.test(v);
+		return strict ? v => typeof v === "string" && re.test(v) : v => typeof v !== "string" || re.test(v);
 	}
 	if (re === undefined && format === undefined) {
 		return strict
-			? (v) => typeof v === "string" && lengthOk(v, min, max)
-			: (v) => typeof v !== "string" || lengthOk(v, min, max);
+			? v => typeof v === "string" && lengthOk(v, min, max)
+			: v => typeof v !== "string" || lengthOk(v, min, max);
 	}
-	return (v) => {
+	return v => {
 		if (typeof v !== "string") return !strict;
 		return lengthOk(v, min, max) && (re === undefined || re.test(v)) && (format === undefined || format(v));
 	};
@@ -175,7 +175,7 @@ export function numberCheck(
 	xmax: number,
 	multipleOf: number | undefined,
 ): Check {
-	return (v) => {
+	return v => {
 		if (typeof v !== "number") return mode === 0;
 		if (mode === 2 && !Number.isInteger(v)) return false;
 		return v >= min && v <= max && v > xmin && v < xmax && (multipleOf === undefined || isMultiple(v, multipleOf));
@@ -201,12 +201,12 @@ function decimal(x: number): [bigint, number] {
 
 /** `inner` for objects; other values pass unless `strict`. */
 export function guardObject(inner: Check, strict: boolean): Check {
-	return strict ? (v) => isObject(v) && inner(v) : (v) => !isObject(v) || inner(v);
+	return strict ? v => isObject(v) && inner(v) : v => !isObject(v) || inner(v);
 }
 
 /** `inner` for arrays; other values pass unless `strict`. */
 export function guardArray(inner: Check, strict: boolean): Check {
-	return strict ? (v) => Array.isArray(v) && inner(v) : (v) => !Array.isArray(v) || inner(v);
+	return strict ? v => Array.isArray(v) && inner(v) : v => !Array.isArray(v) || inner(v);
 }
 
 /**
@@ -221,7 +221,7 @@ export function declaredObject(
 	guard: Guard,
 ): Check {
 	const n = entries.length;
-	return (v) => {
+	return v => {
 		if (guard !== GUARD_NONE && !isObject(v)) return guard === GUARD_LOOSE;
 		// Guarded: by the check above, or by the caller for GUARD_NONE.
 		const o = v as Record<string, unknown>;
@@ -254,7 +254,7 @@ export function openObject(
 	guard: Guard,
 ): Check {
 	const known = patterns.length > 0 || additional !== undefined ? new Set(keys) : undefined;
-	return (v) => {
+	return v => {
 		if (guard !== GUARD_NONE && !isObject(v)) return guard === GUARD_LOOSE;
 		const o = v as Record<string, unknown>;
 		for (let i = 0; i < entries.length; i += 3) {
@@ -286,7 +286,7 @@ export function openObject(
 
 /** Every property name passes `check` (`v` is an object). */
 export function propertyNamesCheck(check: Check): Check {
-	return (v) => {
+	return v => {
 		for (const k in v as object) if (!check(k)) return false;
 		return true;
 	};
@@ -294,7 +294,7 @@ export function propertyNamesCheck(check: Check): Check {
 
 /** `minProperties` and `maxProperties` (`v` is an object). */
 export function propertyCountCheck(min: number, max: number): Check {
-	return (v) => {
+	return v => {
 		let n = 0;
 		for (const _ in v as object) n++;
 		return n >= min && n <= max;
@@ -303,7 +303,7 @@ export function propertyCountCheck(min: number, max: number): Check {
 
 /** `dependentRequired` (`v` is an object). */
 export function dependentRequiredCheck(entries: readonly (readonly [string, readonly string[]])[]): Check {
-	return (v) => {
+	return v => {
 		const o = v as object;
 		for (const [k, list] of entries)
 			if (Object.hasOwn(o, k)) for (const r of list) if (!Object.hasOwn(o, r)) return false;
@@ -313,7 +313,7 @@ export function dependentRequiredCheck(entries: readonly (readonly [string, read
 
 /** `dependentSchemas` (`v` is an object). */
 export function dependentSchemasCheck(entries: readonly (readonly [string, Check])[]): Check {
-	return (v) => {
+	return v => {
 		for (const [k, check] of entries) if (Object.hasOwn(v as object, k) && !check(v)) return false;
 		return true;
 	};
@@ -329,7 +329,7 @@ export function listCheck(
 ): Check {
 	const n = prefix.length;
 	const code = rest === undefined ? 0 : (LEAF_CODES.get(rest) ?? 0);
-	return (v) => {
+	return v => {
 		if (!Array.isArray(v)) return guard === GUARD_LOOSE;
 		const length = v.length;
 		if (length < min || length > max) return false;
@@ -352,12 +352,12 @@ export function itemsCheck(prefix: readonly Check[], rest: Check | undefined): C
 
 /** `minItems` and `maxItems` (`v` is an array). */
 export function lengthCheck(min: number, max: number): Check {
-	return (v) => (v as unknown[]).length >= min && (v as unknown[]).length <= max;
+	return v => (v as unknown[]).length >= min && (v as unknown[]).length <= max;
 }
 
 /** `contains` with its bounds (`v` is an array). */
 export function containsCheck(check: Check, min: number, max: number): Check {
-	return (v) => {
+	return v => {
 		const list = v as unknown[];
 		let n = 0;
 		for (let i = 0; i < list.length; i++) if (check(list[i]) && ++n > max) return false;
@@ -374,27 +374,27 @@ export function uniqueCheck(v: unknown): boolean {
 
 /** `enum`: up to 8 primitives by a scan, more by a Set, objects and arrays by deep equality. */
 export function enumCheck(values: readonly unknown[]): Check {
-	const primitives = values.filter((x) => typeof x !== "object" || x === null);
+	const primitives = values.filter(x => typeof x !== "object" || x === null);
 	if (primitives.length === values.length && primitives.length <= 8) {
-		return (v) => {
+		return v => {
 			for (let i = 0; i < primitives.length; i++) if (primitives[i] === v) return true;
 			return false;
 		};
 	}
 	const set = new Set(primitives);
-	const objects = values.filter((x) => typeof x === "object" && x !== null);
-	return (v) => set.has(v) || (typeof v === "object" && objects.some((o) => deepEqual(v, o)));
+	const objects = values.filter(x => typeof x === "object" && x !== null);
+	return v => set.has(v) || (typeof v === "object" && objects.some(o => deepEqual(v, o)));
 }
 
 /** `const`. */
 export function constCheck(value: unknown): Check {
-	if (typeof value !== "object" || value === null) return (v) => v === value;
-	return (v) => deepEqual(v, value);
+	if (typeof value !== "object" || value === null) return v => v === value;
+	return v => deepEqual(v, value);
 }
 
 /** `anyOf`. */
 export function anyCheck(checks: readonly Check[]): Check {
-	return (v) => {
+	return v => {
 		for (let i = 0; i < checks.length; i++) if (checks[i](v)) return true;
 		return false;
 	};
@@ -402,7 +402,7 @@ export function anyCheck(checks: readonly Check[]): Check {
 
 /** `oneOf`. */
 export function oneCheck(checks: readonly Check[]): Check {
-	return (v) => {
+	return v => {
 		let n = 0;
 		for (let i = 0; i < checks.length; i++) if (checks[i](v) && ++n > 1) return false;
 		return n === 1;
@@ -411,17 +411,17 @@ export function oneCheck(checks: readonly Check[]): Check {
 
 /** `not`. */
 export function notCheck(check: Check): Check {
-	return (v) => !check(v);
+	return v => !check(v);
 }
 
 /** `if`, `then` and `else`. */
 export function ifCheck(cond: Check, then: Check, otherwise: Check): Check {
-	return (v) => (cond(v) ? then(v) : otherwise(v));
+	return v => (cond(v) ? then(v) : otherwise(v));
 }
 
 /** A union of objects tagged by a const on `key`: the tag selects the one branch that can match. */
 export function taggedCheck(key: string, tags: readonly unknown[], checks: readonly Check[]): Check {
-	return (v) => {
+	return v => {
 		if (!isObject(v)) return false;
 		const tag = v[key];
 		for (let i = 0; i < tags.length; i++) if (tags[i] === tag) return checks[i](v);

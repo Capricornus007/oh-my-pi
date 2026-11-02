@@ -204,7 +204,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			// The model owes an answer only to a context ending in a user message or tool results; system messages say
 			// nothing it answers. Otherwise, as for a continue after an answer or in an empty conversation, end the run
 			// before any request.
-			const last = view.messages.findLast((message) => message.role !== "system");
+			const last = view.messages.findLast(message => message.role !== "system");
 			if (last?.role !== "user" && last?.role !== "toolResult") return failNothingToAnswer(runtime, context);
 			const shown = replaySections(view.messages);
 			let env: ExecutionEnv | undefined;
@@ -240,7 +240,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 				}, context);
 				return;
 			}
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				// The context ends in a message the model answers, so the conversation has an entry.
 				let cutoff = (await tx.latestEntryId(conversationId))!;
 				for (const entry of entries) cutoff = (await tx.appendEntry(SystemEntry, conversationId, entry)).id;
@@ -269,7 +269,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			// The attempt shown is presentation, stored like progress (`PROGRESS_COMMIT`); converting a partial left by an
 			// interrupted attempt appends an entry, which makes the commit immediate.
 			await runtime.commit(
-				async (tx) => {
+				async tx => {
 					const live = await tx.doc(LiveDoc, conversationId);
 					await convertPartial(tx, live, conversationId);
 					live.generation = { attempt };
@@ -282,7 +282,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			if (model === undefined) return failNoModel(runtime, ref, context);
 			const view = await runtime.context(conversationId, context, { at: cutoff });
 			let messages = view.messages;
-			await runtime.hooks.each("beforeRequest", async (hook) => {
+			await runtime.hooks.each("beforeRequest", async hook => {
 				const replaced = await hook({ messages }, runtime, context);
 				if (replaced !== undefined) messages = replaced.messages;
 			});
@@ -292,7 +292,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 				telemetry: context.telemetry,
 				sessionId: await ensureProviderSessionId(runtime, context),
 				...(thinkingLevel === "off" ? {} : { reasoning: thinkingLevel }),
-				onPayload: (payload) => providerPayload(runtime, model, payload, context),
+				onPayload: payload => providerPayload(runtime, model, payload, context),
 			};
 			const message = await streamResponse(runtime, model, messages, options, attempt, context);
 			const request = { attempt, compacted, model: ref, thinkingLevel, cutoff, messages: view.messages };
@@ -303,7 +303,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			const { attempt, compacted, until, poll } = task.state.checkpoint;
 			if (cutOffTooOften(task, runtime)) return endCutOff(runtime, task, context);
 			if (until > runtime.now()) return runtime.sleepUntil(until, task.state.checkpoint, context);
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				const live = await tx.doc(LiveDoc, runtime.conversationId);
 				const kept = compacted === undefined ? {} : { compacted };
 				// A poll the host died during polls its response again, as the next attempt.
@@ -344,7 +344,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			// Sequential round: start the next call and wait for it.
 			await runtime.commit(async (tx): Promise<Next> => {
 				const live = await tx.doc(LiveDoc, runtime.conversationId);
-				const slot = live.tools?.find((slot) => slot.callId === next && slot.taskId === undefined);
+				const slot = live.tools?.find(slot => slot.callId === next && slot.taskId === undefined);
 				const taskId = await createToolTask(tx, runtime, assistant, next, slot?.unoffered);
 				if (slot !== undefined) slot.taskId = taskId;
 				const checkpoint: GenerationCheckpoint = {
@@ -364,7 +364,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			const { run } = task.state.checkpoint;
 			if (cutOffTooOften(task, runtime)) return endAnsweredCutOff(runtime, task, run.answer, context);
 			const prepared: PreparedTask[] = [];
-			await runtime.hooks.each("afterRun", async (hook) => {
+			await runtime.hooks.each("afterRun", async hook => {
 				const asked = await hook(run, runtime, context);
 				if (asked !== undefined) prepareRunEndTasks(runtime, asked.tasks, prepared);
 			});
@@ -398,12 +398,12 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint, 
 			checkpoint.phase === "tools"
 				? await readCalls(runtime, checkpoint.assistant, checkpoint.pending, context)
 				: [];
-		await runtime.commit(async (tx) => {
+		await runtime.commit(async tx => {
 			const live = await tx.doc(LiveDoc, conversationId);
 			await convertPartial(tx, live, conversationId);
 			for (const call of unstarted) {
 				// A call its request did not offer could not have run either way.
-				const unoffered = live.tools?.find((slot) => slot.callId === call.id)?.unoffered === true;
+				const unoffered = live.tools?.find(slot => slot.callId === call.id)?.unoffered === true;
 				const result = unoffered
 					? harnessError("tool_unavailable", `Tool ${call.name} is not available`)
 					: harnessError("aborted", `Tool ${call.name} was aborted`);
@@ -424,8 +424,8 @@ async function readCalls(
 	context: Context,
 ): Promise<ToolCall[]> {
 	const message = (await runtime.entry(AssistantEntry, assistant, context))?.model?.[0];
-	const calls = message?.role === "assistant" ? message.content.filter((content) => content.type === "toolCall") : [];
-	return callIds.flatMap((id) => calls.filter((call) => call.id === id).slice(0, 1));
+	const calls = message?.role === "assistant" ? message.content.filter(content => content.type === "toolCall") : [];
+	return callIds.flatMap(id => calls.filter(call => call.id === id).slice(0, 1));
 }
 
 /** A tool task for call `callId`, owned by the generation; `unoffered` for a call to a tool its request did not offer. */
@@ -457,7 +457,7 @@ function thresholdCompaction(
 	if (!policy.enabled || contextWindow <= 0) return undefined;
 	const tokens = estimateContext(
 		view,
-		planned.flatMap((entry) => entry.model ?? []),
+		planned.flatMap(entry => entry.model ?? []),
 	);
 	const blocking = contextWindow - policy.reserveTokens;
 	const background = blocking - policy.backgroundTokens;
@@ -482,7 +482,7 @@ function compactionFailure(outcome: Exclude<TaskOutcome<CompactionResult>, { sta
 
 /** Settle the run's inputs `unanswered` with `model_error` and fail with `text`. */
 async function failModelError(runtime: Runtime, text: string, context: Context): Promise<void> {
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		const failure = await prepareFailure(tx, runtime);
 		const live = await tx.doc(LiveDoc, runtime.conversationId);
 		await endFailedRun(tx, runtime, live, failure, { status: "unanswered", reason: "model_error", detail: text });
@@ -600,7 +600,7 @@ async function cancelDeferred(
 async function failNoModel(runtime: Runtime, ref: ModelRef | undefined, context: Context): Promise<void> {
 	const message =
 		ref === undefined ? "No model is configured" : `Model ${ref.provider}/${ref.modelId} is not available`;
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		const failure = await prepareFailure(tx, runtime);
 		const live = await tx.doc(LiveDoc, runtime.conversationId);
 		await endFailedRun(tx, runtime, live, failure, {
@@ -616,7 +616,7 @@ async function failNoModel(runtime: Runtime, ref: ModelRef | undefined, context:
 /** End the run without a request: its context has nothing the model would answer. */
 async function failNothingToAnswer(runtime: Runtime, context: Context): Promise<void> {
 	const message = "The conversation has nothing to answer";
-	await runtime.commit(async (tx) => {
+	await runtime.commit(async tx => {
 		const failure = await prepareFailure(tx, runtime);
 		const live = await tx.doc(LiveDoc, runtime.conversationId);
 		await endFailedRun(tx, runtime, live, failure, { status: "unanswered", reason: "nothing_to_answer" });
@@ -673,7 +673,7 @@ async function providerPayload(
 	context: Context,
 ): Promise<unknown> {
 	let current = payload;
-	await runtime.hooks.each("beforeProviderRequest", async (hook) => {
+	await runtime.hooks.each("beforeProviderRequest", async hook => {
 		const replaced = await hook({ model, payload: current }, runtime, context);
 		if (replaced !== undefined) current = replaced.payload;
 	});
@@ -713,7 +713,7 @@ async function streamResponse(
 			const taken = changes.take(message);
 			try {
 				await runtime.commit(
-					async (tx) => {
+					async tx => {
 						const live = await tx.doc(LiveDoc, runtime.conversationId);
 						live.generation ??= { attempt };
 						changes.commit(live.generation, message, taken);
@@ -789,7 +789,7 @@ async function classify(
 		}, context);
 		return;
 	}
-	await runtime.hooks.each("afterResponse", (hook) => hook(message, runtime, context));
+	await runtime.hooks.each("afterResponse", hook => hook(message, runtime, context));
 	const calls = message.content.filter((content): content is ToolCall => content.type === "toolCall");
 	if (message.stopReason === "toolUse" && calls.length > 0) {
 		return startToolRound(runtime, request, message, calls, context);
@@ -857,7 +857,7 @@ async function classify(
  */
 async function answer(runtime: Runtime, message: AssistantMessage, context: Context): Promise<void> {
 	let continuation: UserInput | undefined;
-	await runtime.hooks.each("onYield", async (hook) => {
+	await runtime.hooks.each("onYield", async hook => {
 		if (continuation !== undefined) return;
 		continuation = (await hook(message, runtime, context))?.continue;
 	});
@@ -995,7 +995,7 @@ function takesContinuation(continuation: UserInput | undefined, boundary: Bounda
 	const items = boundary.inbox.items;
 	return (
 		continuation !== undefined &&
-		!items.some((item) => item.mode === "steer" || item.mode === "followUp") &&
+		!items.some(item => item.mode === "steer" || item.mode === "followUp") &&
 		!hasQueuedReset(items)
 	);
 }
@@ -1016,14 +1016,13 @@ async function startToolRound(
 	const conversationId = runtime.conversationId;
 	const messages =
 		request.messages ?? (await runtime.context(conversationId, context, { at: request.cutoff })).messages;
-	const offered = new Set(getCurrentTools(messages).map((tool) => tool.name));
+	const offered = new Set(getCurrentTools(messages).map(tool => tool.name));
 	// Read as the round starts; a tool is resolved as its tool task resolves it.
 	const tools = (await runtime.agent(context)).tools;
 	const sequential =
 		runtime.settings.toolExecution === "sequential" ||
 		calls.some(
-			(call) =>
-				offered.has(call.name) && tools.find((tool) => tool.name === call.name)?.executionMode === "sequential",
+			call => offered.has(call.name) && tools.find(tool => tool.name === call.name)?.executionMode === "sequential",
 		);
 	await runtime.commit(async (tx): Promise<Next> => {
 		const live = await tx.doc(LiveDoc, conversationId);
@@ -1079,15 +1078,15 @@ async function finishToolRound(
 		);
 	});
 	const slots = (await runtime.snapshot(LiveDoc, conversationId, context))?.tools ?? [];
-	const results = slots.flatMap((slot) => (slot.entry === undefined ? [] : [slot.entry]));
-	await runtime.hooks.each("afterTools", (hook) => hook(assistant, results, runtime, context));
+	const results = slots.flatMap(slot => (slot.entry === undefined ? [] : [slot.entry]));
+	await runtime.hooks.each("afterTools", hook => hook(assistant, results, runtime, context));
 	// In call order, the slots' order; a slot without a task (faulted or orphaned before it got one) has no control.
-	const ordered = slots.map((slot) => (slot.taskId === undefined ? undefined : controls.get(slot.taskId)));
+	const ordered = slots.map(slot => (slot.taskId === undefined ? undefined : controls.get(slot.taskId)));
 	// Every call of the round must ask to terminate.
-	const terminate = slots.length > 0 && ordered.every((control) => control?.terminate === true);
-	const added = ordered.flatMap((control) => control?.addTools ?? []);
+	const terminate = slots.length > 0 && ordered.every(control => control?.terminate === true);
+	const added = ordered.flatMap(control => control?.addTools ?? []);
 	// The last handoff in call order wins.
-	const handoff = ordered.findLast((control) => control?.handoff !== undefined)?.handoff;
+	const handoff = ordered.findLast(control => control?.handoff !== undefined)?.handoff;
 	// Read from the phase's agent, as every agent field; a `configure()` during the round applies at its end.
 	const maxTurns = (await runtime.agent(context)).maxTurns;
 	const afterRun = terminate && (await asksAfterRun(runtime, context));

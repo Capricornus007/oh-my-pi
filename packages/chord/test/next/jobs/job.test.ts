@@ -80,7 +80,7 @@ async function declared<A, R, S>(
 ): Promise<Declared<A, R, S> & { readonly host: Awaited<ReturnType<typeof loaded>>["host"] }> {
 	let found: Omit<Declared<A, R, S>, "errors"> | undefined;
 	const { host, errors } = await loaded(
-		(h) =>
+		h =>
 			h.serve(Store, (_, self) => {
 				const log = self.state(Log);
 				found = { self, log, job: self.job(definition, implement(self, log)) };
@@ -110,7 +110,7 @@ function gated(gate: Promise<void>) {
 
 /** The reported job errors, as `kind id: message`. */
 function jobReports(errors: readonly HostError[]): string[] {
-	return errors.flatMap((error) => {
+	return errors.flatMap(error => {
 		if (error.kind === "job_failed" || error.kind === "job_finish_failed") {
 			return [`${error.kind}: ${(error.error as Error).message}`];
 		}
@@ -172,7 +172,7 @@ describe("start", () => {
 
 	it("returns the same run for a key started twice in one transaction", async () => {
 		const { job, self } = await declared(Echo, () => ({ run: async ({ text }) => text }));
-		const [one, two] = await self.tx(async (tx) => {
+		const [one, two] = await self.tx(async tx => {
 			return [tx.start(job, { text: "a" }, { key: "k" }), tx.start(job, { text: "b" }, { key: "k" })];
 		}, context);
 		expect(two).toBe(one);
@@ -200,7 +200,7 @@ describe("start", () => {
 			expect(await rejection(job.start({ command: "b" }, context))).toMatchObject(busy);
 			runGate.resolve();
 			await vi.advanceTimersByTimeAsync(0);
-			expect(job.running.value.map((entry) => entry.phase)).toEqual(["finishing"]);
+			expect(job.running.value.map(entry => entry.phase)).toEqual(["finishing"]);
 			expect(await rejection(job.start({ command: "b" }, context))).toMatchObject(busy);
 			await vi.advanceTimersByTimeAsync(1_000);
 			await run.outcome(context);
@@ -211,7 +211,7 @@ describe("start", () => {
 	it("counts runs started earlier in the same transaction", async () => {
 		const { job, self } = await declared(Shell, () => ({ run: async () => ({ exit: 0 }) }));
 		const error = await rejection(
-			self.tx(async (tx) => {
+			self.tx(async tx => {
 				tx.start(job, { command: "a" });
 				tx.start(job, { command: "b" });
 			}, context),
@@ -260,7 +260,7 @@ describe("start", () => {
 
 	it("tx.start commits with the transaction's other writes, both or neither", async () => {
 		const { job, self, log } = await declared(Echo, () => ({ run: async ({ text }) => text }));
-		const run = await self.tx(async (tx) => {
+		const run = await self.tx(async tx => {
 			await append(tx, log, "requested");
 			return tx.start(job, { text: "a" });
 		}, context);
@@ -268,7 +268,7 @@ describe("start", () => {
 		expect((await run.outcome(context)).kind).toBe("done");
 		let discarded: Run<unknown> | undefined;
 		const error = await rejection(
-			self.tx(async (tx) => {
+			self.tx(async tx => {
 				await append(tx, log, "lost");
 				discarded = tx.start(job, { text: "b" });
 				throw new Error("changed my mind");
@@ -311,11 +311,11 @@ describe("start", () => {
 			run: async ({ text }) => {
 				seen.push(`run sees ${l.value.list.join(",")}`);
 				// Outside the batch and the line: a transaction of its own works.
-				await s.tx(async (tx) => append(tx, l, `from run ${text}`), context);
+				await s.tx(async tx => append(tx, l, `from run ${text}`), context);
 				return text;
 			},
 		}));
-		const run = await self.tx(async (tx) => {
+		const run = await self.tx(async tx => {
 			const started = tx.start(job, { text: "a" });
 			await append(tx, log, "written with the start");
 			seen.push("transaction done");
@@ -330,7 +330,7 @@ describe("start", () => {
 		let signalled: boolean | undefined;
 		const { job } = await declared(Echo, () => ({
 			run: async ({ text }, ctx) => {
-				await new Promise((resolve) => setTimeout(resolve, 20));
+				await new Promise(resolve => setTimeout(resolve, 20));
 				signalled = ctx.abortSignal?.aborted;
 				return text;
 			},
@@ -338,7 +338,7 @@ describe("start", () => {
 		const watch = await job.running.watch(context);
 		const aborts: Promise<string>[] = [];
 		// The watch's frame of the start's commit arrives before `run` starts.
-		watch.start(async (call) => {
+		watch.start(async call => {
 			if (call.kind !== "value" || aborts.length > 0) return;
 			for (const entry of call.value) aborts.push(job.abort(entry.id, context));
 		});
@@ -382,7 +382,7 @@ describe("start", () => {
 		const BadJob = defineJob("app.bad", { version: 1, args: obj({ text: str() }), result: str(), state: Bad });
 		const { job, self, log } = await declared(BadJob, () => ({ run: async ({ text }) => text }));
 		const error = await rejection(
-			self.tx(async (tx) => {
+			self.tx(async tx => {
 				await append(tx, log, "lost");
 				tx.start(job, { text: "a" });
 			}, context),
@@ -393,7 +393,7 @@ describe("start", () => {
 
 	it("is refused before its object is live and once it ended", async () => {
 		let early: Promise<unknown> | undefined;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				const log = self.state(Log);
 				const job = self.job(Echo, { run: async ({ text }) => text });
@@ -416,7 +416,7 @@ describe("start", () => {
 describe("self.job", () => {
 	it("is declared once per job name, only while the factory runs", async () => {
 		let later: Self | undefined;
-		const { host, errors } = await loaded((h) =>
+		const { host, errors } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				later = self;
 				self.job(Echo, { run: async ({ text }) => text });
@@ -427,7 +427,7 @@ describe("self.job", () => {
 		expect(await rejection(host.get(Item, { id: 1 }, context))).toMatchObject({
 			message: expect.stringContaining('job "app.echo" is declared twice'),
 		});
-		expect(errors.map((error) => error.kind)).toEqual(["activation_failed"]);
+		expect(errors.map(error => error.kind)).toEqual(["activation_failed"]);
 		expect(() => later!.job(Shell, { run: async () => ({ exit: 0 }) })).toThrow(
 			"app.item(1): self.job is valid only in the factory",
 		);
@@ -439,7 +439,7 @@ describe("run", () => {
 		let seen: Record<string, unknown> | undefined;
 		const host = createHost<TestPrincipal>({ principal: { kind: "server" }, onError: () => {} });
 		let job: JobHandle<{ text: string }, string, undefined> | undefined;
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(Store, (_, self) => {
 				job = self.job(Echo, {
 					run: async ({ text }, ctx) => {
@@ -464,7 +464,7 @@ describe("run", () => {
 		const { job } = await declared(Shell, () => ({
 			run: async (_, ctx) => {
 				values.push(ctx.state.value.output);
-				await ctx.state.change((d) => {
+				await ctx.state.change(d => {
 					d.output = "half";
 				}, ctx);
 				values.push(ctx.state.value.output);
@@ -487,12 +487,12 @@ describe("run", () => {
 		const Many = defineJob("app.many", { version: 1, args: obj({ n: int() }), result: int(), state: Progress });
 		let mine: SingletonHandle<{ output: string }> | undefined;
 		let job: JobHandle<{ n: number }, number, { output: string }> | undefined;
-		await loaded((h) =>
+		await loaded(h =>
 			h.serve(Store, (_, self) => {
 				mine = self.state(Progress);
 				job = self.job(Many, {
 					run: async ({ n }, ctx) => {
-						await ctx.state.change((d) => {
+						await ctx.state.change(d => {
 							d.output = `run ${n}`;
 						}, ctx);
 						await gate.promise;
@@ -504,13 +504,13 @@ describe("run", () => {
 		);
 		const runs = await Promise.all([job!.start({ n: 1 }, context), job!.start({ n: 2 }, context)]);
 		await flushed();
-		expect(job!.running.value.map((entry) => entry.phase !== "blocked" && entry.state.output)).toEqual([
+		expect(job!.running.value.map(entry => entry.phase !== "blocked" && entry.state.output)).toEqual([
 			"run 1",
 			"run 2",
 		]);
 		expect(mine!.value).toEqual({ output: "" });
 		gate.resolve();
-		expect((await Promise.all(runs.map((run) => run.outcome(context)))).map((o) => o.state.output)).toEqual([
+		expect((await Promise.all(runs.map(run => run.outcome(context)))).map(o => o.state.output)).toEqual([
 			"run 1",
 			"run 2",
 		]);
@@ -525,13 +525,13 @@ describe("run", () => {
 				return { exit: 0 };
 			},
 			// After run returned, before finish committed: refused; the outcome's state is the state at run's settle.
-			finish: async (outcome) => {
+			finish: async outcome => {
 				inFinish = [outcome.state, await rejection(captured!.state.change(() => {}, context))];
 			},
 		}));
 		await (await job.start({ command: "a" }, context)).outcome(context);
 		expect(inFinish).toEqual([{ output: "" }, expect.objectContaining({ code: "released" })]);
-		const late = captured!.state.change((d) => {
+		const late = captured!.state.change(d => {
 			d.output = "late";
 		}, context);
 		expect(await rejection(late)).toMatchObject({ code: "released" });
@@ -548,7 +548,7 @@ describe("run", () => {
 			run: async (_, ctx) => {
 				await go.promise;
 				// Admitted while run runs; it waits behind the transaction holding the line.
-				void ctx.state.change((d) => {
+				void ctx.state.change(d => {
 					d.output = "last words";
 				}, ctx);
 				returned = true;
@@ -575,7 +575,7 @@ describe("run", () => {
 		const { job, errors } = await declared(Shell, () => ({
 			run: async (_, ctx) => {
 				await untilAborted(ctx);
-				await ctx.state.change((d) => {
+				await ctx.state.change(d => {
 					d.output = "stopped cleanly";
 				}, ctx);
 				throw new Error("interrupted");
@@ -633,7 +633,7 @@ describe("run", () => {
 			members: { log: obj({ list: arr(str()) }) },
 		});
 		let job: JobHandle<{ text: string }, string, undefined> | undefined;
-		const { host } = await loaded((h) => {
+		const { host } = await loaded(h => {
 			h.serve(Other, (_, self) => ({ log: self.state(Log) }));
 			h.serve(Store, (_, self) => {
 				job = self.job(Echo, {
@@ -660,7 +660,7 @@ describe("run", () => {
 					await gate.promise;
 					late.resolve(
 						await rejection(
-							ctx.state.change((d) => {
+							ctx.state.change(d => {
 								d.output = "too late";
 							}, ctx),
 						),
@@ -699,7 +699,7 @@ describe("finish", () => {
 		const outcomes: string[] = [];
 		const { job, log, self } = await declared(Shell, (_, l) => ({
 			run: async ({ command }, ctx) => {
-				await ctx.state.change((d) => {
+				await ctx.state.change(d => {
 					d.output = `out ${command}`;
 				}, ctx);
 				if (command === "fail") throw new Error("no");
@@ -712,7 +712,7 @@ describe("finish", () => {
 		}));
 		// The log entry and the removed entry arrive in one commit: whenever the log's watch sees an entry, the run is gone.
 		const seen: [number, number][] = [];
-		(await log.watch(context)).start(async (call) => {
+		(await log.watch(context)).start(async call => {
 			if (call.kind === "value") seen.push([call.value.list.length, job.running.value.length]);
 		});
 		void self;
@@ -760,7 +760,7 @@ describe("finish", () => {
 		it("blocks the run after five failures in a row: outcome, state and key kept, not counted; abort drops it", async () => {
 			const { job, errors } = await declared(Shell, () => ({
 				run: async (_, ctx) => {
-					await ctx.state.change((d) => {
+					await ctx.state.change(d => {
 						d.output = "kept";
 					}, ctx);
 					return { exit: 0 };
@@ -783,12 +783,12 @@ describe("finish", () => {
 			expect(await job.start({ command: "b" }, context, { key: "k" })).toBe(run);
 			const other = await job.start({ command: "c" }, context, { key: "other" });
 			await vi.advanceTimersByTimeAsync(0);
-			expect(job.running.value.map((entry) => entry.phase)).toEqual(["blocked", "finishing"]);
+			expect(job.running.value.map(entry => entry.phase)).toEqual(["blocked", "finishing"]);
 			void job.abort(run.id, context);
 			await vi.advanceTimersByTimeAsync(0);
 			expect(await dropped).toMatchObject({ code: "aborted" });
-			expect(job.running.value.map((entry) => entry.id)).toEqual([other.id]);
-			expect(errors.filter((error) => error.kind === "job_dropped")).toEqual([
+			expect(job.running.value.map(entry => entry.id)).toEqual([other.id]);
+			expect(errors.filter(error => error.kind === "job_dropped")).toEqual([
 				{ kind: "job_dropped", object: "app.store", job: "app.shell", id: run.id },
 			]);
 		});
@@ -923,7 +923,7 @@ describe("running", () => {
 		await flushed();
 		const before = job.running.value;
 		const frames = framesOf(await job.running.watch(context));
-		await contexts.get("42")!.state.change((d) => {
+		await contexts.get("42")!.state.change(d => {
 			d.output = "x";
 		}, context);
 		await delivered();
@@ -955,7 +955,7 @@ describe("running", () => {
 		const frames = framesOf(await job.running.watch(context));
 		const data = () => Object.entries(counts()).filter(([name]) => name.startsWith("chord.data."));
 		const before = data();
-		await contexts[0]!.state.change((d) => {
+		await contexts[0]!.state.change(d => {
 			d.output = "x".repeat(10_000);
 		}, context);
 		await delivered();
@@ -987,12 +987,12 @@ describe("keep-alive", () => {
 		const gate = Promise.withResolvers<void>();
 		let job: JobHandle<{ text: string }, string, undefined> | undefined;
 		let ended = false;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(
 				Item,
 				(_, self) => {
 					job = self.job(Echo, { run: gated(gate.promise) });
-					self.onLive(async (ctx) => {
+					self.onLive(async ctx => {
 						await untilAborted(ctx);
 						ended = true;
 					});
@@ -1006,14 +1006,14 @@ describe("keep-alive", () => {
 		expect(host.activity.value.jobs).toBe(1);
 		expect(host.references(Item).value).toHaveLength(1);
 		item.release();
-		await new Promise((resolve) => setTimeout(resolve, 40));
+		await new Promise(resolve => setTimeout(resolve, 40));
 		expect(ended).toBe(false);
 		expect(host.references(Item).value).toHaveLength(0);
 		expect(host.activity.value).toMatchObject({ jobs: 1, lingering: 0 });
 		gate.resolve();
 		await flushed();
 		expect(host.activity.value).toMatchObject({ jobs: 0, lingering: 1 });
-		await new Promise((resolve) => setTimeout(resolve, 40));
+		await new Promise(resolve => setTimeout(resolve, 40));
 		expect(ended).toBe(true);
 		expect(host.activity.value).toMatchObject({ jobs: 0, lingering: 0 });
 	});
@@ -1023,7 +1023,7 @@ describe("keep-alive", () => {
 		const events: string[] = [];
 		let a: JobHandle<{ text: string }, string, undefined> | undefined;
 		let chained: Run<unknown> | undefined;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				self.open(
 					async () => null,
@@ -1031,7 +1031,7 @@ describe("keep-alive", () => {
 				);
 				const b = self.job(Echo, {
 					run: async ({ text }) => {
-						await new Promise((resolve) => setTimeout(resolve, 10));
+						await new Promise(resolve => setTimeout(resolve, 10));
 						events.push(`b ran ${text}`);
 						return text;
 					},
@@ -1048,7 +1048,7 @@ describe("keep-alive", () => {
 		const item = await host.get(Item, { id: 1 }, context);
 		await a!.start({ text: "x" }, context);
 		item.release();
-		await new Promise((resolve) => setTimeout(resolve, 40));
+		await new Promise(resolve => setTimeout(resolve, 40));
 		expect(await chained!.outcome(context)).toMatchObject({ kind: "done", result: "chained" });
 		expect(events).toEqual(["b ran chained", "object ended"]);
 		expect(host.activity.value.jobs).toBe(0);
@@ -1064,7 +1064,7 @@ describe("keep-alive", () => {
 		let job: JobHandle<{ text: string }, string, undefined> | undefined;
 		let ran = false;
 		const server = createHost<TestPrincipal>({ address: Server(), principal: { kind: "server" }, onError: () => {} });
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(View, (_, _principal, self) => {
 				job = self.job(Echo, {
 					run: async ({ text }) => {
@@ -1083,14 +1083,14 @@ describe("keep-alive", () => {
 		let closeOnSend = false;
 		// The server's end of the link closes while it sends: the client's hold, the last reference, goes at once.
 		const failing: Link = {
-			send: (message) => {
+			send: message => {
 				if (!closeOnSend) return a.send(message);
 				closeOnSend = false;
 				a.close();
 			},
-			onMessage: (listener) => a.onMessage(listener),
+			onMessage: listener => a.onMessage(listener),
 			close: () => a.close(),
-			onClose: (listener) => a.onClose(listener),
+			onClose: listener => a.onClose(listener),
 		};
 		server.accept(failing, { principal: { kind: "owner" } }, context);
 		client.connect(b, { principal: { kind: "server" } }, context);
@@ -1109,8 +1109,8 @@ describe("keep-alive", () => {
 		try {
 			let job: JobHandle<{ text: string }, string, undefined> | undefined;
 			const errors: HostError[] = [];
-			const host = createHost({ onError: (error) => errors.push(error) });
-			const facet = defineFacet((h) =>
+			const host = createHost({ onError: error => errors.push(error) });
+			const facet = defineFacet(h =>
 				h.serve(Item, (_, self) => {
 					job = self.job(Echo, {
 						run: async ({ text }) => text,
@@ -1126,7 +1126,7 @@ describe("keep-alive", () => {
 			const run = await job!.start({ text: "a" }, context);
 			item.release();
 			await vi.advanceTimersByTimeAsync(60_000);
-			expect(errors.map((error) => error.kind)).toEqual([...Array(5).fill("job_finish_failed"), "job_dropped"]);
+			expect(errors.map(error => error.kind)).toEqual([...Array(5).fill("job_finish_failed"), "job_dropped"]);
 			expect(await rejection(run.outcome(context))).toMatchObject({ code: "released" });
 			expect(host.activity.value.jobs).toBe(0);
 		} finally {
@@ -1137,7 +1137,7 @@ describe("keep-alive", () => {
 	it("keeps a lingering object when a run starts during its linger", async () => {
 		const gate = Promise.withResolvers<void>();
 		let job: JobHandle<{ text: string }, string, undefined> | undefined;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(
 				Item,
 				(_, self) => {
@@ -1151,7 +1151,7 @@ describe("keep-alive", () => {
 		expect(host.activity.value.lingering).toBe(1);
 		const run = await job!.start({ text: "a" }, context);
 		expect(host.activity.value).toMatchObject({ jobs: 1, lingering: 0 });
-		await new Promise((resolve) => setTimeout(resolve, 40));
+		await new Promise(resolve => setTimeout(resolve, 40));
 		gate.resolve();
 		expect((await run.outcome(context)).kind).toBe("done");
 	});
@@ -1173,16 +1173,16 @@ describe("object end", () => {
 		const server = createHost<TestPrincipal, Revocation>({
 			address: Server(),
 			principal: { kind: "server" },
-			revokedBy: (p) => (p.kind === "guest" ? [{ session: p.session }] : []),
+			revokedBy: p => (p.kind === "guest" ? [{ session: p.session }] : []),
 			onError: () => {},
 		});
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(Jobs, (_, _principal, self) => {
 				job = self.job(Echo, {
 					run: async ({ text }, ctx) => {
 						await untilAborted(ctx);
 						reason = ctx.abortSignal?.reason;
-						await new Promise((resolve) => setTimeout(resolve, 10));
+						await new Promise(resolve => setTimeout(resolve, 10));
 						finished.push("run stopped");
 						return text;
 					},
@@ -1204,7 +1204,7 @@ describe("object end", () => {
 		await flushed();
 		expect(reason).toMatchObject({ code: "forbidden", reason: "revoked" });
 		expect(await rejection(run.outcome(context))).toMatchObject({ code: "forbidden", reason: "revoked" });
-		await new Promise((resolve) => setTimeout(resolve, 30));
+		await new Promise(resolve => setTimeout(resolve, 30));
 		await transported();
 		expect(finished).toEqual(["run stopped"]);
 		expect(server.activity.value.jobs).toBe(0);
@@ -1219,10 +1219,10 @@ describe("object end", () => {
 		const server = createHost<TestPrincipal, Revocation>({
 			address: Server(),
 			principal: { kind: "server" },
-			revokedBy: (p) => (p.kind === "guest" ? [{ session: p.session }] : []),
+			revokedBy: p => (p.kind === "guest" ? [{ session: p.session }] : []),
 			onError: () => {},
 		});
-		const facet = defineFacet<TestPrincipal>((h) =>
+		const facet = defineFacet<TestPrincipal>(h =>
 			h.serve(Jobs, (_, _principal, self) => {
 				self.open(
 					async () => null,
@@ -1262,7 +1262,7 @@ describe("object end", () => {
 		const { job, host } = await declared(Echo, () => ({
 			run: async ({ text }, ctx) => {
 				await untilAborted(ctx);
-				await new Promise((resolve) => setTimeout(resolve, 10));
+				await new Promise(resolve => setTimeout(resolve, 10));
 				finished.push("run stopped");
 				return text;
 			},
@@ -1307,7 +1307,7 @@ describe("GC", () => {
 			}));
 			const run = await job.start({ text: "a" }, context);
 			await vi.advanceTimersByTimeAsync(60_000);
-			expect(job.running.value.map((entry) => entry.phase)).toEqual(["blocked"]);
+			expect(job.running.value.map(entry => entry.phase)).toEqual(["blocked"]);
 			const dropped = run.outcome(context).then(
 				() => new Error("expected a rejection"),
 				(error: Error) => error,
@@ -1361,7 +1361,7 @@ describe("GC", () => {
 	it("an ended object releases its runs, their documents and waiters", async () => {
 		const refs: WeakRef<object>[] = [];
 		let job: JobHandle<{ command: string }, { exit: number }, { output: string }> | undefined;
-		const { host } = await loaded((h) =>
+		const { host } = await loaded(h =>
 			h.serve(Item, (_, self) => {
 				job = self.job(Shell, {
 					run: async (args, ctx) => {

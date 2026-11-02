@@ -37,7 +37,7 @@ const own = createServer(async (message, res) => {
 	res.writeHead(response.status).end(Buffer.from(await response.arrayBuffer()));
 });
 own.on("upgrade", http.upgrade);
-await new Promise<void>((resolve) => own.listen(0, "127.0.0.1", resolve));
+await new Promise<void>(resolve => own.listen(0, "127.0.0.1", resolve));
 const address = own.address();
 const port = typeof address === "object" && address !== null ? address.port : 0;
 
@@ -54,8 +54,8 @@ for (const [method, host] of [
 	["TRACE", `127.0.0.1:${port}`],
 	["GET", `attacker@127.0.0.1:${port}`],
 ] as const) {
-	const status = await new Promise<number | undefined>((resolve) => {
-		request({ host: "127.0.0.1", port, method, path: "/notes", headers: { host } }, (response) => {
+	const status = await new Promise<number | undefined>(resolve => {
+		request({ host: "127.0.0.1", port, method, path: "/notes", headers: { host } }, response => {
 			response.resume();
 			resolve(response.statusCode);
 		}).end();
@@ -64,7 +64,7 @@ for (const [method, host] of [
 }
 
 // 5. The app closes its server and the component (it refuses, then waits for running requests), then the host.
-await new Promise((resolve) => own.close(resolve));
+await new Promise(resolve => own.close(resolve));
 await http.close(context);
 await server.close(context);
 plugins.close();

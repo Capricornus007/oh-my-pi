@@ -12,7 +12,7 @@ describe("canonicalJson", () => {
 	});
 
 	it("counts one walk", async () => {
-		expect(await counted((context) => canonicalJson({ a: [1, 2] }, context))).toEqual({
+		expect(await counted(context => canonicalJson({ a: [1, 2] }, context))).toEqual({
 			walks: 1,
 			validations: 0,
 			compilations: 0,
@@ -35,8 +35,8 @@ describe("principalKey", () => {
 
 	it("caches per principal object: no second walk", async () => {
 		const principal = { kind: "user", id: "u1" };
-		const first = await counted((context) => principalKey(principal, context));
-		const second = await counted((context) => principalKey(principal, context));
+		const first = await counted(context => principalKey(principal, context));
+		const second = await counted(context => principalKey(principal, context));
 		expect([first.walks, second.walks]).toEqual([1, 0]);
 	});
 

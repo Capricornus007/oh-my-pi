@@ -50,7 +50,7 @@ function schemaText(schema: unknown, parts: string[]): void {
 function searchText(tool: ToolRegistration): string {
 	const parts = [tool.description];
 	schemaText(tool.parameters, parts);
-	return parts.filter((part) => part.trim() !== "").join(" ");
+	return parts.filter(part => part.trim() !== "").join(" ");
 }
 
 export function createToolSearchTool() {
@@ -66,14 +66,14 @@ export function createToolSearchTool() {
 			const max = limit ?? DEFAULT_TOOL_SEARCH_LIMIT;
 			if (!Number.isInteger(max) || max <= 0) throw new Error("limit must be a positive integer");
 			const candidates = (await api.agent(context)).deferred;
-			const documents = candidates.map((tool) => ({ name: tool.name, text: searchText(tool) }));
+			const documents = candidates.map(tool => ({ name: tool.name, text: searchText(tool) }));
 			const loaded = rankDocuments(query, documents, max);
 			const text =
 				loaded.length === 0
 					? "No matching tools found."
 					: `Loaded ${loaded.length} tool${loaded.length === 1 ? "" : "s"}. They are available from your next call:\n${loaded
-							.map((name) => {
-								const description = candidates.find((tool) => tool.name === name)?.description ?? "";
+							.map(name => {
+								const description = candidates.find(tool => tool.name === name)?.description ?? "";
 								return `- ${name}: ${description.trim().split(/\r?\n/)[0]}`;
 							})
 							.join("\n")}`;

@@ -3,17 +3,18 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | { [key:
 type IsAny<T> = 0 extends 1 & T ? true : false;
 
 /** Strict-JSON representation of an application data type. Unknown payloads become JsonValue. */
-export type JsonRepresentation<T> = IsAny<T> extends true
-	? JsonValue
-	: unknown extends T
+export type JsonRepresentation<T> =
+	IsAny<T> extends true
 		? JsonValue
-		: T extends null | boolean | number | string
-			? T
-			: T extends readonly (infer TItem)[]
-				? JsonRepresentation<TItem>[]
-				: T extends object
-					? { [TKey in keyof T]: JsonRepresentation<T[TKey]> }
-					: never;
+		: unknown extends T
+			? JsonValue
+			: T extends null | boolean | number | string
+				? T
+				: T extends readonly (infer TItem)[]
+					? JsonRepresentation<TItem>[]
+					: T extends object
+						? { [TKey in keyof T]: JsonRepresentation<T[TKey]> }
+						: never;
 
 const DATA_DESCRIPTOR: PropertyDescriptor = {
 	value: undefined,
@@ -96,7 +97,7 @@ function check(value: unknown, ancestors: Set<object>): boolean {
 	if (Array.isArray(value)) {
 		if (Object.getPrototypeOf(value) !== Array.prototype) return false;
 		const keys = Reflect.ownKeys(value);
-		if (keys.length !== value.length + 1 || keys.some((key) => typeof key !== "string")) return false;
+		if (keys.length !== value.length + 1 || keys.some(key => typeof key !== "string")) return false;
 		if (ancestors.has(value)) return false;
 		ancestors.add(value);
 		try {
@@ -119,7 +120,7 @@ function check(value: unknown, ancestors: Set<object>): boolean {
 	if (typeof value !== "object" || value === null) return false;
 	const prototype = Object.getPrototypeOf(value);
 	if (prototype !== Object.prototype && prototype !== null) return false;
-	if (Reflect.ownKeys(value).some((key) => typeof key !== "string")) return false;
+	if (Reflect.ownKeys(value).some(key => typeof key !== "string")) return false;
 	if (ancestors.has(value)) return false;
 	ancestors.add(value);
 	try {

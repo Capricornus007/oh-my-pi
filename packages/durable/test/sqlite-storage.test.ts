@@ -121,11 +121,11 @@ class ReopeningStorage implements Storage {
 	}
 }
 
-registerStorageConformance({ describe, expect, it }, "SqliteStorage", async (use) =>
+registerStorageConformance({ describe, expect, it }, "SqliteStorage", async use =>
 	use((await createSqliteStorage()).storage),
 );
 
-registerStorageConformance({ describe, expect, it }, "SqliteStorage across reopen", async (use) => {
+registerStorageConformance({ describe, expect, it }, "SqliteStorage across reopen", async use => {
 	const directory = await mkdtemp(join(tmpdir(), "pi-durable-sqlite-conformance-"));
 	const path = join(directory, "storage.sqlite");
 	const created = await openNodeSqliteStorage(path);
@@ -226,8 +226,8 @@ describe("Pico SqliteStorage", () => {
 			const names = database
 				.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'index') AND name NOT LIKE 'sqlite_%'")
 				.all()
-				.map((row) => String(row.name));
-			expect(names.filter((name) => !name.startsWith("pi_"))).toEqual(["tasks"]);
+				.map(row => String(row.name));
+			expect(names.filter(name => !name.startsWith("pi_"))).toEqual(["tasks"]);
 			expect(names).toContain("pi_tasks");
 		} finally {
 			database.close();
@@ -484,7 +484,7 @@ describe("Pico SqliteStorage", () => {
 						WHERE document_id = ? AND seq > ? AND seq <= ? ORDER BY seq`)
 					.all(1, 5, 10),
 			];
-			const details = plans.map((plan) => plan.map((row) => (row as { readonly detail: string }).detail).join("\n"));
+			const details = plans.map(plan => plan.map(row => (row as { readonly detail: string }).detail).join("\n"));
 			expect(details[0]).toContain("documents_by_address");
 			expect(details[1]).toContain("documents_by_address");
 			expect(details[2]).toContain("documents_by_scope_kind");
@@ -699,16 +699,16 @@ describe("SqliteStorage batches", () => {
 			let failCheck = false;
 			let reads = 0;
 			const faulty: SqliteDatabase = {
-				exec: (sql) => database.exec(sql),
+				exec: sql => database.exec(sql),
 				run: (sql, ...params) => database.run(sql, ...params),
 				runCounted: (sql, ...params) => database.runCounted(sql, ...params),
 				get: (sql, ...params) => database.get(sql, ...params),
 				all: (sql, ...params) => database.all(sql, ...params),
 				close: () => database.close(),
-				transaction: (callback) =>
-					database.transaction((transaction) =>
+				transaction: callback =>
+					database.transaction(transaction =>
 						callback({
-							exec: (sql) => transaction.exec(sql),
+							exec: sql => transaction.exec(sql),
 							run: (sql, ...params) => transaction.run(sql, ...params),
 							runCounted: (sql, ...params) => transaction.runCounted(sql, ...params),
 							all: (sql, ...params) => transaction.all(sql, ...params),
@@ -726,13 +726,13 @@ describe("SqliteStorage batches", () => {
 			openStorages.add(storage);
 			await commitWrites(storage, [{ type: "conversation", value: { id: ROOT_CONVERSATION_ID } }], context);
 			const ids = [await storage.mintId<EntryId>(), await storage.mintId<EntryId>()];
-			const batches: StorageWrite[][] = ids.map((id) => [
+			const batches: StorageWrite[][] = ids.map(id => [
 				{ type: "entry", value: { id, conversationId: ROOT_CONVERSATION_ID, kind: "note" } },
 			]);
 			failCheck = true;
 			const receipts: number[] = [];
 			const outcome = await storage
-				.commit(batches, (index) => receipts.push(index), context)
+				.commit(batches, index => receipts.push(index), context)
 				.then(
 					() => "resolved",
 					() => "rejected",
@@ -761,16 +761,16 @@ describe("SqliteStorage batches", () => {
 			// A driver failure in a check's read, armed for the next batch call.
 			let failCheck = false;
 			const faulty: SqliteDatabase = {
-				exec: (sql) => database.exec(sql),
+				exec: sql => database.exec(sql),
 				run: (sql, ...params) => database.run(sql, ...params),
 				runCounted: (sql, ...params) => database.runCounted(sql, ...params),
 				get: (sql, ...params) => database.get(sql, ...params),
 				all: (sql, ...params) => database.all(sql, ...params),
 				close: () => database.close(),
-				transaction: (callback) =>
-					database.transaction((transaction) =>
+				transaction: callback =>
+					database.transaction(transaction =>
 						callback({
-							exec: (sql) => transaction.exec(sql),
+							exec: sql => transaction.exec(sql),
 							run: (sql, ...params) => transaction.run(sql, ...params),
 							runCounted: (sql, ...params) => transaction.runCounted(sql, ...params),
 							all: (sql, ...params) => transaction.all(sql, ...params),
@@ -786,15 +786,15 @@ describe("SqliteStorage batches", () => {
 			await commitWrites(storage, [{ type: "conversation", value: { id: ROOT_CONVERSATION_ID } }], context);
 			const first = await storage.mintId<EntryId>();
 			const second = await storage.mintId<EntryId>();
-			const batches: StorageWrite[][] = [first, second].map((id) => [
+			const batches: StorageWrite[][] = [first, second].map(id => [
 				{ type: "entry", value: { id, conversationId: ROOT_CONVERSATION_ID, kind: "note" } },
 			]);
 			failCheck = true;
 			const receipts: number[] = [];
 			const outcome = await storage
-				.commit(batches, (index) => receipts.push(index), context)
+				.commit(batches, index => receipts.push(index), context)
 				.then(
-					(result) => ({ kind: "resolved", result }),
+					result => ({ kind: "resolved", result }),
 					() => ({ kind: "rejected" }),
 				);
 			failCheck = false;
@@ -805,7 +805,7 @@ describe("SqliteStorage batches", () => {
 			// Durable's own check still refuses, keeping the batches before it.
 			const refused = await storage.commit(
 				[batches[0]!, [{ type: "conversation", value: { id: ROOT_CONVERSATION_ID } }]],
-				(index) => receipts.push(index),
+				index => receipts.push(index),
 				context,
 			);
 			expect(refused.stored).toBe(1);

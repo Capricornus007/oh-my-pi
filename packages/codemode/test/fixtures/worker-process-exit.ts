@@ -11,7 +11,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let workerExited = false;
 const sandbox = new CodemodeSandbox({
 	memoryLimitBytes: 256 * 1024 * 1024,
-	onWorkerStarted: (exited) => {
+	onWorkerStarted: exited => {
 		void exited.then(() => {
 			workerExited = true;
 		});

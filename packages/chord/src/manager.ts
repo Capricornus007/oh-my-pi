@@ -88,7 +88,7 @@ export async function processLock(name: string): Promise<() => Promise<void>> {
 			: file
 				? await lockSocketPath(`chord2-${key}.sock`)
 				: `\0chord2-${key}`;
-	const server = createServer((socket) => socket.end());
+	const server = createServer(socket => socket.end());
 	for (;;) {
 		try {
 			await new Promise<void>((resolve, reject) => {
@@ -118,7 +118,7 @@ export async function processLock(name: string): Promise<() => Promise<void>> {
 	return () =>
 		new Promise<void>((resolve, reject) => {
 			if (file) process.removeListener("exit", removeFile);
-			server.close((error) => (error ? reject(error) : resolve()));
+			server.close(error => (error ? reject(error) : resolve()));
 		});
 }
 
@@ -144,7 +144,7 @@ async function lockSocketPath(file: string): Promise<string> {
 }
 
 function accepting(address: string): Promise<boolean> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const socket = connect(address);
 		socket.once("connect", () => {
 			socket.destroy();
@@ -192,7 +192,7 @@ export function forkDriver(options: ForkDriverOptions): Driver {
 					// No group left.
 				}
 			};
-			const exited = new Promise<Exit>((resolve) => {
+			const exited = new Promise<Exit>(resolve => {
 				child.once("exit", (code, signal) => {
 					// However the leader ended (graceful, crash, kill), nothing it spawned outlives it.
 					killGroup();
@@ -200,7 +200,7 @@ export function forkDriver(options: ForkDriverOptions): Driver {
 				});
 			});
 			const listeners = new Set<(message: ControlMessage) => void>();
-			child.on("message", (message) => {
+			child.on("message", message => {
 				options.onMessage?.(message);
 				const control = (message as { chord2control?: ControlMessage } | null)?.chord2control;
 				if (control !== undefined) for (const listener of listeners) listener(control);
@@ -222,7 +222,7 @@ export function forkDriver(options: ForkDriverOptions): Driver {
 						child.kill("SIGKILL");
 					}
 				},
-				onControl: (listener) => listeners.add(listener),
+				onControl: listener => listeners.add(listener),
 			};
 		},
 	};
@@ -288,7 +288,7 @@ export function createHostManager(options: HostManagerOptions): HostManager {
 		let graceTimer: ReturnType<typeof setTimeout> | undefined;
 		const graceful = await Promise.race([
 			current.exited.then(() => true),
-			new Promise<boolean>((resolve) => {
+			new Promise<boolean>(resolve => {
 				graceTimer = setTimeout(() => resolve(false), options.grace ?? 5000);
 			}),
 		]);
@@ -313,7 +313,7 @@ export function createHostManager(options: HostManagerOptions): HostManager {
 			throw error;
 		}
 		instance = current;
-		current.exited.then((exit) => {
+		current.exited.then(exit => {
 			if (instance === current) {
 				instance = undefined;
 				status = "stopped";
@@ -330,12 +330,12 @@ export function createHostManager(options: HostManagerOptions): HostManager {
 				clearTimeout(timeout);
 				fn();
 			};
-			current.exited.then((exit) =>
+			current.exited.then(exit =>
 				settle(() =>
 					reject(new ChordError("unavailable", `child exited before ready (${exit.code ?? exit.signal})`)),
 				),
 			);
-			current.onControl((message) => {
+			current.onControl(message => {
 				if (message.type === "ready") settle(resolve);
 				else if (message.type === "fatal")
 					settle(() =>
@@ -408,7 +408,7 @@ export function childControl(channel: NodeJS.Process = process): {
 		if (channel.connected) channel.send?.({ chord2control: message }, undefined, undefined, ignoreSendError);
 	};
 	let resolveInit: (value: unknown) => void = () => {};
-	const init = new Promise<unknown>((resolve) => {
+	const init = new Promise<unknown>(resolve => {
 		resolveInit = resolve;
 	});
 	const shutdown = new Set<() => void | Promise<void>>();
@@ -437,7 +437,7 @@ export function childControl(channel: NodeJS.Process = process): {
 		},
 		ready: () => send({ type: "ready" }),
 		fatal,
-		report: (status) => send({ type: "status", ...status }),
-		onShutdown: (handler) => shutdown.add(handler),
+		report: status => send({ type: "status", ...status }),
+		onShutdown: handler => shutdown.add(handler),
 	};
 }

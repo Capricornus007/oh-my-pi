@@ -49,11 +49,11 @@ const Timing = defineExtension({
 	name: "timing",
 	hooks: [
 		hook(ToolTask, {
-			beforeTool: (call) => {
+			beforeTool: call => {
 				if (isBigCat(call)) start = Date.now();
 				return undefined;
 			},
-			afterTool: (call) => {
+			afterTool: call => {
 				if (isBigCat(call)) console.log(`cat /tmp/1gb.txt took ${Date.now() - start} ms`);
 				return undefined;
 			},
@@ -70,7 +70,7 @@ registry.install(Timing);
 const storage = await openNodeJsonlStorage(directory, context);
 const harness = await Harness.open(
 	storage,
-	{ models, registry, env: (target) => new NodeExecutionEnv({ cwd: target.cwd ?? process.cwd() }) },
+	{ models, registry, env: target => new NodeExecutionEnv({ cwd: target.cwd ?? process.cwd() }) },
 	context,
 );
 const root = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" }, cwd: directory } });
@@ -85,14 +85,14 @@ for (const entry of [...transcript.items].reverse()) {
 		continue;
 	}
 	const result = entry.model![0] as ToolResultMessage;
-	const text = result.content.map((item) => (item.type === "text" ? item.text : "")).join("");
+	const text = result.content.map(item => (item.type === "text" ? item.text : "")).join("");
 	console.log(
 		`${entry.kind} ${result.toolName}:`,
 		JSON.stringify(text.length > 200 ? `${text.slice(0, 200)}…` : text),
 	);
 }
 if (settled.status === "done" && settled.type === "input") {
-	const answer = await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+	const answer = await root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 	const message = answer?.model?.[0];
 	console.log("answer:", message?.role === "assistant" ? message.content : message);
 }

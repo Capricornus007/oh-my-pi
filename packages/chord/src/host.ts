@@ -326,7 +326,7 @@ export class HostImpl implements Host, HostCore {
 		this.principal = options.self;
 		this.#principalKey = options.principalKey ?? canonicalJson;
 		this.#selfKey = this.#principalKey(options.self);
-		this.#onError = options.onError ?? ((error) => console.error("chord:", error));
+		this.#onError = options.onError ?? (error => console.error("chord:", error));
 		this.#loader = options.loader;
 		this.taskStopDeadline = options.taskStopDeadline ?? 5000;
 		this.readyTimeout = options.readyTimeout ?? 60_000;
@@ -399,14 +399,14 @@ export class HostImpl implements Host, HostCore {
 		}
 		this.facets.set(facet.name, facet);
 		this.facetRunChanged(facet.name, run);
-		const refs = added.filter(hostLifetime).map((service) => this.startHostObject(service));
+		const refs = added.filter(hostLifetime).map(service => this.startHostObject(service));
 		return options.awaitHostObjects === false ? Promise.resolve() : this.#hostObjectsReady(refs);
 	}
 
 	async load(plugins: readonly PluginRef[], options: LoadOptions = {}): Promise<void> {
 		const facets = await this.resolve(plugins);
 		// No await between installs: a host object's factory may consume a type served by a later facet.
-		await Promise.all(facets.map((facet) => this.install(facet, options)));
+		await Promise.all(facets.map(facet => this.install(facet, options)));
 	}
 
 	ready(): Promise<void> {
@@ -414,7 +414,7 @@ export class HostImpl implements Host, HostCore {
 	}
 
 	#hostObjectsReady(refs: Iterable<RefCore>): Promise<void> {
-		const ready = Promise.all([...refs].map((ref) => ref.ready)).then(() => {});
+		const ready = Promise.all([...refs].map(ref => ref.ready)).then(() => {});
 		// Ignoring install's return still reports through onError without an unhandled rejection.
 		ready.catch(() => {});
 		return ready;
@@ -429,7 +429,7 @@ export class HostImpl implements Host, HostCore {
 			);
 		}
 		const loaded = modules.length > 0 && this.#loader !== undefined ? await this.#loader(modules) : [];
-		return plugins.map((ref) => (isFacet(ref) ? ref : loaded.shift()!));
+		return plugins.map(ref => (isFacet(ref) ? ref : loaded.shift()!));
 	}
 
 	facetApi(serve: Serve, signal: AbortSignal): FacetApi {
@@ -437,7 +437,7 @@ export class HostImpl implements Host, HostCore {
 			serve,
 			name: this.name,
 			root: (fn, options) => this.root(fn, options),
-			registry: (registry) => this.registry(registry),
+			registry: registry => this.registry(registry),
 			signal,
 		};
 	}
@@ -692,7 +692,7 @@ export class HostImpl implements Host, HostCore {
 	foreignRootEnded(rootId: string, from: Connection): void {
 		const links = this.#foreign.get(rootId);
 		if (links === undefined || !links.delete(from) || links.size > 0) return;
-		const running = [...this.codeVersions.values()].some((codeVersion) => codeVersion.roots.has(rootId));
+		const running = [...this.codeVersions.values()].some(codeVersion => codeVersion.roots.has(rootId));
 		// Still running here (a call in flight): the lease ends when it settles.
 		if (running) this.#foreign.delete(rootId);
 		else this.endRoot(rootId);
@@ -763,20 +763,20 @@ export class HostImpl implements Host, HostCore {
 		if (installed === undefined || installed.decls === object.decls) return;
 		const kept = object.allDecls();
 		const keep = <T>(pick: (decls: Decls) => Iterable<T>): Set<T> =>
-			new Set([...kept].flatMap((decls) => [...pick(decls)]));
-		const refs = keep((decls) => decls.refs.values());
-		const resources = keep((decls) => decls.resources.values());
-		const derives = keep((decls) => decls.derives.values());
+			new Set([...kept].flatMap(decls => [...pick(decls)]));
+		const refs = keep(decls => decls.refs.values());
+		const resources = keep(decls => decls.resources.values());
+		const derives = keep(decls => decls.derives.values());
 		for (const derived of installed.decls.derives.values()) if (!derives.has(derived)) derived.detach();
 		const closing = [...installed.decls.resources.values()]
-			.filter((resource) => !resources.has(resource))
+			.filter(resource => !resources.has(resource))
 			.sort((a, b) => object.openOrder.indexOf(b) - object.openOrder.indexOf(a));
-		const releasing = [...installed.decls.refs.values()].filter((ref) => !refs.has(ref));
+		const releasing = [...installed.decls.refs.values()].filter(ref => !refs.has(ref));
 		object.refreshSchemas();
 		runAll(
 			[
-				...closing.map((resource) => () => resource.close(object.openOrder)),
-				...releasing.map((ref) => () => ref.release()),
+				...closing.map(resource => () => resource.close(object.openOrder)),
+				...releasing.map(ref => () => ref.release()),
 			],
 			`${object.address}: retiring code version ${codeVersion} failed`,
 		).catch((error: unknown) => this.report(error));
@@ -794,7 +794,7 @@ export class HostImpl implements Host, HostCore {
 		return {
 			table,
 			get: (key, ctx) => table(ctx).get(key),
-			subscribe: (listener) => {
+			subscribe: listener => {
 				let set = this.#subscribers.get(registry.name);
 				if (set === undefined) {
 					set = new Set();
@@ -854,8 +854,8 @@ export class HostImpl implements Host, HostCore {
 	/** Live objects with their current declarations; objects waiting for a reload's commit only with `candidates`. */
 	liveDecls(candidates = false): [ObjectImpl, Decls][] {
 		return [...this.objects.values()]
-			.filter((object) => object.status === "live" && (candidates || !object.deferredRuntime))
-			.map((object) => [object, object.decls]);
+			.filter(object => object.status === "live" && (candidates || !object.deferredRuntime))
+			.map(object => [object, object.decls]);
 	}
 
 	checkRegistrations(object: ObjectImpl, decls: Decls): void {
@@ -930,7 +930,7 @@ export class HostImpl implements Host, HostCore {
 			}
 		}
 		const matching = [...this.objects.values()].filter(
-			(object) => !this.isSelf(object.principal) && matches(object.principal),
+			object => !this.isSelf(object.principal) && matches(object.principal),
 		);
 		await disposeHoldersFirst(matching, reason, "invalidatePrincipal: disposal failed");
 	}
@@ -1030,7 +1030,7 @@ export class HostImpl implements Host, HostCore {
 	/** Resolves once no reload runs on this host. */
 	whenReloadEnded(): Promise<void> {
 		if (!this.reloading) return Promise.resolve();
-		return new Promise((resolve) => this.#reloadWaiters.push(resolve));
+		return new Promise(resolve => this.#reloadWaiters.push(resolve));
 	}
 
 	connectionClosed(connection: Connection): void {
@@ -1073,7 +1073,7 @@ export class HostImpl implements Host, HostCore {
 	/** A downstream host connection by its configured name (never by what a peer announced). */
 	#childNamed(name: string): Connection | undefined {
 		return [...this.connections].find(
-			(connection) =>
+			connection =>
 				connection.open &&
 				connection.role === "downstream" &&
 				connection.peer.kind === "host" &&
@@ -1112,7 +1112,7 @@ export class HostImpl implements Host, HostCore {
 	#hold(binding: RemoteBinding): void {
 		const bindWhenSynced = (connection: Promise<Connection>): void => {
 			connection.then(
-				(target) => {
+				target => {
 					if (!binding.ended && binding.hold === undefined) target.hold(binding, false);
 				},
 				(error: unknown) => binding.gone(error),
@@ -1150,7 +1150,7 @@ export class HostImpl implements Host, HostCore {
 		const link = await route.resolve(hostName);
 		// Admitted before the checks: a host the route spawned for a request that is gone or refused meanwhile still runs,
 		// and its own references to this host would otherwise wait on a link nobody reads until they time out.
-		let connection = [...this.connections].find((candidate) => candidate.link === link);
+		let connection = [...this.connections].find(candidate => candidate.link === link);
 		connection ??= this.#addConnection(link, {
 			role: "downstream",
 			principal: route.principal(hostName),
@@ -1194,7 +1194,7 @@ export class HostImpl implements Host, HostCore {
 			);
 		}
 		const children = [...this.connections].some(
-			(connection) => connection.role === "downstream" && connection.peer.kind === "host",
+			connection => connection.role === "downstream" && connection.peer.kind === "host",
 		);
 		return children || options.remote !== undefined || options.remoteRemove !== undefined
 			? runClusterReload(this, plugins, options)
@@ -1213,10 +1213,10 @@ export class HostImpl implements Host, HostCore {
 			const modules = remote?.[prefix] ?? [];
 			const removed = remove?.[prefix] ?? [];
 			this.remoteModules[prefix] = [...new Set([...(this.remoteModules[prefix] ?? []), ...modules])].filter(
-				(module) => !removed.includes(module),
+				module => !removed.includes(module),
 			);
 			this.remoteRemoved[prefix] = [...new Set([...(this.remoteRemoved[prefix] ?? []), ...removed])].filter(
-				(module) => !modules.includes(module),
+				module => !modules.includes(module),
 			);
 		}
 	}
@@ -1257,16 +1257,16 @@ async function disposeHoldersFirst(objects: readonly ObjectImpl[], reason: unkno
 		}
 		return result;
 	};
-	const refs = new Map(objects.map((object) => [object, held(object)] as const));
+	const refs = new Map(objects.map(object => [object, held(object)] as const));
 	const errors: unknown[] = [];
 	while (remaining.size > 0) {
 		const heldByRemaining = new Set<ObjectImpl>();
 		for (const object of remaining) for (const target of refs.get(object) ?? []) heldByRemaining.add(target);
-		let wave = [...remaining].filter((object) => !heldByRemaining.has(object));
+		let wave = [...remaining].filter(object => !heldByRemaining.has(object));
 		// A cycle cannot happen in-host; dispose the rest together rather than loop.
 		if (wave.length === 0) wave = [...remaining];
 		for (const object of wave) remaining.delete(object);
-		const results = await Promise.allSettled(wave.map((object) => object.dispose(true, reason)));
+		const results = await Promise.allSettled(wave.map(object => object.dispose(true, reason)));
 		for (const result of results) if (result.status === "rejected") errors.push(result.reason);
 	}
 	if (errors.length === 1) throw errors[0];

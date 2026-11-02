@@ -6,7 +6,7 @@ import { MemoryStorage } from "../src/storage/memory.ts";
 import { commitWrites } from "../src/testing/commit-writes.ts";
 import { type EntryId, ROOT_CONVERSATION_ID, type Seq, type StorageWrite } from "../src/types.ts";
 
-registerStorageConformance({ describe, expect, it }, "MemoryStorage", (use) => use(new MemoryStorage()));
+registerStorageConformance({ describe, expect, it }, "MemoryStorage", use => use(new MemoryStorage()));
 
 it("does not expose retained state through a prepared commit", async () => {
 	const storage = new MemoryStorage();
@@ -58,9 +58,7 @@ it("delivers the receipts of the batches applied before one whose apply throws, 
 	const receipts: [number, Seq][] = [];
 	await expect(
 		storage.commit(
-			[first, second].map((id) => [
-				{ type: "entry", value: { id, conversationId: ROOT_CONVERSATION_ID, kind: "m" } },
-			]),
+			[first, second].map(id => [{ type: "entry", value: { id, conversationId: ROOT_CONVERSATION_ID, kind: "m" } }]),
 			(index, seq) => receipts.push([index, seq]),
 			BACKGROUND_CONTEXT,
 		),

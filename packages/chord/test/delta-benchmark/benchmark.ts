@@ -163,14 +163,14 @@ const metricNames = [
 	"maxRssMiB",
 ] as const satisfies readonly (keyof Result)[];
 
-const summary = scenarios.flatMap((scenario) =>
-	modes.map((mode) => {
-		const selected = results.filter((result) => result.mode === mode && result.scenario === scenario);
+const summary = scenarios.flatMap(scenario =>
+	modes.map(mode => {
+		const selected = results.filter(result => result.mode === mode && result.scenario === scenario);
 		const averages: Record<string, number | null> = {};
 		const medians: Record<string, number | null> = {};
 		const ranges: Record<string, readonly [number, number] | null> = {};
 		for (const metric of metricNames) {
-			const values = selected.map((result) => result[metric]);
+			const values = selected.map(result => result[metric]);
 			averages[metric] = average(values);
 			medians[metric] = median(values);
 			ranges[metric] = range(values);

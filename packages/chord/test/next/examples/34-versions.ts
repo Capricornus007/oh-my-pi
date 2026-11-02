@@ -36,7 +36,7 @@ const NotesV1 = remote("example.notes", {
 	hostAddress: () => Server(),
 	variants: { editor: { state: { notes: arr(str()) }, methods: { add: method(obj({ text: str() }), int()) } } },
 });
-const NotesV2 = evolve(NotesV1, (e) =>
+const NotesV2 = evolve(NotesV1, e =>
 	e
 		.state("editor", "notes", arr(obj({ text: str(), tag: str() })))
 		.method("add", obj({ text: str(), tag: str() }), obj({ count: int() })),
@@ -59,7 +59,7 @@ function serveV2(host: FacetHost<Principal>): void {
 				members: {
 					notes: self.derive([list], ([value]) => value.notes),
 					add: async ({ text, tag }, ctx) => {
-						await list.change((draft) => void draft.notes.push({ text, tag }), ctx);
+						await list.change(draft => void draft.notes.push({ text, tag }), ctx);
 						return { count: list.value.notes.length };
 					},
 				},
@@ -68,8 +68,8 @@ function serveV2(host: FacetHost<Principal>): void {
 		{
 			accepts: {
 				1: {
-					state: { editor: { notes: (current) => current.map(({ text }) => text) } },
-					methods: { add: { args: (old) => ({ ...old, tag: "untagged" }), result: (current) => current.count } },
+					state: { editor: { notes: current => current.map(({ text }) => text) } },
+					methods: { add: { args: old => ({ ...old, tag: "untagged" }), result: current => current.count } },
 				},
 			},
 		},
@@ -85,7 +85,7 @@ function serveV1(host: FacetHost<Principal>): void {
 			members: {
 				notes: self.derive([list], ([value]) => value.notes.map(({ text }) => text)),
 				add: async ({ text }, ctx) => {
-					await list.change((draft) => void draft.notes.push({ text, tag: "" }), ctx);
+					await list.change(draft => void draft.notes.push({ text, tag: "" }), ctx);
 					return list.value.notes.length;
 				},
 			},
@@ -104,7 +104,7 @@ tab.connect(down, { principal: { kind: "server" } }, context);
 const old = await tab.get(NotesV1, {}, context);
 await old.add({ text: "milk" }, context);
 const watch = await old.notes.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("   tab frame:", JSON.stringify(call.ops));
 });
 console.log("1. v1 everywhere:", old.notes.value);
@@ -112,12 +112,12 @@ console.log("1. v1 everywhere:", old.notes.value);
 // 2. The server reloads to v2 with `accepts[1]`: the old tab's hold is kept; its version is an older one now, so it is
 // bound again through the mapping (one snapshot), and from then on gets the mapped diffs.
 await server.reload([{ name: "@example/notes", facet: defineFacet<Principal>(serveV2) }], context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("2. server on v2; the old tab still reads", old.notes.value, "and its state:", old.state.value.kind);
 
 // 3. The old tab calls v1's `add`: its args are mapped forwards, the v2 result mapped back to v1's count.
 console.log("3. old add returned", await old.add({ text: "eggs" }, context));
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 // A new tab (v2 code) on the same object sees the tags.
 const fresh = await tab.get(NotesV2, {}, context);
 console.log("   a v2 consumer reads", JSON.stringify(fresh.notes.value));
@@ -141,7 +141,7 @@ let release: (() => void) | undefined;
 
 /** The exports plugin with `job` (v1 or v2): its `run` waits for `release` once, its `finish` prints the outcome. */
 function exportsPlugin(code: string, job: typeof ExportV1 | typeof ExportV2) {
-	return defineFacet<Principal>((host) =>
+	return defineFacet<Principal>(host =>
 		host.serve(Exports, (_, self) => {
 			// One handle for either version of the job (the two definitions' types differ).
 			const handle = (
@@ -154,7 +154,7 @@ function exportsPlugin(code: string, job: typeof ExportV1 | typeof ExportV2) {
 				}
 			)(job, {
 				run: async (args: { path: string }) => {
-					await new Promise<void>((resolve) => {
+					await new Promise<void>(resolve => {
 						release = resolve;
 					});
 					return job.version === 1 ? `${args.path}.md` : { file: `${args.path}.out` };
@@ -174,11 +174,11 @@ const worker = createHost<Principal>({ onError: () => {} });
 await worker.load([{ name: "@example/exports", facet: exportsPlugin("v1 code", ExportV1) }], context);
 const exportsRef = await worker.get(Exports, {}, context);
 await exportsRef.start({ path: "notes" }, context);
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise(resolve => setTimeout(resolve, 0));
 await worker.reload([{ name: "@example/exports", facet: exportsPlugin("v2 code", ExportV2) }], context);
 console.log("4. after the reload, running shows the v1 run mapped:", JSON.stringify(exportsRef.running.value));
 release?.();
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("   running is empty again:", JSON.stringify(exportsRef.running.value));
 
 await worker.close(context);

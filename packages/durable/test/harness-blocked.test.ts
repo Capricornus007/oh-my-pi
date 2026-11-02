@@ -44,7 +44,7 @@ function crashLoop(state: { crashing: boolean; started: number }) {
 			run: async (_task, runtime, ctx) => {
 				state.started++;
 				if (state.crashing)
-					await new Promise<void>((resolve) => runtime.signal.addEventListener("abort", () => resolve()));
+					await new Promise<void>(resolve => runtime.signal.addEventListener("abort", () => resolve()));
 				else await runtime.commit(() => completed(null), ctx);
 			},
 		},
@@ -70,7 +70,7 @@ async function openWith(path: string, registry: Registry, settings: { restartLim
 	const { harness, infos } = await openTasks(storage, [], {
 		registry,
 		settings,
-		onWake: (wake) => wakes.push(wake),
+		onWake: wake => wakes.push(wake),
 	});
 	const kill = (): void => {
 		dead = true;
@@ -92,10 +92,9 @@ describe("recovery at open", () => {
 		const registry = createRegistry();
 		registry.install(defineExtension({ name: "held", tasks: [Held] }));
 		const first = await openWith(path, registry);
-		const id = await (await first.harness.root(context)).commit(
-			(tx) => tx.createTask(Held, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await first.harness.root(context)
+		).commit(tx => tx.createTask(Held, null, { ownership: { kind: "conversation" } }), context);
 		await first.harness.close(context);
 		// A crash left the task holding its outcome: the next open's recovery pass makes it terminal.
 		const raw = await openNodeSqliteStorage(path);
@@ -125,7 +124,7 @@ describe("recovery at open", () => {
 			},
 		});
 		const wakes: Wake[] = [];
-		const { harness } = await openTasks(failing, [], { registry, onWake: (wake) => wakes.push(wake) });
+		const { harness } = await openTasks(failing, [], { registry, onWake: wake => wakes.push(wake) });
 		expect((await harness.closed).kind).toBe("failed");
 		// The host was told work is underway, and never that it ended: its recovery alarm stays.
 		expect(wakes).toEqual([{ active: true }]);
@@ -142,7 +141,7 @@ describe("tasks that cannot run", () => {
 		registry.install(defineExtension({ name: "loop", tasks: [Loop] }));
 		let opened = await openWith(path, registry, { restartLimit: 3 });
 		const root = await opened.harness.root(context);
-		const id = await root.commit((tx) => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
+		const id = await root.commit(tx => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
 		// Each open runs the phase, and each crash cuts it off: three restarts.
 		for (let run = 1; run <= 3; run++) {
 			opened.harness.resume();
@@ -154,7 +153,7 @@ describe("tasks that cannot run", () => {
 		expect((await harness.getTask(id, context))?.restarts).toBe(3);
 		// Nothing is parked: the task is ready, and the host is asked to run, which ends it.
 		const inspection = await harness.inspect(context);
-		expect(inspection.tasks.find((task) => task.record.id === id)?.state).toEqual({
+		expect(inspection.tasks.find(task => task.record.id === id)?.state).toEqual({
 			kind: "pending",
 			migrates: false,
 		});
@@ -188,10 +187,9 @@ describe("tasks that cannot run", () => {
 		const Loop = crashLoop(state);
 		registry.install(defineExtension({ name: "loop", tasks: [Loop] }));
 		let opened = await openWith(path, registry, { restartLimit: 1 });
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
 		opened.harness.resume();
 		await eventually(() => state.started === 1);
 		await opened.harness.close(context);
@@ -211,7 +209,7 @@ describe("tasks that cannot run", () => {
 		registry.install(defineExtension({ name: "loop", tasks: [Loop] }));
 		const { harness } = await openWith(path, registry);
 		const root = await harness.root(context);
-		const id = await root.commit((tx) => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
+		const id = await root.commit(tx => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();
 		await eventually(() => state.started === 1);
 		// Hold the line; the abort mark is admitted behind it, then close begins.
@@ -238,21 +236,19 @@ describe("tasks that cannot run", () => {
 			version: 1,
 			initial: () => ({ phase: "run" }),
 			phases: {
-				run: (_task, runtime) =>
-					new Promise((resolve) => runtime.signal.addEventListener("abort", () => resolve())),
+				run: (_task, runtime) => new Promise(resolve => runtime.signal.addEventListener("abort", () => resolve())),
 			},
 			abort: (_task, runtime) => {
 				aborts++;
-				return new Promise((resolve) => runtime.signal.addEventListener("abort", () => resolve()));
+				return new Promise(resolve => runtime.signal.addEventListener("abort", () => resolve()));
 			},
 		});
 		const registry = createRegistry();
 		registry.install(defineExtension({ name: "stuck", tasks: [Stuck] }));
 		let opened = await openWith(path, registry, { restartLimit: 1 });
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Stuck, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(Stuck, null, { ownership: { kind: "conversation" } }), context);
 		opened.harness.resume();
 		void opened.harness.abortTask(id, context);
 		await eventually(() => aborts === 1);
@@ -279,10 +275,9 @@ describe("tasks that cannot run", () => {
 		registry.install(defineExtension({ name: "loop", tasks: [Loop] }));
 		const settings: { restartLimit?: number } = { restartLimit: 1 };
 		let opened = await openWith(path, registry, settings);
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
 		opened.harness.resume();
 		await eventually(() => state.started === 1);
 		opened.kill(); // a crash: a close would not count
@@ -311,10 +306,9 @@ describe("tasks that cannot run", () => {
 		});
 		registry.install(defineExtension({ name: "loop", tasks: [Loop] }));
 		let opened = await openWith(path, registry, { restartLimit: 1 });
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(Loop, null, { ownership: { kind: "conversation" } }), context);
 		opened.harness.resume();
 		await eventually(() => state.started === 1);
 		opened.kill(); // a crash: a close would not count
@@ -338,7 +332,7 @@ describe("tasks that cannot run", () => {
 					started++;
 					// Intent before an effect, then the effect never returns: the checkpoint is unchanged.
 					await runtime.commit(() => ({ status: "running", checkpoint: task.state.checkpoint }), ctx);
-					await new Promise<void>((resolve) => runtime.signal.addEventListener("abort", () => resolve()));
+					await new Promise<void>(resolve => runtime.signal.addEventListener("abort", () => resolve()));
 				},
 			},
 			abort: async () => {},
@@ -346,10 +340,9 @@ describe("tasks that cannot run", () => {
 		const registry = createRegistry();
 		registry.install(defineExtension({ name: "intent", tasks: [Intent] }));
 		let opened = await openWith(path, registry, { restartLimit: 2 });
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Intent, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(Intent, null, { ownership: { kind: "conversation" } }), context);
 		for (let run = 1; run <= 2; run++) {
 			opened.harness.resume();
 			await eventually(() => started === run);
@@ -379,12 +372,12 @@ describe("tasks that cannot run", () => {
 				one: async (_task, runtime, ctx) => {
 					started++;
 					if (crashing)
-						await new Promise<void>((resolve) => runtime.signal.addEventListener("abort", () => resolve()));
+						await new Promise<void>(resolve => runtime.signal.addEventListener("abort", () => resolve()));
 					else await runtime.commit(() => ({ status: "running", checkpoint: { phase: "two" } }), ctx);
 				},
 				two: async (_task, runtime) => {
 					started++;
-					await new Promise<void>((resolve) => runtime.signal.addEventListener("abort", () => resolve()));
+					await new Promise<void>(resolve => runtime.signal.addEventListener("abort", () => resolve()));
 				},
 			},
 			abort: async () => {},
@@ -392,10 +385,9 @@ describe("tasks that cannot run", () => {
 		const registry = createRegistry();
 		registry.install(defineExtension({ name: "steps", tasks: [Steps] }));
 		let opened = await openWith(path, registry, { restartLimit: 2 });
-		const id: TaskId = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Steps, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id: TaskId = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(Steps, null, { ownership: { kind: "conversation" } }), context);
 		opened.harness.resume();
 		await eventually(() => started === 1);
 		opened.kill(); // a crash: a close would not count
@@ -431,10 +423,9 @@ describe("tasks that cannot run", () => {
 		first.install(defineExtension({ name: "v1", tasks: [V1] }));
 		let opened = await openWith(path, first);
 		// Created, never run: scheduling stays off.
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(V1, null, { ownership: { kind: "conversation" } }),
-			context,
-		);
+		const id = await (
+			await opened.harness.root(context)
+		).commit(tx => tx.createTask(V1, null, { ownership: { kind: "conversation" } }), context);
 		await opened.harness.close(context);
 		const second = createRegistry();
 		second.install(defineExtension({ name: "v2", tasks: [V2] }));
@@ -463,8 +454,10 @@ describe("tasks that cannot run", () => {
 		const registry = createRegistry();
 		registry.install(defineExtension({ name: "abandoned", tasks: [Abandoned] }));
 		let opened = await openWith(path, registry);
-		const id = await (await opened.harness.root(context)).commit(
-			(tx) => tx.createTask(Abandoned, null, { ownership: { kind: "conversation" }, abandonOnRestart: true }),
+		const id = await (
+			await opened.harness.root(context)
+		).commit(
+			tx => tx.createTask(Abandoned, null, { ownership: { kind: "conversation" }, abandonOnRestart: true }),
 			context,
 		);
 		await opened.harness.close(context);
@@ -496,7 +489,7 @@ describe("tasks that cannot run", () => {
 		graph.start(async () => {});
 		const root = await harness.root(context);
 		const id = await root.commit(
-			(tx) => tx.createTask(Missing, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Missing, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		harness.resume();
@@ -505,7 +498,7 @@ describe("tasks that cannot run", () => {
 		registry.install(defineExtension({ name: "late", tasks: [Missing] }));
 		// The graph follows the registry; the host hears it can run work now.
 		await eventually(() => graph.value.tasks[String(id)]?.blocked === undefined);
-		await eventually(() => wakes.some((wake) => wake.active));
+		await eventually(() => wakes.some(wake => wake.active));
 		expect((await harness.waitForTask(id, context)).state.outcome.status).toBe("completed");
 		await graph.stop();
 		await harness.close(context);

@@ -28,7 +28,7 @@ function hook(): void {
 			const version = context.parentURL === undefined ? null : new URL(context.parentURL).searchParams.get(PARAM);
 			if (version === null || !result.url.startsWith("file:")) return result;
 			const url = new URL(result.url);
-			if (url.searchParams.has(PARAM) || ![...roots].some((root) => url.href.startsWith(root))) return result;
+			if (url.searchParams.has(PARAM) || ![...roots].some(root => url.href.startsWith(root))) return result;
 			url.searchParams.set(PARAM, version);
 			return { ...result, url: url.href };
 		},
@@ -41,11 +41,11 @@ const toUrl = (module: string | URL): URL =>
 		: new URL(module.startsWith("file:") ? module : pathToFileURL(module).href);
 
 /** Imports fresh copies of facet modules (default export: a FacetDefinition); each facet is named by its URL. */
-export const nodeLoader: FacetLoader = async (modules) => {
+export const nodeLoader: FacetLoader = async modules => {
 	hook();
 	const version = String(++generation);
 	const facets: Facet[] = [];
-	const urls = modules.map((module) => {
+	const urls = modules.map(module => {
 		const url = toUrl(module);
 		url.search = "";
 		return url;

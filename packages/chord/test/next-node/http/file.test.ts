@@ -70,7 +70,7 @@ describe("fileResponse", () => {
 
 	it("types by extension: text, images, audio, video; never HTML or SVG unless named", async () => {
 		const types = await Promise.all(
-			["a.txt", "a.png", "a.mp3", "a.webm", "a.html", "a.svg", "a.bin"].map(async (name) => {
+			["a.txt", "a.png", "a.mp3", "a.webm", "a.html", "a.svg", "a.bin"].map(async name => {
 				const response = await fileResponse(await file(name, 1));
 				return response.kind === "bytes" ? response.mime : response.kind;
 			}),
@@ -117,8 +117,8 @@ describe("fileResponse", () => {
 			const past = await send(port, "GET", "/f", { headers: { range: "bytes=999999999-" } });
 			expect([past.status, opened(path)]).toEqual([416, 0]);
 			expect([(await send(port, "GET", "/wrapped")).status, opened(path)]).toEqual([403, 0]);
-			await new Promise<void>((resolve) => {
-				const request = httpRequest({ host: "127.0.0.1", port, path: "/f", agent: false }, (response) => {
+			await new Promise<void>(resolve => {
+				const request = httpRequest({ host: "127.0.0.1", port, path: "/f", agent: false }, response => {
 					response.once("data", () => {
 						expect(opened(path)).toBe(1);
 						request.destroy();
@@ -127,7 +127,7 @@ describe("fileResponse", () => {
 				});
 				request.end();
 			});
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise(resolve => setTimeout(resolve, 100));
 			expect(opened(path)).toBe(0);
 			await server.close();
 		},

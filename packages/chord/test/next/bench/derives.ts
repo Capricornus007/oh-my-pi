@@ -40,7 +40,7 @@ async function bursts(): Promise<{ readonly median: number; readonly p95: number
 		let list: SingletonHandle<{ items: string[] }> | undefined;
 		let self: Self | undefined;
 		const host = createHost({ onError: () => {} });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Diamond, (_, declared) => {
 				self = declared;
 				list = declared.state(List);
@@ -53,7 +53,7 @@ async function bursts(): Promise<{ readonly median: number; readonly p95: number
 		watch.start(async () => {});
 		for (let step = 0; step < STEPS; step++) {
 			const before = performance.now();
-			await self!.tx(async (tx) => {
+			await self!.tx(async tx => {
 				await tx.retire(list!);
 				(await tx.draft(list!)).items.push(`${step}`);
 			}, context);

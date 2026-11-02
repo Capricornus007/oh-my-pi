@@ -20,7 +20,7 @@ export class Session extends DurableObject<Env> {
 			{
 				name: "count",
 				description: "Adds to a counter kept in the session and returns the new value",
-				execute: (args) => {
+				execute: args => {
 					this.counter += (args as { add: number }).add;
 					return this.counter;
 				},

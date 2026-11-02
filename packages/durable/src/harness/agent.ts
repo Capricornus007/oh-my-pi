@@ -104,8 +104,8 @@ export async function addTools(tx: Tx, conversationId: ConversationId, added: re
 	const tools = state.tools;
 	if (Array.isArray(tools)) {
 		for (const name of added) if (!tools.includes(name)) tools.push(name);
-	} else if (tools?.remove.some((name) => added.includes(name))) {
-		state.tools = { remove: tools.remove.filter((name) => !added.includes(name)) };
+	} else if (tools?.remove.some(name => added.includes(name))) {
+		state.tools = { remove: tools.remove.filter(name => !added.includes(name)) };
 	}
 	const modelTools = state.modelTools;
 	if (Array.isArray(modelTools)) {
@@ -113,7 +113,7 @@ export async function addTools(tx: Tx, conversationId: ConversationId, added: re
 		return;
 	}
 	// Assigned whole; a document write of an equal value records no change.
-	const remove = (modelTools?.remove ?? []).filter((name) => !added.includes(name));
+	const remove = (modelTools?.remove ?? []).filter(name => !added.includes(name));
 	const add = [...(modelTools?.add ?? [])];
 	for (const name of added) if (!add.includes(name)) add.push(name);
 	state.modelTools = { ...(remove.length === 0 ? {} : { remove }), add };
@@ -170,7 +170,7 @@ function isList<T>(value: readonly T[] | object): value is readonly T[] {
 }
 
 function names(items: readonly { readonly name: string }[]): string[] {
-	return items.map((item) => item.name);
+	return items.map(item => item.name);
 }
 
 /**
@@ -204,8 +204,8 @@ export function agentHooks(
 export function sectionExtension(agent: Agent, key: string): string | undefined {
 	let found: string | undefined;
 	for (const extension of agent.extensions) {
-		const provides = extension.sections?.some((section) => section.key === key) === true;
-		const wraps = extension.wraps?.some((wrap) => "section" in wrap && wrap.section === key) === true;
+		const provides = extension.sections?.some(section => section.key === key) === true;
+		const wraps = extension.wraps?.some(wrap => "section" in wrap && wrap.section === key) === true;
 		if (provides || wraps) found = extension.name;
 	}
 	return found;
@@ -215,8 +215,8 @@ export function sectionExtension(agent: Agent, key: string): string | undefined 
 export function toolExtension(agent: Agent, name: string): string | undefined {
 	let found: string | undefined;
 	for (const extension of agent.extensions) {
-		const provides = extension.tools?.some((tool) => tool.name === name) === true;
-		const wraps = extension.wraps?.some((wrap) => "tool" in wrap && wrap.tool === name) === true;
+		const provides = extension.tools?.some(tool => tool.name === name) === true;
+		const wraps = extension.wraps?.some(wrap => "tool" in wrap && wrap.tool === name) === true;
 		if (provides || wraps) found = extension.name;
 	}
 	return found;
@@ -248,16 +248,16 @@ export function resolveAgent<Tool extends ToolRegistration>(
 				applyWrap(
 					composed,
 					wrap.tool,
-					(tool) => wrap.wrap(tool),
-					(tool) => tool.name,
+					tool => wrap.wrap(tool),
+					tool => tool.name,
 					wrapReport,
 				);
 			else
 				applyWrap(
 					sections,
 					wrap.section,
-					(section) => wrap.wrap(section),
-					(section) => section.key,
+					section => wrap.wrap(section),
+					section => section.key,
 					wrapReport,
 				);
 		}
@@ -269,7 +269,7 @@ export function resolveAgent<Tool extends ToolRegistration>(
 	const modelCallable = enabled.filter(callableBy("model"));
 	const tools = offeredTools(modelCallable, state?.modelTools);
 	const offered = new Set(tools);
-	const deferred = modelCallable.filter((tool) => tool.deferred === true && !offered.has(tool));
+	const deferred = modelCallable.filter(tool => tool.deferred === true && !offered.has(tool));
 	const callable = enabled.filter(callableBy("tools"));
 
 	const instructions = state?.instructions;
@@ -295,10 +295,10 @@ export function resolveAgent<Tool extends ToolRegistration>(
 function offeredTools<Tool extends ToolRegistration>(tools: Tool[], filter: AgentState["modelTools"]): Tool[] {
 	if (Array.isArray(filter)) return filterTools(tools, filter);
 	const removed = new Set(filter?.remove ?? []);
-	const kept = tools.filter((tool) => tool.deferred !== true && !removed.has(tool.name));
+	const kept = tools.filter(tool => tool.deferred !== true && !removed.has(tool.name));
 	// Loaded deferred tools follow in load order, so loading one appends to the declared tools.
-	const byName = new Map(tools.map((tool) => [tool.name, tool]));
-	const loaded = [...new Set(filter?.add ?? [])].flatMap((name) => {
+	const byName = new Map(tools.map(tool => [tool.name, tool]));
+	const loaded = [...new Set(filter?.add ?? [])].flatMap(name => {
 		const tool = byName.get(name);
 		return tool?.deferred === true && !removed.has(name) ? [tool] : [];
 	});
@@ -309,14 +309,14 @@ function offeredTools<Tool extends ToolRegistration>(tools: Tool[], filter: Agen
 function filterTools<Tool extends ToolRegistration>(tools: Tool[], filter: AgentState["tools"]): Tool[] {
 	if (filter === undefined) return tools;
 	if (Array.isArray(filter)) {
-		const byName = new Map(tools.map((tool) => [tool.name, tool]));
-		return [...new Set(filter)].flatMap((name) => {
+		const byName = new Map(tools.map(tool => [tool.name, tool]));
+		return [...new Set(filter)].flatMap(name => {
 			const tool = byName.get(name);
 			return tool === undefined ? [] : [tool];
 		});
 	}
 	const removed = new Set((filter as { remove: string[] }).remove);
-	return tools.filter((tool) => !removed.has(tool.name));
+	return tools.filter(tool => !removed.has(tool.name));
 }
 
 /** Selected installed extensions: the stored array, or the default selection edited by `{ add, remove }`. */
@@ -328,10 +328,10 @@ function selectExtensions<Tool extends ToolRegistration>(
 	let selected: string[];
 	if (Array.isArray(stored)) selected = stored;
 	else {
-		const base = settings.extensions?.map((extension) => extension.name) ?? snapshot.installed().map((e) => e.name);
+		const base = settings.extensions?.map(extension => extension.name) ?? snapshot.installed().map(e => e.name);
 		const edit = stored as { add?: string[]; remove?: string[] } | undefined;
 		const removed = new Set(edit?.remove ?? []);
-		selected = [...base, ...(edit?.add ?? [])].filter((name) => !removed.has(name));
+		selected = [...base, ...(edit?.add ?? [])].filter(name => !removed.has(name));
 	}
 	const extensions: Extension<Tool>[] = [];
 	for (const name of new Set(selected)) {

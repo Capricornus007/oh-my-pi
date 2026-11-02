@@ -45,7 +45,7 @@ async function connect(): Promise<{ connection: Connection; remote: RemotePlatfo
 		const remote = await detectPlatform(target);
 		log(`detected ${JSON.stringify(remote)}; deploying`);
 		log(`deployed ${await deployDaemon(target, remote, daemon)}; connecting`);
-		const result = await connectSsh({ ...target, binary: daemon, onLog: (text) => log(`daemon: ${text.trim()}`) });
+		const result = await connectSsh({ ...target, binary: daemon, onLog: text => log(`daemon: ${text.trim()}`) });
 		log("connected; saying hello");
 		log(`hello ${JSON.stringify(await result.connection.info())}`);
 		return result;
@@ -74,7 +74,7 @@ if (host !== undefined) {
 	registerEnvConformance(
 		{ describe, expect, it },
 		"RemoteExecutionEnv over SSH",
-		async (use) => {
+		async use => {
 			const { connection } = await connect();
 			const info = await connection.info();
 			const home = new RemoteExecutionEnv({ connection, id: "pi-env:external", cwd: info.home });

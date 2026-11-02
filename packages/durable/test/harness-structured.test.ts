@@ -158,7 +158,7 @@ function waitOn(on: readonly TaskId[], policy: JoinPolicy, round = 1): Next {
 }
 
 async function start(conversation: Conversation, name: string, options: TaskOptions = OWN_CONVERSATION) {
-	return conversation.commit((tx) => tx.createTask(Node, { name }, options), context);
+	return conversation.commit(tx => tx.createTask(Node, { name }, options), context);
 }
 
 type Opened = { harness: Harness; root: Conversation; registry: Registry; reports: unknown[] };
@@ -206,7 +206,7 @@ describe("task ownership", () => {
 		let child: TaskId | undefined;
 		script("parent", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					child = await spawn(tx, runtime.taskId, "child");
 					return waitOn([child], "allSettled");
 				}, ctx),
@@ -225,14 +225,13 @@ describe("task ownership", () => {
 		const { harness, root } = await openNodes();
 		const parent = await start(root, "parent");
 		const other = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
-		const create = (options: TaskOptions) =>
-			root.commit((tx) => tx.createTask(Node, { name: "x" }, options), context);
+		const create = (options: TaskOptions) => root.commit(tx => tx.createTask(Node, { name: "x" }, options), context);
 		await expect(create({} as TaskOptions)).rejects.toThrow();
 		await expect(create(owned(999_999 as TaskId))).rejects.toThrow("does not exist");
 		await expect(create({ ...owned(parent), conversationId: other.id })).rejects.toThrow("owner's conversation");
 		await expect(create({ ...owned(parent), background: true })).rejects.toThrow("cannot be background");
 		// The owner's conversation is the default, even from a commit bound to another conversation.
-		const child = await other.commit((tx) => spawn(tx, parent, "child"), context);
+		const child = await other.commit(tx => spawn(tx, parent, "child"), context);
 		expect((await harness.getTask(child, context))!.conversationId).toBe(root.id);
 		open("parent");
 		open("child");
@@ -244,7 +243,7 @@ describe("task ownership", () => {
 		const { harness, root } = await openNodes();
 		script("parent", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					await spawn(tx, runtime.taskId, "child");
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx);
@@ -252,9 +251,9 @@ describe("task ownership", () => {
 		});
 		const parent = await start(root, "parent");
 		await until(async () => (await state(harness, parent)).status === "completing");
-		const createChild = () => root.commit((tx) => spawn(tx, parent, "late"), context);
+		const createChild = () => root.commit(tx => spawn(tx, parent, "late"), context);
 		const createConversation = () =>
-			root.commit((tx) => tx.createConversation({ ownership: { kind: "task", taskId: parent } }), context);
+			root.commit(tx => tx.createConversation({ ownership: { kind: "task", taskId: parent } }), context);
 		await expect(createChild()).rejects.toThrow("is completing");
 		await expect(createConversation()).rejects.toThrow("is completing");
 		open("child");
@@ -271,7 +270,7 @@ describe("task ownership", () => {
 		const slow = await start(root, "slow");
 		await until(() => log.includes("run:slow"));
 		await harness.abortTask(slow, context);
-		await expect(root.commit((tx) => spawn(tx, slow, "late"), context)).rejects.toThrow("is abort-marked");
+		await expect(root.commit(tx => spawn(tx, slow, "late"), context)).rejects.toThrow("is abort-marked");
 		open("abort.slow");
 		expect(await outcomeOf(harness, slow)).toBe("aborted");
 		await harness.close(context);
@@ -281,7 +280,7 @@ describe("task ownership", () => {
 		const { harness, root } = await openNodes();
 		script("eager", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					await spawn(tx, runtime.taskId, "never");
 					return end("completed", "eager");
 				}, ctx),
@@ -292,18 +291,18 @@ describe("task ownership", () => {
 			error: { message: expect.stringContaining("is completing") },
 		});
 		// The rejected commit wrote nothing.
-		const nodes = await harness.commit((tx) => tx.scanTasks({ kind: "test.node" }, 20), context);
-		expect(nodes.items.map((task) => (task.input as NodeInput).name)).toEqual(["eager"]);
+		const nodes = await harness.commit(tx => tx.scanTasks({ kind: "test.node" }, 20), context);
+		expect(nodes.items.map(task => (task.input as NodeInput).name)).toEqual(["eager"]);
 
 		let child: ConversationId | undefined;
 		script("host", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					child = (await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } })).id;
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx),
 			resume: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					await tx.createTask(Node, { name: "inner" }, { ...OWN_CONVERSATION, conversationId: child! });
 					return end("completed", "host");
 				}, ctx),
@@ -324,12 +323,12 @@ function parentOf(parent: string, children: readonly string[], policy: JoinPolic
 	const found = { ids: [] as TaskId<string>[], outcomes: [] as string[] };
 	script(parent, {
 		run: (runtime, ctx) =>
-			runtime.commit(async (tx) => {
+			runtime.commit(async tx => {
 				for (const name of children) found.ids.push(await spawn(tx, runtime.taskId, name));
 				return waitOn(found.ids, policy);
 			}, ctx),
 		resume: async (runtime, ctx) => {
-			found.outcomes = (await runtime.outcomes(found.ids, ctx)).map((outcome) => outcome.status);
+			found.outcomes = (await runtime.outcomes(found.ids, ctx)).map(outcome => outcome.status);
 			await runtime.commit(() => end("completed", parent), ctx);
 		},
 	});
@@ -342,14 +341,14 @@ describe("waiting", () => {
 		const found = { ids: [] as TaskId[], outcomes: [] as string[] };
 		script("parent", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					for (const name of ["ok", "fails", "throws", "aborted"])
 						found.ids.push(await spawn(tx, runtime.taskId, name));
 					found.ids.push(await tx.createTask(Unregistered, { name: "orphan" }, owned(runtime.taskId)));
 					return waitOn(found.ids, "allSettled");
 				}, ctx),
 			resume: async (runtime, ctx) => {
-				found.outcomes = (await runtime.outcomes(found.ids, ctx)).map((outcome) => outcome.status);
+				found.outcomes = (await runtime.outcomes(found.ids, ctx)).map(outcome => outcome.status);
 				await runtime.commit(() => end("completed", "parent"), ctx);
 			},
 		});
@@ -364,7 +363,7 @@ describe("waiting", () => {
 		expect(await outcomeOf(harness, parent)).toBe("completed");
 		expect(found.outcomes).toEqual(["completed", "failed", "faulted", "aborted", "orphaned"]);
 		// allSettled never marks siblings.
-		expect(log.filter((line) => line.startsWith("abort:"))).toEqual(["abort:aborted"]);
+		expect(log.filter(line => line.startsWith("abort:"))).toEqual(["abort:aborted"]);
 		await harness.close(context);
 	});
 
@@ -378,7 +377,7 @@ describe("waiting", () => {
 			expect(await outcomeOf(harness, parent)).toBe("completed");
 			expect(found.outcomes).toEqual(["aborted", ending === "throw" ? "faulted" : "failed", "aborted", "aborted"]);
 			expect((await harness.getTask(parent, context))!.abortRequested).toBe(false);
-			expect(log.filter((line) => line.startsWith("abort:")).sort()).toEqual(["abort:p1", "abort:p3", "abort:p4"]);
+			expect(log.filter(line => line.startsWith("abort:")).sort()).toEqual(["abort:p1", "abort:p3", "abort:p4"]);
 			await harness.close(context);
 		});
 	}
@@ -388,7 +387,7 @@ describe("waiting", () => {
 		const found = { ids: [] as TaskId[] };
 		script("p1", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					await spawn(tx, runtime.taskId, "grandchild");
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx);
@@ -404,7 +403,7 @@ describe("waiting", () => {
 		let outside: TaskId | undefined;
 		script("parent", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					for (const name of ["p1", "p2"]) found.ids.push(await spawn(tx, runtime.taskId, name));
 					outside = await spawn(tx, runtime.taskId, "outside");
 					return waitOn(found.ids, "failFast");
@@ -448,7 +447,7 @@ describe("waiting", () => {
 		script("parent", {
 			run: (runtime, ctx) => runtime.commit(() => waitOn([done, live], "allSettled"), ctx),
 			resume: async (runtime, ctx) => {
-				outcomes = (await runtime.outcomes([done, live], ctx)).map((outcome) => outcome.status);
+				outcomes = (await runtime.outcomes([done, live], ctx)).map(outcome => outcome.status);
 				await runtime.commit(() => end("completed", "parent"), ctx);
 			},
 		});
@@ -465,7 +464,7 @@ describe("waiting", () => {
 		const { harness, root } = await openNodes();
 		const other = await start(root, "other");
 		const cases: [string, (runtime: NodeRuntime) => readonly TaskId[], JoinPolicy, string][] = [
-			["self", (runtime) => [runtime.taskId], "allSettled", "is a wait cycle"],
+			["self", runtime => [runtime.taskId], "allSettled", "is a wait cycle"],
 			["missing", () => [999_999 as TaskId], "allSettled", "does not exist"],
 			["foreign", () => [other], "failFast", "only on tasks it owns"],
 		];
@@ -482,7 +481,7 @@ describe("waiting", () => {
 		script("child", { run: (runtime, ctx) => runtime.commit(() => waitOn([parent!], "allSettled"), ctx) });
 		script("parent", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					child = await spawn(tx, runtime.taskId, "child");
 					return waitOn([child], "allSettled");
 				}, ctx),
@@ -504,7 +503,7 @@ describe("waiting", () => {
 		let b: TaskId | undefined;
 		script("a", { run: (runtime, ctx) => runtime.commit(() => waitOn([b!], "allSettled"), ctx) });
 		script("b", { run: (runtime, ctx) => runtime.commit(() => waitOn([a!], "allSettled"), ctx) });
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			a = await tx.createTask(Node, { name: "a" }, OWN_CONVERSATION);
 			b = await tx.createTask(Node, { name: "b" }, OWN_CONVERSATION);
 		}, context);
@@ -522,7 +521,7 @@ describe("waiting", () => {
 		const child = spawnAndFinish("held", "child");
 		script("child", { run: (runtime, ctx) => runtime.commit(() => waitOn([other!], "allSettled"), ctx) });
 		script("other", { run: (runtime, ctx) => runtime.commit(() => waitOn([held!], "allSettled"), ctx) });
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			held = await tx.createTask(Node, { name: "held" }, OWN_CONVERSATION);
 			other = await tx.createTask(Node, { name: "other" }, OWN_CONVERSATION);
 		}, context);
@@ -542,7 +541,7 @@ describe("waiting", () => {
 		const grandchild = spawnAndFinish("child", "grandchild");
 		script("grandchild", { run: (runtime, ctx) => runtime.commit(() => waitOn([other!], "allSettled"), ctx) });
 		script("other", { run: (runtime, ctx) => runtime.commit(() => waitOn([held!], "allSettled"), ctx) });
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			held = await tx.createTask(Node, { name: "held" }, OWN_CONVERSATION);
 			other = await tx.createTask(Node, { name: "other" }, OWN_CONVERSATION);
 		}, context);
@@ -559,7 +558,7 @@ describe("waiting", () => {
 		const { harness, root } = await openNodes();
 		let owner: TaskId | undefined;
 		script("background", { run: (runtime, ctx) => runtime.commit(() => waitOn([owner!], "allSettled"), ctx) });
-		const background = await root.commit(async (tx) => {
+		const background = await root.commit(async tx => {
 			owner = await tx.createTask(Node, { name: "owner" }, OWN_CONVERSATION);
 			const conversation = await tx.createConversation({ ownership: { kind: "task", taskId: owner } });
 			const options = { ...OWN_CONVERSATION, conversationId: conversation.id, background: true };
@@ -580,7 +579,7 @@ describe("waiting", () => {
 		// The orchestrator spawns a worker and finishes; the running worker holds it as completing.
 		script("orchestrator", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					ids.worker = await spawn(tx, runtime.taskId, "worker");
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx),
@@ -603,7 +602,7 @@ describe("waiting", () => {
 		await until(async () => (await state(harness, ids.orchestrator!)).status === "completing");
 		ids.reviewer = await start(root, "reviewer");
 		const outcomes = await Promise.all(
-			["orchestrator", "worker", "reviewer"].map((name) => outcomeOf(harness, ids[name]!)),
+			["orchestrator", "worker", "reviewer"].map(name => outcomeOf(harness, ids[name]!)),
 		);
 		expect(outcomes).toEqual(["completed", "faulted", "completed"]);
 		const worker = (await harness.waitForTask(ids.worker!, context)).state.outcome;
@@ -623,7 +622,7 @@ describe("waiting", () => {
 		});
 		script("left", { run: (runtime, ctx) => runtime.commit(() => waitOn([ids.bottom!], "allSettled"), ctx) });
 		script("right", { run: (runtime, ctx) => runtime.commit(() => waitOn([ids.bottom!], "allSettled"), ctx) });
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			ids.bottom = await tx.createTask(Node, { name: "bottom" }, OWN_CONVERSATION);
 			ids.left = await tx.createTask(Node, { name: "left" }, OWN_CONVERSATION);
 			ids.right = await tx.createTask(Node, { name: "right" }, OWN_CONVERSATION);
@@ -642,7 +641,7 @@ describe("waiting", () => {
 		// b owns c and waits on a; aborting b leaves c's cleanup pending, so b waits only for c.
 		script("b", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					ids.c = await spawn(tx, runtime.taskId, "c");
 					return waitOn([ids.a!], "allSettled");
 				}, ctx),
@@ -661,7 +660,7 @@ describe("waiting", () => {
 			},
 			resume: (runtime, ctx) => runtime.commit(() => end("completed", "a"), ctx),
 		});
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			ids.a = await tx.createTask(Node, { name: "a" }, OWN_CONVERSATION);
 			ids.b = await tx.createTask(Node, { name: "b" }, OWN_CONVERSATION);
 		}, context);
@@ -686,12 +685,12 @@ describe("waiting", () => {
 			const next = names[(index + 1) % names.length]!;
 			script(name, { run: (runtime, ctx) => runtime.commit(() => waitOn([ids[next]!], "allSettled"), ctx) });
 		}
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			for (const name of names) ids[name] = await tx.createTask(Node, { name }, OWN_CONVERSATION);
 		}, context);
-		const outcomes = await Promise.all(names.map((name) => outcomeOf(harness, ids[name]!)));
-		expect(outcomes.filter((outcome) => outcome === "faulted")).toHaveLength(1);
-		expect(outcomes.filter((outcome) => outcome === "completed")).toHaveLength(2);
+		const outcomes = await Promise.all(names.map(name => outcomeOf(harness, ids[name]!)));
+		expect(outcomes.filter(outcome => outcome === "faulted")).toHaveLength(1);
+		expect(outcomes.filter(outcome => outcome === "completed")).toHaveLength(2);
 		await harness.close(context);
 	});
 
@@ -708,7 +707,7 @@ describe("waiting", () => {
 		const ids: TaskId[] = [];
 		script("parent", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					for (const name of ["a", "b", "c"]) ids.push(await spawn(tx, runtime.taskId, name));
 					return { status: "running", checkpoint: { phase: "resume", round: 0 } };
 				}, ctx);
@@ -730,7 +729,7 @@ describe("waiting", () => {
 		await until(() => log.includes("round:1"));
 		open("c");
 		expect(await outcomeOf(harness, parent)).toBe("completed");
-		expect(log.filter((line) => line.startsWith("round:"))).toEqual(["round:0", "round:1", "round:2"]);
+		expect(log.filter(line => line.startsWith("round:"))).toEqual(["round:0", "round:1", "round:2"]);
 		await harness.close(context);
 	});
 });
@@ -743,7 +742,7 @@ describe("completing", () => {
 		let child: TaskId | undefined;
 		script("parent", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					(await tx.doc(TaskNotes, runtime.taskId)).text = "notes";
 					child = await spawn(tx, runtime.taskId, "child");
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
@@ -759,7 +758,7 @@ describe("completing", () => {
 		const waiter = harness.waitForTask(parent, context);
 		expect(await settled(waiter)).toBe(false);
 		expect(await harness.snapshot(TaskNotes, parent, context)).toEqual({ text: "notes" });
-		expect((await harness.inspect(context)).tasks.find((task) => task.record.id === parent)?.state).toEqual({
+		expect((await harness.inspect(context)).tasks.find(task => task.record.id === parent)?.state).toEqual({
 			kind: "completing",
 		});
 		expect(await settled(root.waitForIdle(context))).toBe(false);
@@ -776,7 +775,7 @@ describe("completing", () => {
 		let conversation: ConversationId | undefined;
 		script("parent", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					conversation = (await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } })).id;
 					await tx.createTask(Node, { name: "first" }, { ...OWN_CONVERSATION, conversationId: conversation });
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
@@ -804,7 +803,7 @@ describe("completing", () => {
 			let child: TaskId | undefined;
 			script("parent", {
 				run: async (runtime, ctx) => {
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						child = await spawn(tx, runtime.taskId, "child");
 						return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 					}, ctx);
@@ -827,7 +826,7 @@ describe("completing", () => {
 		let child: TaskId | undefined;
 		script("parent", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					child = await spawn(tx, runtime.taskId, "child");
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx);
@@ -854,7 +853,7 @@ describe("abort order", () => {
 		const found: { id?: TaskId } = {};
 		script(name, {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					found.id = await spawn(tx, runtime.taskId, child);
 					return waitOn([found.id], "allSettled");
 				}, ctx),
@@ -876,7 +875,7 @@ describe("abort order", () => {
 		await until(async () => (await state(harness, c.id!)).status === "running");
 		expect(await harness.abortTask(a, context)).toBe("marked");
 		expect(await outcomeOf(harness, a)).toBe("aborted");
-		expect(log.filter((line) => line.startsWith("abort:") || line.includes(" saw "))).toEqual([
+		expect(log.filter(line => line.startsWith("abort:") || line.includes(" saw "))).toEqual([
 			"abort:c",
 			"abort:b",
 			"b saw terminal",
@@ -911,7 +910,7 @@ describe("abort order", () => {
 		});
 		script("parent", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					child = await spawn(tx, runtime.taskId, "child");
 					return waitOn([child], "allSettled");
 				}, ctx),
@@ -920,7 +919,7 @@ describe("abort order", () => {
 		await until(async () => (await state(harness, parent)).status === "waiting");
 		await harness.abortTask(parent, context);
 		await until(() => log.includes("abort:child"));
-		const inspected = (await harness.inspect(context)).tasks.find((task) => task.record.id === parent);
+		const inspected = (await harness.inspect(context)).tasks.find(task => task.record.id === parent);
 		expect(inspected?.state).toEqual({ kind: "waiting", on: [child] });
 		open("abort.child");
 		expect(await outcomeOf(harness, parent)).toBe("aborted");
@@ -942,7 +941,7 @@ describe("abort order", () => {
 
 	it("orphans a blocked task only after its owned work drained", async () => {
 		const { harness, root } = await openNodes();
-		const { owner, child } = await root.commit(async (tx) => {
+		const { owner, child } = await root.commit(async tx => {
 			const owner = await tx.createTask(Unregistered, { name: "owner" }, OWN_CONVERSATION);
 			return { owner, child: await spawn(tx, owner, "child") };
 		}, context);
@@ -962,14 +961,14 @@ describe("abort order", () => {
 		let x: TaskId | undefined;
 		script("a", {
 			run: (runtime, ctx) =>
-				runtime.commit(async (tx) => {
+				runtime.commit(async tx => {
 					b = await spawn(tx, runtime.taskId, "b");
 					return waitOn([b], "allSettled");
 				}, ctx),
 		});
 		script("b", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					const conversation = await tx.createConversation({
 						ownership: { kind: "task", taskId: runtime.taskId },
 					});
@@ -977,7 +976,7 @@ describe("abort order", () => {
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx);
 			},
-			resume: async (runtime) => {
+			resume: async runtime => {
 				await aborted(runtime.signal);
 			},
 		});
@@ -986,7 +985,7 @@ describe("abort order", () => {
 		await harness.abortTask(a, context);
 		expect(await outcomeOf(harness, a)).toBe("aborted");
 		expect(await outcomeOf(harness, x!)).toBe("aborted");
-		expect(log.filter((line) => line.startsWith("abort:"))).toEqual(["abort:x", "abort:b", "abort:a"]);
+		expect(log.filter(line => line.startsWith("abort:"))).toEqual(["abort:x", "abort:b", "abort:a"]);
 		await harness.close(context);
 	});
 });
@@ -1001,7 +1000,7 @@ describe("boundaries", () => {
 		let below: TaskId | undefined;
 		script("background", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					child = await spawn(tx, runtime.taskId, "child");
 					const conversation = await tx.createConversation({
 						ownership: { kind: "task", taskId: runtime.taskId },
@@ -1030,12 +1029,12 @@ describe("boundaries", () => {
 		let conversation: ConversationId | undefined;
 		script("agent", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					conversation = (await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } })).id;
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx);
 			},
-			resume: async (runtime) => {
+			resume: async runtime => {
 				await aborted(runtime.signal);
 			},
 		});
@@ -1065,7 +1064,7 @@ async function seed(
 	edit: (set: (id: TaskId, patch: object) => Promise<void>, seeded: Seeded) => Promise<void>,
 ): Promise<Seeded> {
 	const session = createSession(await openNodeSqliteStorage(path));
-	const seeded = await session.commit(async (tx) => {
+	const seeded = await session.commit(async tx => {
 		const root = await tx.createConversation({ ownership: { kind: "ownerless" } });
 		const parent = await tx.createTask(Node, { name: "parent" }, { ...OWN_CONVERSATION, conversationId: root.id });
 		const ids: TaskId[] = [];
@@ -1073,7 +1072,7 @@ async function seed(
 		return { parent, children: ids };
 	}, context);
 	await edit(async (id, patch) => {
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const record = (await tx.task(id))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({ ...record, ...patch });
 		}, context);
@@ -1154,7 +1153,7 @@ describe("recovery", () => {
 		const { harness } = await openNodes(await openNodeSqliteStorage(path));
 		expect(await outcomeOf(harness, parent)).toBe("aborted");
 		expect(await outcomeOf(harness, children[0]!)).toBe("aborted");
-		expect(log.filter((line) => line.startsWith("abort:"))).toEqual(["abort:c1", "abort:parent"]);
+		expect(log.filter(line => line.startsWith("abort:"))).toEqual(["abort:c1", "abort:parent"]);
 		await harness.close(context);
 	});
 
@@ -1223,12 +1222,12 @@ describe("tool rounds", () => {
 		setup.faux.setResponses([toolCalls(["noop", "c1"], ["noop", "c2"]), fauxAssistantMessage([fauxText("done")])]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		expect((await (await root.submit({ type: "input", content: "go" }, context)).wait(context)).status).toBe("done");
-		const tasks = (await harness.commit((tx) => tx.scanTasks({ conversationId: root.id }, 20), context)).items;
-		const [first, second] = tasks.filter((task) => task.kind === "pi.generation");
-		expect(tasks.filter((task) => task.kind === "pi.tool").map((task) => task.owner)).toEqual([first!.id, first!.id]);
+		const tasks = (await harness.commit(tx => tx.scanTasks({ conversationId: root.id }, 20), context)).items;
+		const [first, second] = tasks.filter(task => task.kind === "pi.generation");
+		expect(tasks.filter(task => task.kind === "pi.tool").map(task => task.owner)).toEqual([first!.id, first!.id]);
 		expect(first!.owner).toBeUndefined();
 		expect(second!.owner).toBeUndefined();
-		const assistant = (await allEntries(root)).find((entry) => entry.kind === "pi.assistant")!;
+		const assistant = (await allEntries(root)).find(entry => entry.kind === "pi.assistant")!;
 		expect(first!.state).toEqual({
 			status: "terminal",
 			outcome: { status: "completed", result: { entryId: assistant.id } },
@@ -1249,8 +1248,8 @@ describe("tool rounds", () => {
 		const generation = (await harness.snapshot(LiveDoc, root.id, context))!.run!.taskId;
 		await harness.abortTask(generation, context);
 		expect(await submission.wait(context)).toMatchObject({ status: "unanswered", reason: "aborted" });
-		const results = (await allEntries(root)).filter((entry) => ToolResultEntry.is(entry));
-		expect(results.map((entry) => (entry.model![0] as ToolResultMessage).toolCallId)).toEqual(["c1", "c2"]);
+		const results = (await allEntries(root)).filter(entry => ToolResultEntry.is(entry));
+		expect(results.map(entry => (entry.model![0] as ToolResultMessage).toolCallId)).toEqual(["c1", "c2"]);
 		expect(await harness.snapshot(LiveDoc, root.id, context)).toEqual({
 			runFailure: { taskId: generation, inputs: [submission.id], reason: "aborted", first: expect.any(Number) },
 		});
@@ -1268,21 +1267,21 @@ describe("tool rounds", () => {
 		const submission = await root.submit({ type: "input", content: "go" }, context);
 		await one.started;
 		expect(
-			(await harness.snapshot(LiveDoc, root.id, context))!.tools!.map((slot) => slot.taskId !== undefined),
+			(await harness.snapshot(LiveDoc, root.id, context))!.tools!.map(slot => slot.taskId !== undefined),
 		).toEqual([true, false, false]);
 		const generation = (await harness.snapshot(LiveDoc, root.id, context))!.run!.taskId;
 		await harness.abortTask(generation, context);
 		expect(await submission.wait(context)).toMatchObject({ status: "unanswered", reason: "aborted" });
 		const results = (await allEntries(root))
-			.filter((entry) => ToolResultEntry.is(entry))
-			.map((entry) => entry.model![0] as ToolResultMessage);
-		expect(results.map((result) => result.toolCallId)).toEqual(["c1", "c2", "c3"]);
-		expect(results.map((result) => result.isError)).toEqual([true, true, true]);
+			.filter(entry => ToolResultEntry.is(entry))
+			.map(entry => entry.model![0] as ToolResultMessage);
+		expect(results.map(result => result.toolCallId)).toEqual(["c1", "c2", "c3"]);
+		expect(results.map(result => result.isError)).toEqual([true, true, true]);
 		expect(results[1]!.content).toEqual([
 			{ type: "text", text: "<harness>\n[error] Tool two was aborted\n</harness>" },
 		]);
 		const tools = (
-			await harness.commit((tx) => tx.scanTasks({ conversationId: root.id, kind: "pi.tool" }, 20), context)
+			await harness.commit(tx => tx.scanTasks({ conversationId: root.id, kind: "pi.tool" }, 20), context)
 		).items;
 		expect(tools).toHaveLength(1);
 		await harness.close(context);
@@ -1303,7 +1302,7 @@ describe("tool rounds", () => {
 		// An extension's hook starts work owned by the generation, which holds it while the next turn runs.
 		addHooks(setup.registry, GenerationTask, {
 			afterTools: async (_assistant, _results, api, callContext) => {
-				await opened!.commit((tx) => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
+				await opened!.commit(tx => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
 			},
 		});
 		setup.faux.setResponses([toolCalls(["noop", "c1"]), fauxAssistantMessage([fauxText("done")])]);
@@ -1312,15 +1311,15 @@ describe("tool rounds", () => {
 		const graph = await graphHistory(harness);
 		const history = await viewHistory(harness, root.id);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const first = (await harness.commit((tx) => tx.scanTasks({ kind: "pi.generation" }, 1), context)).items[0]!;
+		const first = (await harness.commit(tx => tx.scanTasks({ kind: "pi.generation" }, 1), context)).items[0]!;
 		expect((await state(harness, first.id)).status).toBe("completing");
 		// The first generation's outcome is committed at its hold: the successor already runs the run, and the graph shows
 		// the first one completing beside it.
-		const handed = graph.graphs.find((value) => generations(value).length === 2)!;
+		const handed = graph.graphs.find(value => generations(value).length === 2)!;
 		const [held, successor] = generations(handed);
 		expect(held).toMatchObject({ id: first.id, state: { status: "completing" } });
 		expect(successor!.state.status).not.toBe("completing");
-		expect(history.live().some((live) => live.run?.taskId === successor!.id)).toBe(true);
+		expect(history.live().some(live => live.run?.taskId === successor!.id)).toBe(true);
 		open("hooked");
 		expect(await outcomeOf(harness, first.id)).toBe("completed");
 		await waitFor(() => graph.graphs.at(-1)!.tasks[String(first.id)] === undefined);
@@ -1346,7 +1345,7 @@ describe("tool rounds", () => {
 		let opened: Harness | undefined;
 		addHooks(setup.registry, GenerationTask, {
 			beforeRequest: async (_request, api, callContext) => {
-				await opened!.commit((tx) => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
+				await opened!.commit(tx => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
 				return undefined;
 			},
 		});
@@ -1366,7 +1365,7 @@ describe("tool rounds", () => {
 			) {
 				const refuses = (writes: readonly StorageWrite[]): boolean => {
 					const finalizes = writes.some(
-						(write) =>
+						write =>
 							write.type === "task" && write.value.id === reject && write.value.state.status === "terminal",
 					);
 					if (finalizes) reject = undefined;
@@ -1409,7 +1408,7 @@ describe("tool rounds", () => {
 				first: expect.any(Number),
 			},
 		});
-		expect((await allEntries(reopened.root)).map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant"]);
+		expect((await allEntries(reopened.root)).map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant"]);
 		await reopened.harness.close(context);
 	});
 });
@@ -1418,7 +1417,7 @@ describe("tool rounds", () => {
 function invalidFinalStream(): ReturnType<Models["streamSimple"]> {
 	const events = async function* () {
 		yield { type: "start", partial: fauxAssistantMessage("partial", { stopReason: "pending" }) };
-		await new Promise((resolve) => setTimeout(resolve, 300));
+		await new Promise(resolve => setTimeout(resolve, 300));
 	};
 	const final = { ...fauxAssistantMessage("final"), invalid: () => {} };
 	return { [Symbol.asyncIterator]: events, result: async () => final } as unknown as ReturnType<
@@ -1463,7 +1462,7 @@ function spawnAndFinish(name: string, child: string): { id?: TaskId } {
 	const found: { id?: TaskId } = {};
 	script(name, {
 		run: async (runtime, ctx) => {
-			await runtime.commit(async (tx) => {
+			await runtime.commit(async tx => {
 				found.id = await spawn(tx, runtime.taskId, child);
 				return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 			}, ctx);
@@ -1477,13 +1476,13 @@ describe("definitions and waits", () => {
 		const { harness, root, registry } = await openNodes();
 		const registration = addTask(registry, versioned(1));
 		const other = await start(root, "other");
-		const waiter = await root.commit((tx) => tx.createTask(versioned(1), { on: [other] }, OWN_CONVERSATION), context);
+		const waiter = await root.commit(tx => tx.createTask(versioned(1), { on: [other] }, OWN_CONVERSATION), context);
 		await until(async () => (await state(harness, waiter)).status === "waiting");
 		registration.dispose();
 		open("other");
 		await harness.waitForTask(other, context);
 		const inspected = async () =>
-			(await harness.inspect(context)).tasks.find((task) => task.record.id === waiter)?.state;
+			(await harness.inspect(context)).tasks.find(task => task.record.id === waiter)?.state;
 		expect(await inspected()).toEqual({ kind: "blocked", reason: "missing_task" });
 		expect((await state(harness, waiter)).status).toBe("waiting");
 		addTask(registry, versioned(2));
@@ -1495,7 +1494,7 @@ describe("definitions and waits", () => {
 		const { harness, root, registry } = await openNodes();
 		const registration = addTask(registry, versioned(1));
 		const other = await start(root, "other");
-		const waiter = await root.commit((tx) => tx.createTask(versioned(1), { on: [other] }, OWN_CONVERSATION), context);
+		const waiter = await root.commit(tx => tx.createTask(versioned(1), { on: [other] }, OWN_CONVERSATION), context);
 		await until(async () => (await state(harness, waiter)).status === "waiting");
 		registration.dispose();
 		expect(await harness.abortTask(waiter, context)).toBe("marked");
@@ -1514,7 +1513,7 @@ describe("definitions and waits", () => {
 				initial: () => ({ phase: "run" }),
 				phases: {
 					run: async (task, runtime, ctx) => {
-						await runtime.commit(async (tx) => {
+						await runtime.commit(async tx => {
 							await spawn(tx, task.id, "child");
 							return undefined;
 						}, ctx);
@@ -1531,7 +1530,7 @@ describe("definitions and waits", () => {
 				},
 			});
 		addTask(registry, holder(1));
-		const parent = await root.commit((tx) => tx.createTask(holder(1), null, OWN_CONVERSATION), context);
+		const parent = await root.commit(tx => tx.createTask(holder(1), null, OWN_CONVERSATION), context);
 		await until(async () => (await state(harness, parent)).status === "completing");
 		// The same extension name replaces the old one in place.
 		addTask(registry, holder(2));
@@ -1612,7 +1611,7 @@ describe("conversation abort and boundaries", () => {
 				await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
 			},
 		});
-		const tree = await root.commit(async (tx) => {
+		const tree = await root.commit(async tx => {
 			const owner = await tx.createTask(Node, { name: "owner" }, OWN_CONVERSATION);
 			const outer = await tx.createConversation({ ownership: { kind: "task", taskId: owner } });
 			const background = await tx.createTask(
@@ -1653,7 +1652,7 @@ describe("conversation abort and boundaries", () => {
 			) {
 				const refuses = (writes: readonly StorageWrite[]): boolean => {
 					const finalizes = writes.some(
-						(write) =>
+						write =>
 							write.type === "task" && write.value.id === reject && write.value.state.status === "terminal",
 					);
 					if (finalizes) reject = undefined;
@@ -1682,7 +1681,7 @@ describe("recovery through ownership edges", () => {
 	it("shows an abort-marked owner waiting for work in its owned conversation before resume after reopen", async () => {
 		const path = await sqlitePath();
 		const session = createSession(await openNodeSqliteStorage(path));
-		const tree = await session.commit(async (tx) => {
+		const tree = await session.commit(async tx => {
 			const conversation = await tx.createConversation({ ownership: { kind: "ownerless" } });
 			const owner = await tx.createTask(
 				Node,
@@ -1693,18 +1692,18 @@ describe("recovery through ownership edges", () => {
 			const inner = await tx.createTask(Node, { name: "inner" }, { ...OWN_CONVERSATION, conversationId: child.id });
 			return { owner, inner };
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			const record = (await tx.task(tree.owner))!;
 			(tx as unknown as { setTask(value: unknown): void }).setTask({ ...record, abortRequested: true });
 		}, context);
 		await session.close(context);
 
 		const { harness } = await openTasks(await openNodeSqliteStorage(path), [Node]);
-		const inspected = (await harness.inspect(context)).tasks.find((task) => task.record.id === tree.owner);
+		const inspected = (await harness.inspect(context)).tasks.find(task => task.record.id === tree.owner);
 		expect(inspected?.state).toEqual({ kind: "waiting", on: [tree.inner] });
 		harness.resume();
 		expect(await outcomeOf(harness, tree.owner)).toBe("aborted");
-		expect(log.filter((line) => line.startsWith("abort:"))).toEqual(["abort:inner", "abort:owner"]);
+		expect(log.filter(line => line.startsWith("abort:"))).toEqual(["abort:inner", "abort:owner"]);
 		await harness.close(context);
 	});
 
@@ -1713,7 +1712,7 @@ describe("recovery through ownership edges", () => {
 		let inner: TaskId | undefined;
 		script("child", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					const conversation = await tx.createConversation({
 						ownership: { kind: "task", taskId: runtime.taskId },
 					});
@@ -1746,7 +1745,7 @@ describe("recovery through ownership edges", () => {
 		let conversation: ConversationId | undefined;
 		script("child", {
 			run: async (runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					conversation = (await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } })).id;
 					return { status: "running", checkpoint: { phase: "resume", round: 1 } };
 				}, ctx);
@@ -1773,7 +1772,7 @@ describe("recovery through ownership edges", () => {
 describe("tool rounds as the view shows them", () => {
 	/** The tool result entries of a view, by call ID, in transcript order. */
 	function resultsOf(view: ConversationView): string[] {
-		return view.entries.flatMap((entry) => {
+		return view.entries.flatMap(entry => {
 			const message = entry.model?.[0];
 			return message?.role === "toolResult" ? [message.toolCallId] : [];
 		});
@@ -1795,19 +1794,18 @@ describe("tool rounds as the view shows them", () => {
 		// The started call ends with its result entry; the commit that ends the run appends the unstarted calls' results,
 		// in call order, and removes the round.
 		const states = history.live();
-		const c1Done = slotsOf(states, "c1").find((slot) => slot?.status === "done");
+		const c1Done = slotsOf(states, "c1").find(slot => slot?.status === "done");
 		const last = history.views.at(-1)!;
 		expect(resultsOf(last)).toEqual(["c1", "c2", "c3"]);
 		const c1Result = last.entries.find(
-			(entry) =>
-				entry.model?.[0]?.role === "toolResult" && (entry.model[0] as ToolResultMessage).toolCallId === "c1",
+			entry => entry.model?.[0]?.role === "toolResult" && (entry.model[0] as ToolResultMessage).toolCallId === "c1",
 		);
 		expect(c1Done?.entry).toBe(c1Result?.id);
-		const ending = history.views.findIndex((view) => resultsOf(view).includes("c2"));
+		const ending = history.views.findIndex(view => resultsOf(view).includes("c2"));
 		expect(resultsOf(history.views[ending]!)).toEqual(["c1", "c2", "c3"]);
 		expect(states[ending]!.run).toBeUndefined();
 		expect(states[ending]!.tools).toBeUndefined();
-		expect(states[ending - 1]!.tools?.map((slot) => [slot.callId, slot.status])).toEqual([
+		expect(states[ending - 1]!.tools?.map(slot => [slot.callId, slot.status])).toEqual([
 			["c1", "done"],
 			["c2", "pending"],
 			["c3", "pending"],
@@ -1829,7 +1827,7 @@ describe("tool rounds as the view shows them", () => {
 		);
 		addHooks(setup.registry, GenerationTask, {
 			afterTools: async (_assistant, _results, api, callContext) => {
-				await opened!.commit((tx) => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
+				await opened!.commit(tx => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
 			},
 		});
 		setup.faux.setResponses([toolCalls(["noop", "c1"]), fauxAssistantMessage([fauxText("done")])]);
@@ -1839,11 +1837,11 @@ describe("tool rounds as the view shows them", () => {
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		const late = await graphHistory(harness);
 		open("hooked");
-		const [first] = (await harness.commit((tx) => tx.scanTasks({ kind: "pi.generation" }, 1), context)).items;
+		const [first] = (await harness.commit(tx => tx.scanTasks({ kind: "pi.generation" }, 1), context)).items;
 		await harness.waitForTask(first!.id, context);
 		// The early observer saw both generations; the late one starts with the held one, completing, and sees it leave.
 		const seen = (graphs: readonly TaskGraph[]) =>
-			new Set(graphs.flatMap((graph) => generations(graph).map((node) => node.id)));
+			new Set(graphs.flatMap(graph => generations(graph).map(node => node.id)));
 		expect(seen(early.graphs).size).toBe(2);
 		expect(generations(late.graphs[0]!)).toEqual([
 			expect.objectContaining({ id: first!.id, state: expect.objectContaining({ status: "completing" }) }),
@@ -1864,7 +1862,7 @@ describe("tool rounds as the view shows them", () => {
 				description: "Starts work in a conversation it owns",
 				parameters: obj({}),
 				execute: async (_args, api, callContext) => {
-					await api.commit(async (tx) => {
+					await api.commit(async tx => {
 						const child = await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } });
 						await tx.createTask(Node, { name: "sub" }, { ...OWN_CONVERSATION, conversationId: child.id });
 					}, callContext);
@@ -1904,7 +1902,7 @@ describe("tool rounds as the view shows them", () => {
 				description: "Starts owned work, then returns a result that is not strict JSON",
 				parameters: obj({}),
 				execute: async (_args, api, callContext) => {
-					await api.commit((tx) => tx.createTask(Node, { name: "held" }, owned(api.taskId)), callContext);
+					await api.commit(tx => tx.createTask(Node, { name: "held" }, owned(api.taskId)), callContext);
 					return { output: [], details: { fn: (() => 1) as unknown as JsonValue } };
 				},
 			}),
@@ -1926,7 +1924,7 @@ describe("tool rounds as the view shows them", () => {
 		expect(await outcomeOf(harness, tool)).toBe("faulted");
 		await waitFor(() => graph.graphs.at(-1)!.tasks[String(tool)] === undefined);
 		// The slot ends done without a result entry.
-		const done = slotsOf(history.live(), "c1").find((slot) => slot?.status === "done");
+		const done = slotsOf(history.live(), "c1").find(slot => slot?.status === "done");
 		expect(done).toBeDefined();
 		expect(done).not.toHaveProperty("entry");
 		history.detach();

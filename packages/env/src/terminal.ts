@@ -120,7 +120,7 @@ export function openTerminal(connection: Connection, options: TerminalOptions): 
 				},
 			},
 		)
-		.then((reply) => Number(reply.json.exitCode));
+		.then(reply => Number(reply.json.exitCode));
 	// Failing before it started rejects the open; afterwards, `exited` carries it.
 	exited.catch(started.reject);
 	return started.promise;

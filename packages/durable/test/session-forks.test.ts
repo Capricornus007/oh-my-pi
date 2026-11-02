@@ -18,11 +18,11 @@ import {
 } from "./session-support.ts";
 
 function documentCreates(writes: readonly StorageWrite[]) {
-	return writes.filter((write) => write.type === "document.create");
+	return writes.filter(write => write.type === "document.create");
 }
 
 function documentCopies(writes: readonly StorageWrite[]) {
-	return writes.filter((write) => write.type === "document.copy");
+	return writes.filter(write => write.type === "document.copy");
 }
 
 describe("Session conversation document forks", () => {
@@ -62,7 +62,7 @@ describe("Session conversation document forks", () => {
 			scope: "conversation",
 			history: "rewindable",
 			fork: "asOf",
-			initial: (seed) => ({ value: seed }),
+			initial: seed => ({ value: seed }),
 		});
 		const CurrentFamily = defineDocFamily<{ value: string }, string>({
 			checkpointWhen: () => false,
@@ -72,12 +72,12 @@ describe("Session conversation document forks", () => {
 			scope: "conversation",
 			history: "latest",
 			fork: "current",
-			initial: (seed) => ({ value: seed }),
+			initial: seed => ({ value: seed }),
 		});
 		const { session, storage, publications } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "fork-point" })).id;
 			(await tx.doc(AsOf, parentId)).value = "as-at-fork";
 			(await tx.doc(Current, parentId)).value = "current-at-fork";
@@ -86,7 +86,7 @@ describe("Session conversation document forks", () => {
 			(await tx.doc(AsOfFamily, parentId, "b", "unused")).value = "family-as-b";
 			(await tx.doc(CurrentFamily, parentId, "a", "unused")).value = "family-current-a";
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(AsOf, parentId)).value = "as-after-fork";
 			(await tx.doc(Current, parentId)).value = "current-when-copied";
 			(await tx.doc(AsOfFamily, parentId, "a", "unused")).value = "family-as-after";
@@ -96,7 +96,7 @@ describe("Session conversation document forks", () => {
 		const documentReads = storage.documentReadCount;
 
 		const child = await session.commit(
-			(tx) => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		await flush();
@@ -114,10 +114,10 @@ describe("Session conversation document forks", () => {
 		const admitted = storage.admittedCommits.at(-1)!;
 		const copies = documentCopies(admitted);
 		expect(copies).toHaveLength(5);
-		expect(copies.every((write) => write.record.scope.kind === "conversation")).toBe(true);
+		expect(copies.every(write => write.record.scope.kind === "conversation")).toBe(true);
 		expect(
 			copies.every(
-				(write) => write.record.scope.kind === "conversation" && write.record.scope.conversationId === child.id,
+				write => write.record.scope.kind === "conversation" && write.record.scope.conversationId === child.id,
 			),
 		).toBe(true);
 		const publication = publications.at(-1)!;
@@ -126,7 +126,7 @@ describe("Session conversation document forks", () => {
 		for (const change of copied) {
 			expect(change.record.createdAt).toBe(publication.seq);
 			expect(change.conversationId).toBe(child.id);
-			const write = copies.find((candidate) => candidate.record.id === change.record.id)!;
+			const write = copies.find(candidate => candidate.record.id === change.record.id)!;
 			expect(change.source).toEqual(write.source);
 		}
 
@@ -142,12 +142,12 @@ describe("Session conversation document forks", () => {
 		);
 		expect(childRecord!.id).not.toBe(parentRecord!.id);
 
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(AsOf, child.id)).value = "child-independent";
 		}, context);
 		expect(await session.snapshot(AsOf, parentId, context)).toEqual({ value: "as-after-fork" });
 		expect(await session.snapshot(AsOf, child.id, context)).toEqual({ value: "child-independent" });
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Initial, child.id)).value = "child-created";
 		}, context);
 		expect(await session.snapshot(Initial, child.id, context)).toEqual({ value: "child-created" });
@@ -167,17 +167,17 @@ describe("Session conversation document forks", () => {
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
 		let excluded!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "included" })).id;
 			(await tx.doc(Doc, parentId)).value = "final-state-of-commit";
 			excluded = (await tx.appendEntry(parentId, { kind: "excluded" })).id;
 		}, context);
 		const child = await session.commit(
-			(tx) => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await session.snapshot(Doc, child.id, context)).toEqual({ value: "final-state-of-commit" });
-		const visible = await session.commit((tx) => tx.scanEntries({ conversationId: child.id }, 10), context);
+		const visible = await session.commit(tx => tx.scanEntries({ conversationId: child.id }, 10), context);
 		expect(visible.items.map(({ id }) => id)).toContain(forkAt);
 		expect(visible.items.map(({ id }) => id)).not.toContain(excluded);
 	});
@@ -204,31 +204,31 @@ describe("Session conversation document forks", () => {
 		const { session } = openTestSession();
 		const rootId = await createConversation(session);
 		let inherited!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			inherited = (await tx.appendEntry(rootId, { kind: "root" })).id;
 			(await tx.doc(AsOf, rootId)).value = "root-at-entry";
 			(await tx.doc(Current, rootId)).value = "root-current";
 		}, context);
 		const parent = await session.commit(
-			(tx) => tx.forkConversation(rootId, inherited, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(rootId, inherited, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		let parentEntry!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			parentEntry = (await tx.appendEntry(parent.id, { kind: "parent" })).id;
 			(await tx.doc(AsOf, parent.id)).value = "parent-at-own-entry";
 			(await tx.doc(Current, parent.id)).value = "parent-current";
 		}, context);
 
 		const inheritedFork = await session.commit(
-			(tx) => tx.forkConversation(parent.id, inherited, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parent.id, inherited, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await session.snapshot(AsOf, inheritedFork.id, context)).toEqual({ value: "root-at-entry" });
 		expect(await session.snapshot(Current, inheritedFork.id, context)).toEqual({ value: "parent-current" });
 
 		const ownEntryFork = await session.commit(
-			(tx) => tx.forkConversation(parent.id, parentEntry, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parent.id, parentEntry, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await session.snapshot(AsOf, ownEntryFork.id, context)).toEqual({ value: "parent-at-own-entry" });
@@ -263,7 +263,7 @@ describe("Session conversation document forks", () => {
 		const { session, storage } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			await tx.doc(V1, parentId);
 		}, context);
@@ -272,7 +272,7 @@ describe("Session conversation document forks", () => {
 		expect(migrations).toBe(1);
 
 		const child = await session.commit(
-			(tx) => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(migrations).toBe(1);
@@ -305,7 +305,7 @@ describe("Session conversation document forks", () => {
 			history: "rewindable",
 			fork: "asOf",
 			initial: () => ({ count: 0, migrated: false }),
-			migrate: (value) => ({ count: value.count as number, migrated: true }),
+			migrate: value => ({ count: value.count as number, migrated: true }),
 			checkpointWhen: () => {
 				checkpoints++;
 				return false;
@@ -314,13 +314,13 @@ describe("Session conversation document forks", () => {
 		const { session, storage, publications } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			await tx.doc(V1, parentId);
 		}, context);
 
 		const documentReads = storage.documentReadCount;
-		const child = await session.commit(async (tx) => {
+		const child = await session.commit(async tx => {
 			const created = await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } });
 			const value = await tx.doc(V2, created.id);
 			value.count = 9;
@@ -361,29 +361,29 @@ describe("Session conversation document forks", () => {
 		let oldAt!: EntryId;
 		let retiredAt!: EntryId;
 		let newAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			oldAt = (await tx.appendEntry(parentId, { kind: "old" })).id;
 			(await tx.doc(Doc, parentId)).value = "old";
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			retiredAt = (await tx.appendEntry(parentId, { kind: "retired" })).id;
 			await tx.retireDoc(Doc, parentId);
 		}, context);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			newAt = (await tx.appendEntry(parentId, { kind: "new" })).id;
 			(await tx.doc(Doc, parentId)).value = "new";
 		}, context);
 
 		const oldChild = await session.commit(
-			(tx) => tx.forkConversation(parentId, oldAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, oldAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		const emptyChild = await session.commit(
-			(tx) => tx.forkConversation(parentId, retiredAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, retiredAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		const newChild = await session.commit(
-			(tx) => tx.forkConversation(parentId, newAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, newAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await session.snapshot(Doc, oldChild.id, context)).toEqual({ value: "old" });
@@ -396,25 +396,25 @@ describe("Session conversation document forks", () => {
 		const rootId = await createConversation(session);
 		let visible!: EntryId;
 		let hidden!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			visible = (await tx.appendEntry(rootId, { kind: "visible" })).id;
 			hidden = (await tx.appendEntry(rootId, { kind: "hidden" })).id;
 		}, context);
 		const parent = await session.commit(
-			(tx) => tx.forkConversation(rootId, visible, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(rootId, visible, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		await flush();
 		const commits = storage.commits.length;
 		const published = publications.length;
 		await expect(
-			session.commit((tx) => tx.forkConversation(parent.id, hidden, { ownership: { kind: "ownerless" } }), context),
+			session.commit(tx => tx.forkConversation(parent.id, hidden, { ownership: { kind: "ownerless" } }), context),
 		).rejects.toThrow(`Entry ${hidden} is not visible`);
 		await flush();
 		expect(storage.commits).toHaveLength(commits);
 		expect(publications).toHaveLength(published);
 		const independent = await session.commit(
-			(tx) => tx.createConversation({ ownership: { kind: "ownerless" } }),
+			tx => tx.createConversation({ ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await storage.conversation(independent.id, context)).toEqual(independent);
@@ -442,19 +442,19 @@ describe("Session conversation document forks", () => {
 		const { session, storage } = openTestSession();
 		const parentId = await createConversation(session);
 		let oldAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			oldAt = (await tx.appendEntry(parentId, { kind: "old" })).id;
 			await tx.doc(AsOf, parentId);
 		}, context);
-		await session.commit((tx) => tx.retireDoc(AsOf, parentId), context);
-		await session.commit((tx) => tx.doc(Current, parentId).then(() => undefined), context);
+		await session.commit(tx => tx.retireDoc(AsOf, parentId), context);
+		await session.commit(tx => tx.doc(Current, parentId).then(() => undefined), context);
 		const commits = storage.commits.length;
 		await expect(
-			session.commit((tx) => tx.forkConversation(parentId, oldAt, { ownership: { kind: "ownerless" } }), context),
+			session.commit(tx => tx.forkConversation(parentId, oldAt, { ownership: { kind: "ownerless" } }), context),
 		).rejects.toThrow("Fork selects multiple source documents");
 		expect(storage.commits).toHaveLength(commits);
 		const independent = await session.commit(
-			(tx) => tx.createConversation({ ownership: { kind: "ownerless" } }),
+			tx => tx.createConversation({ ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await storage.conversation(independent.id, context)).toEqual(independent);
@@ -482,26 +482,26 @@ describe("Session conversation document forks", () => {
 		const { session, storage } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			await tx.doc(Current, parentId);
 			await tx.doc(AsOf, parentId);
 		}, context);
 		const commits = storage.commits.length;
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				(await tx.doc(Current, parentId)).value = "before-fork";
 				await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } });
 			}, context),
 		).rejects.toThrow("Cannot change fork source document");
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } });
 				(await tx.doc(Current, parentId)).value = "after-fork";
 			}, context),
 		).rejects.toThrow("Cannot change fork source document");
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				(await tx.doc(AsOf, parentId)).value = "as-of-write";
 				await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } });
 			}, context),
@@ -509,7 +509,7 @@ describe("Session conversation document forks", () => {
 		expect(storage.commits).toHaveLength(commits);
 		expect(await session.snapshot(Current, parentId, context)).toEqual({ value: "committed" });
 		const child = await session.commit(
-			(tx) => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(await session.snapshot(Current, child.id, context)).toEqual({ value: "committed" });
@@ -539,7 +539,7 @@ describe("Session conversation document forks", () => {
 		const { session, storage, publications } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			await tx.doc(Copied, parentId);
 			await tx.doc(Failure);
@@ -549,7 +549,7 @@ describe("Session conversation document forks", () => {
 		const published = publications.length;
 		let childId!: ConversationId;
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				childId = (await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } })).id;
 				(await tx.doc(Failure)).count = 1;
 			}, context),
@@ -559,7 +559,7 @@ describe("Session conversation document forks", () => {
 		expect(publications).toHaveLength(published);
 		expect(await storage.conversation(childId, context)).toBeUndefined();
 		failCheckpoint = false;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(Failure)).count = 2;
 		}, context);
 		expect(await session.snapshot(Failure, context)).toEqual({ count: 2 });
@@ -579,7 +579,7 @@ describe("Session conversation document forks", () => {
 		const { session, storage } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			await tx.doc(Doc, parentId);
 		}, context);
@@ -587,12 +587,12 @@ describe("Session conversation document forks", () => {
 		const rejection = new Error("copy rejected");
 		storage.failNextCommit(rejection);
 		await expect(
-			session.commit(async (tx) => {
+			session.commit(async tx => {
 				rejectedChildId = (await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } })).id;
 			}, context),
 		).rejects.toBe(rejection);
 		await expect(
-			session.commit((tx) => tx.createConversation({ ownership: { kind: "ownerless" } }), context),
+			session.commit(tx => tx.createConversation({ ownership: { kind: "ownerless" } }), context),
 		).rejects.toMatchObject({ name: "SessionFailed", cause: rejection });
 		// The failed Session closed its Storage; reopened, it holds nothing of the batch.
 		expect(await session.closed).toEqual({ kind: "failed", error: rejection });
@@ -612,20 +612,20 @@ describe("Session conversation document forks", () => {
 		const { session, storage } = openTestSession();
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			(await tx.doc(Doc, parentId)).value = "copied";
 		}, context);
-		const child = await session.commit(async (tx) => {
+		const child = await session.commit(async tx => {
 			const created = await tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } });
 			await tx.retireDoc(Doc, created.id);
 			(await tx.doc(Doc, created.id)).value = "replacement";
 			return created;
 		}, context);
 		const writes = storage.commits.at(-1)!;
-		expect(writes.filter((write) => write.type === "document.copy")).toHaveLength(1);
-		expect(writes.filter((write) => write.type === "document.create")).toHaveLength(1);
-		expect(writes.filter((write) => write.type === "document.retire")).toHaveLength(1);
+		expect(writes.filter(write => write.type === "document.copy")).toHaveLength(1);
+		expect(writes.filter(write => write.type === "document.create")).toHaveLength(1);
+		expect(writes.filter(write => write.type === "document.retire")).toHaveLength(1);
 		expect(await session.snapshot(Doc, child.id, context)).toEqual({ value: "replacement" });
 	});
 
@@ -664,7 +664,7 @@ describe("Session conversation document forks", () => {
 		const parentId = await createConversation(session);
 		let forkAt!: EntryId;
 		let taskId!: TaskId;
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			forkAt = (await tx.appendEntry(parentId, { kind: "point" })).id;
 			taskId = await tx.createTask(Work, null, { ownership: { kind: "conversation" }, conversationId: parentId });
 			await tx.doc(Copied, parentId);
@@ -672,13 +672,13 @@ describe("Session conversation document forks", () => {
 			await tx.doc(TaskOnly, taskId);
 		}, context);
 		const child = await session.commit(
-			(tx) => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		await flush();
 		const copies = documentCopies(storage.commits.at(-1)!);
-		expect(copies.map((write) => write.record.kind)).toEqual([Copied.definition.kind]);
-		expect(documentCopyChanges(publications.at(-1)!).map((change) => change.record.kind)).toEqual([
+		expect(copies.map(write => write.record.kind)).toEqual([Copied.definition.kind]);
+		expect(documentCopyChanges(publications.at(-1)!).map(change => change.record.kind)).toEqual([
 			Copied.definition.kind,
 		]);
 		expect(await session.snapshot(Copied, child.id, context)).toEqual({ value: "conversation" });
@@ -695,15 +695,12 @@ describe("Session conversation document forks", () => {
 			scope: "conversation",
 			history: "latest",
 			fork: "current",
-			initial: (seed) => ({ value: seed }),
+			initial: seed => ({ value: seed }),
 		});
 		const { session, storage } = openTestSession();
 		const parentId = await createConversation(session);
-		const forkAt = await session.commit(
-			async (tx) => (await tx.appendEntry(parentId, { kind: "point" })).id,
-			context,
-		);
-		await session.commit(async (tx) => {
+		const forkAt = await session.commit(async tx => (await tx.appendEntry(parentId, { kind: "point" })).id, context);
+		await session.commit(async tx => {
 			await Promise.all(
 				Array.from({ length: 260 }, async (_, index) => {
 					await tx.doc(Family, parentId, `member-${index}`, index);
@@ -711,7 +708,7 @@ describe("Session conversation document forks", () => {
 			);
 		}, context);
 		const child = await session.commit(
-			(tx) => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
+			tx => tx.forkConversation(parentId, forkAt, { ownership: { kind: "ownerless" } }),
 			context,
 		);
 		expect(documentCopies(storage.commits.at(-1)!)).toHaveLength(260);

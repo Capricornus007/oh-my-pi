@@ -53,7 +53,7 @@ async function drive(outputLimits: ToolRegistration["outputLimits"] = {}) {
 	]);
 	const { harness, root } = await openChat(new MemoryStorage(), setup);
 	const commits: Op[][] = [];
-	followCommits(harness, (publication) => {
+	followCommits(harness, publication => {
 		for (const change of documentValues(publication)) {
 			if (change.record.kind === "pi.live" && change.ops.length > 0) commits.push([...change.ops]);
 		}
@@ -70,7 +70,7 @@ async function drive(outputLimits: ToolRegistration["outputLimits"] = {}) {
 		/** Operations of every `pi.live` commit so far. */
 		async step(action: Action): Promise<readonly Op[]> {
 			const before = commits.length;
-			push(async (api) => {
+			push(async api => {
 				await action(api);
 				return true;
 			});
@@ -116,7 +116,7 @@ describe("pi.live deltas", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const commits: Op[][] = [];
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of documentValues(publication)) {
 					if (change.record.kind === "pi.live" && change.ops.length > 0) commits.push([...change.ops]);
 				}
@@ -124,12 +124,12 @@ describe("pi.live deltas", () => {
 			end: () => {},
 		});
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const tasks = await harness.commit((tx) => tx.scanTasks({ conversationId: root.id }, 20), context);
-		const id = (kind: string) => tasks.items.filter((task) => task.kind === kind).map((task) => task.id);
+		const tasks = await harness.commit(tx => tx.scanTasks({ conversationId: root.id }, 20), context);
+		const id = (kind: string) => tasks.items.filter(task => task.kind === kind).map(task => task.id);
 		const [firstGeneration, secondGeneration] = id("pi.generation").sort((a, b) => a - b);
 		const [tool] = id("pi.tool");
 		const entries = await root.entries({}, 10, undefined, context);
-		const result = entries.items.find((entry) => entry.kind === "pi.tool-result")!.id;
+		const result = entries.items.find(entry => entry.kind === "pi.tool-result")!.id;
 		expect(commits).toEqual([
 			// submission
 			[
@@ -170,14 +170,14 @@ describe("pi.live deltas", () => {
 
 	it("appends head output and then only updates the dropped counts once the window is full", async () => {
 		const run = await drive({ maxLines: 2 });
-		expect(await run.step((api) => api.output("one\n"))).toEqual([["s", OUTPUT, "one\n"]]);
-		expect(await run.step((api) => api.output("two\n"))).toEqual([["a", OUTPUT, "two\n"]]);
+		expect(await run.step(api => api.output("one\n"))).toEqual([["s", OUTPUT, "one\n"]]);
+		expect(await run.step(api => api.output("two\n"))).toEqual([["a", OUTPUT, "two\n"]]);
 		// The window is full: the retained text stays; only the counts change.
-		expect(await run.step((api) => api.output("three\n"))).toEqual([
+		expect(await run.step(api => api.output("three\n"))).toEqual([
 			["s", ["tools", 0, "droppedBytes"], 6],
 			["s", ["tools", 0, "droppedLines"], 1],
 		]);
-		expect(await run.step((api) => api.output("four\n"))).toEqual([
+		expect(await run.step(api => api.output("four\n"))).toEqual([
 			["s", ["tools", 0, "droppedBytes"], 11],
 			["s", ["tools", 0, "droppedLines"], 2],
 		]);
@@ -187,17 +187,17 @@ describe("pi.live deltas", () => {
 
 	it("slides a tail window as a front trim plus an append", async () => {
 		const run = await drive({ maxLines: 3, retain: "tail" });
-		expect(await run.step((api) => api.output("line 1\nline 2\nline 3\n"))).toEqual([
+		expect(await run.step(api => api.output("line 1\nline 2\nline 3\n"))).toEqual([
 			["s", OUTPUT, "line 1\nline 2\nline 3\n"],
 		]);
-		expect(await run.step((api) => api.output("line 4\n"))).toEqual([
+		expect(await run.step(api => api.output("line 4\n"))).toEqual([
 			["t", OUTPUT, 7],
 			["a", OUTPUT, "line 4\n"],
 			["s", ["tools", 0, "droppedBytes"], 7],
 			["s", ["tools", 0, "droppedLines"], 1],
 		]);
 		// The buffer keeps only the window, and later slides stay minimal and exact.
-		expect(await run.step((api) => api.output("line 5\nline 6\n"))).toEqual([
+		expect(await run.step(api => api.output("line 5\nline 6\n"))).toEqual([
 			["t", OUTPUT, 14],
 			["a", OUTPUT, "line 5\nline 6\n"],
 			["s", ["tools", 0, "droppedBytes"], 21],
@@ -214,17 +214,17 @@ describe("pi.live deltas", () => {
 		const line = (index: number) => `${String(index).padStart(10, "0")} ${"x".repeat(989)}\n`;
 		let text = "";
 		for (let index = 0; index < 100; index++) text += line(index);
-		await wide.step((api) => api.output(text));
-		const slid = await wide.step((api) => api.output(line(100) + line(101) + line(102) + line(103)));
-		expect(slid.filter(isOutput).map((op) => op[0])).toEqual(["s"]);
+		await wide.step(api => api.output(text));
+		const slid = await wide.step(api => api.output(line(100) + line(101) + line(102) + line(103)));
+		expect(slid.filter(isOutput).map(op => op[0])).toEqual(["s"]);
 		await wide.finish();
 		await wide.harness.close(context);
 
 		// Repetitive output still finds an overlap here; Chord's bounded candidate search can give up on other inputs
 		// and then writes one window.
 		const repetitive = await drive({ maxLines: 50, retain: "tail" });
-		await repetitive.step((api) => api.output("y\n".repeat(50)));
-		const repeated = await repetitive.step((api) => api.output("z\n"));
+		await repetitive.step(api => api.output("y\n".repeat(50)));
+		const repeated = await repetitive.step(api => api.output("z\n"));
 		expect(repeated.filter(isOutput)).toEqual([
 			["t", OUTPUT, 2],
 			["a", OUTPUT, "z\n"],
@@ -236,21 +236,21 @@ describe("pi.live deltas", () => {
 	it("diffs details leaf by leaf and appends diagnostics", async () => {
 		const run = await drive();
 		const details = ["tools", 0, "details"];
-		expect(await run.step((api) => api.details({ step: 1, log: "a" }, context))).toEqual([
+		expect(await run.step(api => api.details({ step: 1, log: "a" }, context))).toEqual([
 			["s", details, { step: 1, log: "a" }],
 		]);
-		expect(await run.step((api) => api.details({ step: 2, log: "ab" }, context))).toEqual(
+		expect(await run.step(api => api.details({ step: 2, log: "ab" }, context))).toEqual(
 			expect.arrayContaining([
 				["s", [...details, "step"], 2],
 				["a", [...details, "log"], "b"],
 			]),
 		);
-		expect(await run.step((api) => api.details({ step: 2 }, context))).toEqual([["d", [...details, "log"]]]);
+		expect(await run.step(api => api.details({ step: 2 }, context))).toEqual([["d", [...details, "log"]]]);
 		const diagnostics = ["tools", 0, "diagnostics"];
 		const first = { severity: "info", message: "first" } as const;
 		const second = { severity: "warn", message: "second" } as const;
-		expect(await run.step((api) => api.diagnostic(first))).toEqual([["s", diagnostics, [first]]]);
-		expect(await run.step((api) => api.diagnostic(second))).toEqual([["p", diagnostics, 1, 0, [second]]]);
+		expect(await run.step(api => api.diagnostic(first))).toEqual([["s", diagnostics, [first]]]);
+		expect(await run.step(api => api.diagnostic(second))).toEqual([["p", diagnostics, 1, 0, [second]]]);
 		// Settlement moves everything into the result entry and keeps the slot small.
 		const [settled] = await run.finish();
 		expect(settled).toEqual(
@@ -268,7 +268,7 @@ describe("pi.live deltas", () => {
 		setup.faux.setResponses([fauxAssistantMessage([fauxText("word ".repeat(250))])]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const commits: Op[][] = [];
-		followCommits(harness, (publication) => {
+		followCommits(harness, publication => {
 			for (const change of documentValues(publication)) {
 				if (change.record.kind === "pi.live" && change.ops.length > 0) commits.push([...change.ops]);
 			}
@@ -293,7 +293,7 @@ describe("pi.live deltas", () => {
 				receive: Parameters<MemoryStorage["commit"]>[1],
 				context: Parameters<MemoryStorage["commit"]>[2],
 			) {
-				const kinds = batches.map((writes) => {
+				const kinds = batches.map(writes => {
 					let kind: "base" | "delta" | undefined;
 					for (const write of writes) {
 						if (write.type === "document.change" && write.id === liveId) kind = write.content.kind;
@@ -321,7 +321,7 @@ describe("pi.live deltas", () => {
 					parameters: obj({}),
 					execute: async (_args, api) => {
 						api.output(`${name} output\n`);
-						await new Promise((resolve) => setTimeout(resolve, 150));
+						await new Promise(resolve => setTimeout(resolve, 150));
 						api.output(`${name} more\n`);
 						return {};
 					},
@@ -340,7 +340,7 @@ describe("pi.live deltas", () => {
 		const { harness, root } = await openChat(new RecordingStorage(), setup);
 		const values = new Map<number, LiveState>();
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of documentChanges(publication)) {
 					if (change.record.kind !== "pi.live") continue;
 					liveId = change.record.id;
@@ -351,13 +351,13 @@ describe("pi.live deltas", () => {
 		});
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		const nothingRuns = (value: LiveState) =>
-			value.generation === undefined && !(value.tools ?? []).some((slot) => slot.status === "running");
+			value.generation === undefined && !(value.tools ?? []).some(slot => slot.status === "running");
 		const kinds = [...written].map(([seq, kind]) => {
 			expect(kind === "base").toBe(nothingRuns(values.get(seq)!));
 			return kind;
 		});
 		// Bases at the handover, after each sequential tool, after the round, and when the run ends.
-		expect(kinds.filter((kind) => kind === "base").length).toBeGreaterThanOrEqual(5);
+		expect(kinds.filter(kind => kind === "base").length).toBeGreaterThanOrEqual(5);
 		expect(kinds).toContain("delta");
 		await harness.close(context);
 	});
@@ -383,7 +383,7 @@ describe("pi.live deltas", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const commits: Op[][] = [];
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of documentValues(publication)) {
 					if (change.record.kind === "pi.live" && change.ops.length > 0) commits.push([...change.ops]);
 				}
@@ -391,7 +391,7 @@ describe("pi.live deltas", () => {
 			end: () => {},
 		});
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-		const handover = commits.find((ops) => ops.some((op) => op[0] === "s" && op[1][0] === "tools"))!;
+		const handover = commits.find(ops => ops.some(op => op[0] === "s" && op[1][0] === "tools"))!;
 		// #11043: an unoffered call gets a task too, flagged on its slot.
 		expect(handover).toContainEqual([
 			"s",
@@ -426,7 +426,7 @@ describe("pi.live deltas", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		let handover: CommitPublication | undefined;
 		harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of documentValues(publication)) {
 					if (change.record.kind === "pi.live" && (change.value as LiveState)?.tools?.length === 2) {
 						handover ??= publication;
@@ -437,7 +437,7 @@ describe("pi.live deltas", () => {
 		});
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		const changes = handover!.changes;
-		const kinds = changes.flatMap((change) =>
+		const kinds = changes.flatMap(change =>
 			change.type === "entry" ? [change.value.kind] : change.type === "task" ? [change.value.kind] : [],
 		);
 		expect(kinds.sort()).toEqual(["pi.assistant", "pi.generation", "pi.tool", "pi.tool"]);
@@ -446,13 +446,13 @@ describe("pi.live deltas", () => {
 
 	it("writes an aborted tool's slot with field-level ops", async () => {
 		const run = await drive();
-		await run.step((api) => api.output("partial\n"));
-		await run.step((api) => api.details({ n: 1 }, context));
+		await run.step(api => api.output("partial\n"));
+		await run.step(api => api.details({ n: 1 }, context));
 		const taskId = (await live(run.harness))!.tools![0]!.taskId!;
 		const before = run.commits.length;
 		await run.harness.abortTask(taskId, context);
 		const isAbortCommit = (ops: readonly Op[]) =>
-			ops.some((op) => op[0] === "s" && JSON.stringify(op[1]) === JSON.stringify(["tools", 0, "status"]));
+			ops.some(op => op[0] === "s" && JSON.stringify(op[1]) === JSON.stringify(["tools", 0, "status"]));
 		await waitFor(() => run.commits.slice(before).some(isAbortCommit));
 		const abortCommit = run.commits.slice(before).find(isAbortCommit)!;
 		expect(abortCommit).toEqual(

@@ -31,8 +31,8 @@ function cacheProbe(nonce: string): string {
 
 function assistant(harness: Harness, conversationId: ConversationId, answer: EntryId) {
 	return harness
-		.commit((tx) => tx.entry(AssistantEntry, answer), context)
-		.then((record) => {
+		.commit(tx => tx.entry(AssistantEntry, answer), context)
+		.then(record => {
 			if (record?.conversationId !== conversationId) throw new Error("Answer belongs to another conversation");
 			return record.model?.[0] as AssistantMessage | undefined;
 		});

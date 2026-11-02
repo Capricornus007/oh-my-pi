@@ -225,7 +225,7 @@ function chordTransactions(options: {
 			: undefined;
 		let note: SingletonHandle<typeof VALUE> | undefined;
 		const host = createHost({ store, onError: () => {} });
-		const facet = defineFacet((h) =>
+		const facet = defineFacet(h =>
 			h.serve(Counter, (_, self) => {
 				note = self.state(options.persist ? PersistedNote : InMemoryNote);
 				return { touch: async () => null };
@@ -233,14 +233,14 @@ function chordTransactions(options: {
 		);
 		await host.load([{ name: "@bench/store", facet }], context);
 		const reference = await host.get(Counter, {}, context);
-		await note!.change((draft) => {
+		await note!.change(draft => {
 			draft.n = -1;
 		}, context);
 		const watch = options.watched ? await note!.watch(context) : undefined;
 		watch?.start(async () => {});
 		return {
 			commit: (index: number) =>
-				note!.change((draft) => {
+				note!.change(draft => {
 					draft.n = index + 1;
 				}, context),
 			close: async () => {
@@ -268,14 +268,14 @@ function durableTransactions(watched: boolean) {
 		const { path, remove } = await file();
 		const storage = await SqliteStorage.open(await openNodeSqliteDatabase(path));
 		const session = createSession(storage);
-		await session.commit(async (tx) => {
+		await session.commit(async tx => {
 			(await tx.doc(DurableNote)).n = -1;
 		}, context);
 		const watch = watched ? await session.watchDoc(DurableNote, context) : undefined;
 		watch?.start(async () => {});
 		return {
 			commit: (index: number) =>
-				session.commit(async (tx) => {
+				session.commit(async tx => {
 					(await tx.doc(DurableNote)).n = index + 1;
 				}, context),
 			close: async () => {
@@ -377,7 +377,7 @@ console.log("(e) other costs:");
 			let started = 0;
 			const timed: StagedWrite = {
 				order: put.order,
-				apply: (step) => {
+				apply: step => {
 					started = performance.now();
 					return put.apply(step);
 				},
@@ -394,7 +394,7 @@ console.log("(e) other costs:");
 }
 {
 	const { handle, close } = await filledEdits(10_000, VALUE.body, IndexedEdits);
-	const q = query(IndexedEdits).orderBy((e) => e.at, "desc");
+	const q = query(IndexedEdits).orderBy(e => e.at, "desc");
 	let after: string | undefined;
 	const started = performance.now();
 	for (let page = 0; page < 100; page++) {
@@ -428,8 +428,8 @@ for (const length of [10, 10_000]) {
 }
 {
 	const { store, table, fence, close } = await filledEdits(10_000);
-	const EditsV2 = evolveTable(Edits, (t) =>
-		t.add("dir", str({ default: "" })).rows((row) => ({ dir: row.path.slice(0, 3) })),
+	const EditsV2 = evolveTable(Edits, t =>
+		t.add("dir", str({ default: "" })).rows(row => ({ dir: row.path.slice(0, 3) })),
 	);
 	const chunks: number[] = [];
 	const commit = store.commit.bind(store);

@@ -98,7 +98,7 @@ export function corpus(count: number, seed = 42): CorpusItem[] {
 		const properties = schema.properties as Record<string, Record<string, unknown>>;
 		if (random() < 0.2) {
 			// Move one nested object into $defs and reference it, as MCP servers built with zod often do.
-			const key = Object.keys(properties).find((k) => properties[k].type === "object");
+			const key = Object.keys(properties).find(k => properties[k].type === "object");
 			if (key !== undefined) {
 				const name = `${word()}Def`;
 				schema.$defs = { [name]: properties[key] };

@@ -232,7 +232,7 @@ function checkSequence(sequence: Sequence, rnd: Random): { ops: number; folded: 
 		for (const op of commit.ops) Object.freeze(op);
 		Object.freeze(commit.ops);
 	}
-	const received = JSON.stringify(sequence.commits.map((commit) => commit.ops));
+	const received = JSON.stringify(sequence.commits.map(commit => commit.ops));
 	const queue = new PendingOps();
 	const taken: Array<{ batch: PendingTake; value: JsonValue }> = [];
 	for (const [index, commit] of sequence.commits.entries()) {
@@ -257,7 +257,7 @@ function checkSequence(sequence: Sequence, rnd: Random): { ops: number; folded: 
 	}
 	expect(replica).toEqual(final);
 	expect(decoded).toEqual(final);
-	expect(JSON.stringify(sequence.commits.map((commit) => commit.ops))).toBe(received);
+	expect(JSON.stringify(sequence.commits.map(commit => commit.ops))).toBe(received);
 	return { ops: sequence.commits.reduce((sum, commit) => sum + commit.ops.length, 0), folded };
 }
 
@@ -276,7 +276,7 @@ describe("PendingOps folding", () => {
 					rnd.root(),
 					1 + rnd.int(30),
 					rnd,
-					(draft) => mutateAnywhere(draft, rnd, appendToDraft),
+					draft => mutateAnywhere(draft, rnd, appendToDraft),
 					rnd.root,
 				);
 				const result = checkSequence(sequence, rnd);
@@ -306,7 +306,7 @@ describe("PendingOps folding", () => {
 					initial,
 					5 + rnd.int(40),
 					rnd,
-					(draft) => mutateList(draft, rnd),
+					draft => mutateList(draft, rnd),
 					() => ({ list: [] }),
 				);
 				const result = checkSequence(sequence, rnd);
@@ -326,7 +326,7 @@ describe("PendingOps folding", () => {
 				const initial = Array.from({ length: rnd.int(6) }, () => rnd.value());
 				const replace = () => Array.from({ length: rnd.int(6) }, () => rnd.value());
 				checkSequence(
-					trackedSequence(initial, 40, rnd, (draft) => mutateRootArray(draft, rnd), replace),
+					trackedSequence(initial, 40, rnd, draft => mutateRootArray(draft, rnd), replace),
 					rnd,
 				);
 			}
@@ -695,7 +695,7 @@ const collect = (() => {
 	const gc = runInNewContext("gc") as () => void;
 	return async (): Promise<void> => {
 		for (let round = 0; round < 5; round++) {
-			await new Promise((resolve) => setTimeout(resolve, 0));
+			await new Promise(resolve => setTimeout(resolve, 0));
 			gc();
 		}
 	};

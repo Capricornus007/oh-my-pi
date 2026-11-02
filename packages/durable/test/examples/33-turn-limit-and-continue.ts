@@ -23,7 +23,7 @@ const step = defineTool({
 	name: "step",
 	description: "Do one step of the work",
 	parameters: obj({ n: num() }),
-	execute: async (args) => ({ output: [{ type: "text", text: `step ${args.n} done` }] }),
+	execute: async args => ({ output: [{ type: "text", text: `step ${args.n} done` }] }),
 });
 const call = (n: number) => fauxAssistantMessage(fauxToolCall("step", { n }), { stopReason: "toolUse" });
 
@@ -65,7 +65,7 @@ for (const entry of page.items) {
 	if (message?.role === "toolResult")
 		console.log("  tool:", message.content[0]?.type === "text" ? message.content[0].text : "");
 	if (message?.role === "assistant" && message.stopReason === "stop") {
-		console.log("agent:", message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(""));
+		console.log("agent:", message.content.flatMap(part => (part.type === "text" ? [part.text] : [])).join(""));
 	}
 }
 // A continue after an answer has nothing to answer: it ends without a model request.

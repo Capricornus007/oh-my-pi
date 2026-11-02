@@ -45,18 +45,18 @@ function family(gates: { readonly child: Promise<void>; readonly late: Promise<v
 			spawn: async (task, runtime, ctx) => {
 				const ownership = { kind: "task", taskId: task.id } as const;
 				// Two conversations in a commit that leaves the parent's record unchanged.
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					await tx.createConversation({ ownership });
 					await tx.createConversation({ ownership });
 					return undefined;
 				}, ctx);
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					const child = await tx.createTask(Child, { late: false }, { ownership });
 					return { status: "waiting", checkpoint: { phase: "join", child }, on: [child], policy: "allSettled" };
 				}, ctx);
 			},
 			join: async (task, runtime, ctx) => {
-				await runtime.commit(async (tx) => {
+				await runtime.commit(async tx => {
 					await tx.createTask(Child, { late: true }, { ownership: { kind: "task", taskId: task.id } });
 					return { status: "running", checkpoint: { phase: "finish" } };
 				}, ctx);
@@ -78,7 +78,7 @@ function gatesNever() {
 /** Node states by task kind, for compact assertions. */
 function statuses(graph: TaskGraph): Record<string, string> {
 	return Object.fromEntries(
-		Object.values(graph.tasks).map((node) => [`${node.kind}#${node.id}`, node.state.status] as const),
+		Object.values(graph.tasks).map(node => [`${node.kind}#${node.id}`, node.state.status] as const),
 	);
 }
 
@@ -111,7 +111,7 @@ describe("task graph view", () => {
 		};
 
 		const parent = await root.commit(
-			(tx) => tx.createTask(Parent, null, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(Parent, null, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		await flush();
@@ -134,7 +134,7 @@ describe("task graph view", () => {
 		function childId(): string {
 			return (
 				Object.values(graph.value.tasks)
-					.find((node) => node.kind === "test.graph-child")
+					.find(node => node.kind === "test.graph-child")
 					?.id.toString() ?? ""
 			);
 		}
@@ -164,7 +164,7 @@ describe("task graph view", () => {
 		// Every revision is one commit that changed a node; none repeats its predecessor.
 		for (let index = 1; index < seen.length; index++) expect(seen[index]).not.toEqual(seen[index - 1]);
 		// The commit that created the two conversations published one revision setting them.
-		expect(seen.some((value) => value.tasks[String(parent)]?.conversations.length === 2)).toBe(true);
+		expect(seen.some(value => value.tasks[String(parent)]?.conversations.length === 2)).toBe(true);
 		await graph.stop();
 		await harness.close(context);
 	});
@@ -189,7 +189,7 @@ describe("task graph view", () => {
 		});
 		const first = await openTasks(await openNodeSqliteStorage(path), [Work]);
 		const firstRoot = await first.harness.root(context);
-		const [foreground, background, owned] = await firstRoot.commit(async (tx) => {
+		const [foreground, background, owned] = await firstRoot.commit(async tx => {
 			const foreground = await tx.createTask(Work, null, { ownership: { kind: "conversation" } });
 			const background = await tx.createTask(Work, null, { ownership: { kind: "conversation" }, background: true });
 			const owned = await tx.createConversation({ ownership: { kind: "task", taskId: foreground } });
@@ -197,7 +197,7 @@ describe("task graph view", () => {
 		}, context);
 		first.harness.resume();
 		await eventually(async () =>
-			(await first.harness.inspect(context)).tasks.every((task) => task.state.kind === "running"),
+			(await first.harness.inspect(context)).tasks.every(task => task.state.kind === "running"),
 		);
 		const running = await first.harness.watchTaskGraph(context);
 		expect(statuses(running.value)).toEqual({
@@ -252,7 +252,7 @@ describe("task graph view", () => {
 			initial: () => ({ phase: "spawn" }),
 			phases: {
 				spawn: async (task, runtime, ctx) => {
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						const ownership = { kind: "task", taskId: task.id } as const;
 						const [forked, fresh] = await Promise.all([
 							tx.forkConversation(runtime.conversationId, task.input.at, { ownership }),
@@ -271,7 +271,7 @@ describe("task graph view", () => {
 		const root = await harness.root(context);
 		const graph = await harness.watchTaskGraph(context);
 		graph.start(async () => {});
-		const id = await root.commit(async (tx) => {
+		const id = await root.commit(async tx => {
 			const entry = await tx.appendEntry(root.id, { kind: "note" });
 			return tx.createTask(Spawner, { at: entry.id }, { ownership: { kind: "conversation" } });
 		}, context);
@@ -293,11 +293,11 @@ describe("task graph view", () => {
 		const { harness } = await openTasks(storage, []);
 		const root = await harness.root(context);
 		await root.commit(
-			(tx) => tx.createTask(family(gatesNever()).Child, { late: false }, { ownership: { kind: "conversation" } }),
+			tx => tx.createTask(family(gatesNever()).Child, { late: false }, { ownership: { kind: "conversation" } }),
 			context,
 		);
 		const held = storage.holdCommits();
-		const blocking = harness.commit((tx) => tx.appendEntry(root.id, { kind: "blocker" }).then(() => {}), context);
+		const blocking = harness.commit(tx => tx.appendEntry(root.id, { kind: "blocker" }).then(() => {}), context);
 		await held.entered;
 		const controller = new AbortController();
 		const cancelled = harness.watchTaskGraph({ ...context, abortSignal: controller.signal });
@@ -335,7 +335,7 @@ describe("task graph view", () => {
 		});
 		const { harness } = await openTasks(new MemoryStorage(), [Memo]);
 		const root = await harness.root(context);
-		const id = await root.commit((tx) => tx.createTask(Memo, null, { ownership: { kind: "conversation" } }), context);
+		const id = await root.commit(tx => tx.createTask(Memo, null, { ownership: { kind: "conversation" } }), context);
 		const first = await harness.watchTaskGraph(context);
 		const second = await harness.watchTaskGraph(context);
 		expect(second.value).toBe(first.value);
@@ -379,7 +379,7 @@ describe("task graph view", () => {
 		});
 		const view = await harness.observeConversation(root.id, record("view"), context);
 		const graph = await harness.observeTaskGraph(record("graph"), context);
-		await root.commit(async (tx) => {
+		await root.commit(async tx => {
 			await tx.appendEntry(root.id, { kind: "note" });
 			await tx.createTask(Parent, null, { ownership: { kind: "conversation" } });
 		}, context);

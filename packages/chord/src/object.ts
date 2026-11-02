@@ -696,7 +696,7 @@ class MemberReadable implements Readable<unknown> {
 		this.#source = source;
 		if (source === undefined) return;
 		let first = true;
-		this.#upstream = source.events((event) => {
+		this.#upstream = source.events(event => {
 			const isFirst = first;
 			first = false;
 			if (isFirst && this.#unseen.size === 0 && this.#seen !== undefined && event.value === this.#seen.value) return;
@@ -810,7 +810,7 @@ export class RefImpl {
 		if (installed === undefined || view === undefined) return undefined;
 		return {
 			variant: variantOf(view),
-			members: Object.keys(view).filter((key) => key !== "variant"),
+			members: Object.keys(view).filter(key => key !== "variant"),
 			contract: installed.service.contract.fingerprint,
 		};
 	}
@@ -828,7 +828,7 @@ export class RefImpl {
 	readonly #statusListeners = new Set<StatusListener>();
 
 	#statusChanged(): void {
-		notifyStatus(this.#statusListeners, this.status, this.error, (error) => this.object.host.report(error));
+		notifyStatus(this.#statusListeners, this.status, this.error, error => this.object.host.report(error));
 	}
 
 	release(): void {
@@ -960,7 +960,7 @@ export class RefImpl {
 					} catch (error) {
 						return Promise.reject(error);
 					}
-					return this.object.host.root((root) => this.object.call(this, name, args, root as CtxImpl), {
+					return this.object.host.root(root => this.object.call(this, name, args, root as CtxImpl), {
 						signal: ctx?.signal,
 					});
 				}
@@ -1197,7 +1197,7 @@ export class ObjectImpl {
 			if (promise === undefined) {
 				promise = (async () => {
 					await Promise.all(
-						resource.deps.map((dep) =>
+						resource.deps.map(dep =>
 							!(dep instanceof ResourceImpl) ? dep.ready : resources.includes(dep) ? openOne(dep) : undefined,
 						),
 					);
@@ -1207,11 +1207,11 @@ export class ObjectImpl {
 			}
 			return promise;
 		};
-		const ready = this.withinReadyTimeout(Promise.all(refs.map((ref) => ref.ready)), () =>
-			refs.filter((ref) => ref.status === "loading").map((ref) => ref.address),
+		const ready = this.withinReadyTimeout(Promise.all(refs.map(ref => ref.ready)), () =>
+			refs.filter(ref => ref.status === "loading").map(ref => ref.address),
 		);
 		const results = await Promise.allSettled([...resources.map(openOne), ready]);
-		const failure = results.find((result) => result.status === "rejected");
+		const failure = results.find(result => result.status === "rejected");
 		if (failure !== undefined) throw failure.reason;
 	}
 
@@ -1223,13 +1223,13 @@ export class ObjectImpl {
 		const exposed = Object.entries(run.implementation ?? {});
 		const pending = unhydrated([...run.created.derives, ...exposed.map(([, value]) => value)]);
 		if (pending.length === 0) return;
-		await this.withinReadyTimeout(Promise.all(pending.map((hydration) => hydration.whenHydrated())), () => [
+		await this.withinReadyTimeout(Promise.all(pending.map(hydration => hydration.whenHydrated())), () => [
 			...exposed
 				.filter(([, value]) => hydrationOf(value)?.hydrated === false)
 				.map(([name]) => `${this.address}.${name}`),
 			...run.created.derives
-				.filter((derived) => hydrationOf(derived) !== undefined)
-				.map((derived) => `derive ${derived.key}`),
+				.filter(derived => hydrationOf(derived) !== undefined)
+				.map(derived => `derive ${derived.key}`),
 		]);
 	}
 
@@ -1267,11 +1267,11 @@ export class ObjectImpl {
 		if (run.created.inits.length === 0) return;
 		const results = await Promise.allSettled(
 			run.created.inits.map(async ([cell, init]) => {
-				const value = await this.host.root((ctx) => init(ctx), { signal });
+				const value = await this.host.root(ctx => init(ctx), { signal });
 				if (!signal.aborted) cell.initialize(value);
 			}),
 		);
-		const failure = results.find((result) => result.status === "rejected");
+		const failure = results.find(result => result.status === "rejected");
 		if (failure !== undefined) throw failure.reason;
 	}
 
@@ -1283,8 +1283,8 @@ export class ObjectImpl {
 		);
 		await runAll(
 			[
-				...resources.map((resource) => () => resource.close(this.openOrder)),
-				...run.created.refs.map((ref) => () => ref.release()),
+				...resources.map(resource => () => resource.close(this.openOrder)),
+				...run.created.refs.map(ref => () => ref.release()),
 			],
 			`${this.address}: cleanup failed`,
 		);
@@ -1362,11 +1362,11 @@ export class ObjectImpl {
 				if (isSource(source) || isReadableLike(source)) {
 					entry.buffer = undefined;
 					entry.subscribe = () => {
-						entry.unsubscribe = source.subscribe((event) => this.#deliver(key, event));
+						entry.unsubscribe = source.subscribe(event => this.#deliver(key, event));
 					};
 					continue;
 				}
-				entry.unsubscribe = source.subscribe((event) => {
+				entry.unsubscribe = source.subscribe(event => {
 					if (entry.buffer !== undefined) entry.buffer.push(event);
 					else this.#deliver(key, event);
 				});
@@ -1417,11 +1417,11 @@ export class ObjectImpl {
 		}
 		const deadline = this.host.taskStopDeadline;
 		let timer: ReturnType<typeof setTimeout> | undefined;
-		const late = new Promise<boolean>((resolve) => {
+		const late = new Promise<boolean>(resolve => {
 			timer = setTimeout(() => resolve(true), deadline);
 		});
 		const stopped = Promise.allSettled([...this.#stopped]).then(() => false);
-		void Promise.race([stopped, late]).then((missed) => {
+		void Promise.race([stopped, late]).then(missed => {
 			clearTimeout(timer);
 			if (run !== this.#taskRuns || this.status !== "live") return;
 			if (missed) {
@@ -1493,7 +1493,7 @@ export class ObjectImpl {
 			}
 			const decl = this.decls.listeners.get(key);
 			if (decl === undefined || (this.status !== "live" && this.status !== "activating")) return;
-			const invocation = this.host.root((root) => {
+			const invocation = this.host.root(root => {
 				this.lease(root);
 				const child = (root as CtxImpl).child(this);
 				return this.#invoke(async () => {
@@ -1695,7 +1695,7 @@ export class ObjectImpl {
 		this.stopTasks();
 		this.stopListeners();
 		await Promise.allSettled([...this.#invocations]);
-		const registered = [...decls].some((set) => set.registrations.size > 0) && !this.deferredRuntime;
+		const registered = [...decls].some(set => set.registrations.size > 0) && !this.deferredRuntime;
 		this.implementations.clear();
 		this.decls = new Decls();
 		if (registered) this.host.registriesChanged();
@@ -1708,8 +1708,8 @@ export class ObjectImpl {
 			await runAll(
 				[
 					() => Promise.allSettled([...this.#stopped]),
-					...[...this.openOrder].reverse().map((resource) => () => resource.close(this.openOrder)),
-					...[...refs].map((ref) => () => ref.release()),
+					...[...this.openOrder].reverse().map(resource => () => resource.close(this.openOrder)),
+					...[...refs].map(ref => () => ref.release()),
 				],
 				`${this.address}: disposal failed`,
 			);
@@ -1815,7 +1815,7 @@ class SelfImpl implements Self {
 				this.#object.guard,
 				{
 					dev: host.dev,
-					report: (error) => host.report(error),
+					report: error => host.report(error),
 				},
 			);
 			if (init !== undefined) this.#created.inits.push([cell, init]);
@@ -1859,7 +1859,7 @@ class SelfImpl implements Self {
 	resource<T>(name: string, declaration: ResourceDeclaration<T>): Resource<T> {
 		this.#unique(this.#decls.resources, "resource", name);
 		if (!Number.isInteger(declaration.version)) throw new TypeError(`resource ${name}: version must be an integer`);
-		const deps = (declaration.deps ?? []).map((dep) => {
+		const deps = (declaration.deps ?? []).map(dep => {
 			const resolved = refOf(dep) ?? resourceOf(dep);
 			if (resolved === undefined) {
 				throw new TypeError(`resource ${name}: deps must be references or resources of this object`);
@@ -1904,7 +1904,7 @@ class SelfImpl implements Self {
 		const key = `#${this.#decls.derives.size}`;
 		const derived = new Derived(key, sources, fn as unknown as (...values: never[]) => unknown, {
 			dev: host.dev,
-			report: (error) => host.report(error),
+			report: error => host.report(error),
 		});
 		this.#created.derives.push(derived);
 		this.#decls.derives.set(key, derived);

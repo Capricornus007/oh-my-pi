@@ -17,7 +17,7 @@ class RegistryState<Tool extends ToolRegistration> implements RegistrySnapshot<T
 
 	constructor(extensions: readonly Extension<Tool>[]) {
 		this.#extensions = extensions;
-		this.#byName = new Map(extensions.map((extension) => [extension.name, extension]));
+		this.#byName = new Map(extensions.map(extension => [extension.name, extension]));
 		const tasks = new Map<string, AnyTask>();
 		for (const task of BUILTIN_TASKS) tasks.set(task.definition.name, task);
 		for (const extension of extensions) {
@@ -39,13 +39,11 @@ class RegistryState<Tool extends ToolRegistration> implements RegistrySnapshot<T
 	}
 
 	tools(): readonly { readonly extension: Extension<Tool>; readonly tool: Tool }[] {
-		return this.#extensions.flatMap((extension) => (extension.tools ?? []).map((tool) => ({ extension, tool })));
+		return this.#extensions.flatMap(extension => (extension.tools ?? []).map(tool => ({ extension, tool })));
 	}
 
 	sections(): readonly { readonly extension: Extension<Tool>; readonly section: PromptSection<Tool> }[] {
-		return this.#extensions.flatMap((extension) =>
-			(extension.sections ?? []).map((section) => ({ extension, section })),
-		);
+		return this.#extensions.flatMap(extension => (extension.sections ?? []).map(section => ({ extension, section })));
 	}
 
 	tasks(): readonly AnyTask[] {
@@ -73,7 +71,7 @@ class RegistryImpl<Tool extends ToolRegistration> implements Registry<Tool> {
 	install(extension: Extension<Tool>): void {
 		validateExtension(extension);
 		const current = this.#current.installed();
-		const index = current.findIndex((installed) => installed.name === extension.name);
+		const index = current.findIndex(installed => installed.name === extension.name);
 		const next =
 			index < 0 ? [...current, extension] : current.map((installed, at) => (at === index ? extension : installed));
 		this.#publish(next);
@@ -81,8 +79,8 @@ class RegistryImpl<Tool extends ToolRegistration> implements Registry<Tool> {
 
 	uninstall(extension: Extension): void {
 		const current = this.#current.installed();
-		if (!current.some((installed) => installed.name === extension.name)) return;
-		this.#publish(current.filter((installed) => installed.name !== extension.name));
+		if (!current.some(installed => installed.name === extension.name)) return;
+		this.#publish(current.filter(installed => installed.name !== extension.name));
 	}
 
 	/** Build and validate the next state, which throws on a task name collision, then publish it synchronously. */

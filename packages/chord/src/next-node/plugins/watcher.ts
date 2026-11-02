@@ -111,13 +111,13 @@ export class PluginWatcher extends Source {
 		if (this.#manifest === seen.manifest) this.#manifest = 0;
 		// A removed plugin has nothing to install (its directory went, its package.json with it).
 		for (const name of this.#install)
-			if (!discovery.plugins.some((plugin) => plugin.name === name)) this.#install.delete(name);
+			if (!discovery.plugins.some(plugin => plugin.name === name)) this.#install.delete(name);
 		// A plugin directory linked from outside the roots: a tree of its own (a symlink is not followed).
-		const linked = discovery.plugins.filter(({ dir }) => !this.#roots.some((root) => inside(root, dir)));
+		const linked = discovery.plugins.filter(({ dir }) => !this.#roots.some(root => inside(root, dir)));
 		for (const { dir } of linked) this.#watchTree(dir);
 		for (const tree of this.#trees) {
 			const kept =
-				this.#roots.includes(tree) || this.#baseDirs.includes(tree) || linked.some((each) => each.dir === tree);
+				this.#roots.includes(tree) || this.#baseDirs.includes(tree) || linked.some(each => each.dir === tree);
 			if (!kept) this.#unwatchTree(tree);
 		}
 		this.#changed();
@@ -157,8 +157,8 @@ export class PluginWatcher extends Source {
 
 	/** Marks what a change of the file or directory at `path` (absolute) asks for. */
 	mark(path: string): void {
-		if (path.split(sep).some((part) => IGNORED.has(part))) return;
-		if (this.#baseDirs.some((dir) => inside(dir, path))) {
+		if (path.split(sep).some(part => IGNORED.has(part))) return;
+		if (this.#baseDirs.some(dir => inside(dir, path))) {
 			this.#baseChanged = true;
 		} else {
 			this.#markPlugin(path, this.#generation++);
@@ -180,9 +180,9 @@ export class PluginWatcher extends Source {
 	 * facets read the file is dirty too.
 	 */
 	#markPlugin(path: string, generation: number): void {
-		const plugin = this.#discovery.plugins.find((each) => each.dir === path || inside(each.dir, path));
+		const plugin = this.#discovery.plugins.find(each => each.dir === path || inside(each.dir, path));
 		if (plugin === undefined) {
-			if (this.#roots.some((root) => inside(root, path))) this.#set = generation;
+			if (this.#roots.some(root => inside(root, path))) this.#set = generation;
 		} else if (path === join(plugin.dir, "package.json")) {
 			this.#install.add(plugin.name);
 			this.#manifest = generation;
@@ -197,7 +197,7 @@ export class PluginWatcher extends Source {
 
 	/** Whether `file` (at a plugin's top) is named as a facet file of one of the app's kinds. */
 	#isFacetFile(file: string): boolean {
-		return this.#options.kinds.some((kind) => FACET_EXTENSIONS.some((extension) => file === `${kind}${extension}`));
+		return this.#options.kinds.some(kind => FACET_EXTENSIONS.some(extension => file === `${kind}${extension}`));
 	}
 
 	/** Watches the tree at `dir` (once): it and every directory under it but ignored ones; a missing one is skipped. */
@@ -225,7 +225,7 @@ export class PluginWatcher extends Source {
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT") this.#failed(error);
 			return;
 		}
-		watcher.on("error", (error) => this.#failed(error));
+		watcher.on("error", error => this.#failed(error));
 		this.#watchers.set(dir, watcher);
 		let entries: Dirent[];
 		try {

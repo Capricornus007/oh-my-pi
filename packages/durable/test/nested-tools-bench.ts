@@ -108,7 +108,7 @@ async function runScenario(scenario: Scenario): Promise<{ perRun: Run[]; closedB
 			execute: async (_args, api) => {
 				for (let n = 0; n < CHUNKS; n++) {
 					api.output(chunk);
-					await new Promise((resolve) => setTimeout(resolve, scenario.gapMs));
+					await new Promise(resolve => setTimeout(resolve, scenario.gapMs));
 				}
 				return {};
 			},
@@ -124,7 +124,7 @@ async function runScenario(scenario: Scenario): Promise<{ perRun: Run[]; closedB
 					const calls = Array.from({ length: args.count }, (_, n) =>
 						api.executeTool(target, { n, count: FAN_OUT }, callContext, options),
 					);
-					const failed = (await Promise.all(calls)).filter((result) => result.isError).length;
+					const failed = (await Promise.all(calls)).filter(result => result.isError).length;
 					return { output: [{ type: "text", text: `${failed} failed` }], isError: failed > 0 };
 				},
 			});
@@ -189,7 +189,7 @@ async function runScenario(scenario: Scenario): Promise<{ perRun: Run[]; closedB
 /** A run that answers `done` may still have failed tools; the model-issued call's result says whether any did. */
 async function assertToolsSucceeded(root: Conversation, run: number): Promise<void> {
 	const page = await root.entries({}, 10, undefined, context);
-	const result = page.items.find((entry) => ToolResultEntry.is(entry))?.model?.[0];
+	const result = page.items.find(entry => ToolResultEntry.is(entry))?.model?.[0];
 	if (result?.role !== "toolResult" || result.isError) throw new Error(`run ${run}: a nested call failed`);
 }
 
@@ -215,9 +215,9 @@ async function report(title: string, scenarios: Scenario[]): Promise<void> {
 				`${scenario.gapMs} ms`.padEnd(5),
 				(scenario.progress ? "yes" : "no").padEnd(6),
 				`${first.commits}, ${first.ms} ms, ${mib(all)} (${mib(first.written.task)} / ${mib(first.written["document.change"])} / ${mib(first.written["document.create"])})`,
-				perRun.map((run) => mib(run.storedBytes)).join(" / "),
+				perRun.map(run => mib(run.storedBytes)).join(" / "),
 				mib(closedBytes),
-				`${mib(first.peakHeap)}; ${perRun.map((run) => mib(run.heldHeap)).join(" / ")}`,
+				`${mib(first.peakHeap)}; ${perRun.map(run => mib(run.heldHeap)).join(" / ")}`,
 			].join(" | "),
 		);
 	}

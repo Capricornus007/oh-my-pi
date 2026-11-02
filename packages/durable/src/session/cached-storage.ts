@@ -118,7 +118,7 @@ export class CachedStorage implements Storage {
 		return this.#keep(
 			id,
 			() => this.#storage.conversation(id, context),
-			(record) => this.#conversations.set(id, record),
+			record => this.#conversations.set(id, record),
 		);
 	}
 
@@ -165,7 +165,7 @@ export class CachedStorage implements Storage {
 		return this.#keep(
 			id,
 			() => this.#storage.task(id, context),
-			(record) => this.#keepTask(record),
+			record => this.#keepTask(record),
 		);
 	}
 

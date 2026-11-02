@@ -103,11 +103,11 @@ export class ConsumerSide {
 			method,
 			args: part,
 			segments: payload?.segments,
-			resolve: (value) => {
+			resolve: value => {
 				done();
 				resolve(value);
 			},
-			reject: (error) => {
+			reject: error => {
 				done();
 				reject(error);
 			},

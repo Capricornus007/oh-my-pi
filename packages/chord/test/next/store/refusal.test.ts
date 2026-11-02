@@ -38,16 +38,16 @@ describe("Chord's owners", () => {
 	it("an int out of range fails only its transaction; the object stays live", async () => {
 		const store = await memoryStore();
 		const { host, errors } = await loaded(
-			(h) =>
+			h =>
 				h.serve(Counter, (_, self) => {
 					const counts = self.table(Counts);
 					return {
 						bump: async ({ by }, ctx) => {
-							await self.tx(async (tx) => tx.update(counts, { id: "a" }, (c) => ({ n: add(c.n, by) })), ctx);
+							await self.tx(async tx => tx.update(counts, { id: "a" }, c => ({ n: add(c.n, by) })), ctx);
 							return null;
 						},
-						reset: async (ctx) => {
-							await self.tx(async (tx) => tx.put(counts, { id: "a", n: Number.MAX_SAFE_INTEGER }), ctx);
+						reset: async ctx => {
+							await self.tx(async tx => tx.put(counts, { id: "a", n: Number.MAX_SAFE_INTEGER }), ctx);
 							return null;
 						},
 					};

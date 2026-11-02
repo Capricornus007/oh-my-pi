@@ -93,7 +93,7 @@ export class Route {
 		if (routed === undefined) {
 			const made: Routed = {
 				address,
-				path: new Path((event) => this.#changed(made, event)),
+				path: new Path(event => this.#changed(made, event)),
 				resolving: false,
 				failure: undefined,
 				suspended: false,

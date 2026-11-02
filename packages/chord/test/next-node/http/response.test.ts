@@ -165,7 +165,7 @@ describe("bytes", () => {
 			kind: "bytes",
 			mime: "text/plain",
 			ranges: true,
-			read: async (offset) => {
+			read: async offset => {
 				offsets.push(offset);
 				return pieces.shift()!;
 			},
@@ -225,8 +225,8 @@ describe("bytes", () => {
 				return Buffer.alloc(length);
 			},
 		});
-		await new Promise<void>((resolve) => {
-			const request = httpRequest({ host: "127.0.0.1", port: server.port, path: "/r", agent: false }, (response) => {
+		await new Promise<void>(resolve => {
+			const request = httpRequest({ host: "127.0.0.1", port: server.port, path: "/r", agent: false }, response => {
 				response.once("data", () => {
 					request.destroy();
 					resolve();
@@ -234,9 +234,9 @@ describe("bytes", () => {
 			});
 			request.end();
 		});
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		const after = reads;
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await new Promise(resolve => setTimeout(resolve, 100));
 		expect(signal?.aborted).toBe(true);
 		expect(reads).toBe(after);
 		expect(after).toBeLessThan(1000);

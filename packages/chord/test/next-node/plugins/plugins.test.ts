@@ -65,7 +65,7 @@ function component(root: string): { plugins: Plugins; reported: unknown[] } {
 		{
 			roots: [root],
 			kinds: kindsOf(HOST_PACKAGES),
-			onError: (e) => reported.push(e),
+			onError: e => reported.push(e),
 		},
 		context,
 	);
@@ -90,7 +90,7 @@ describe("per plugin at startup", () => {
 		});
 		const { plugins } = component(root);
 		const host = createHost({ onError: () => {} });
-		const core = defineFacet((h) => h.serve(Item, () => ({ label: constant("core") })));
+		const core = defineFacet(h => h.serve(Item, () => ({ label: constant("core") })));
 		const report = await plugins.load(
 			host,
 			{ kind: "worker", core: [{ name: "@app/core", facet: core }], modules: HOST_PACKAGES },
@@ -232,7 +232,7 @@ describe("rollout", () => {
 	});
 	const report = (failed: readonly string[]): ReloadReport => ({
 		plugins: { added: [], changed: [], removed: [] },
-		failed: failed.map((plugin) => ({ plugin, error: new Error("x") })),
+		failed: failed.map(plugin => ({ plugin, error: new Error("x") })),
 		objects: [],
 	});
 
@@ -388,7 +388,7 @@ describe("installs through the component", () => {
 				roots: [root],
 				kinds: kindsOf(HOST_PACKAGES),
 				install: { npmCommand: [process.execPath, join(tools, "npm.mjs")] },
-				onError: (error) => reported.push(error),
+				onError: error => reported.push(error),
 			},
 			context,
 		);

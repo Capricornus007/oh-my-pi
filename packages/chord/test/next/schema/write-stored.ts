@@ -27,7 +27,7 @@ try {
 	] as const) {
 		await owner.write({ id, body }, context);
 	}
-	await new Promise((resolve) => setTimeout(resolve, 200));
+	await new Promise(resolve => setTimeout(resolve, 200));
 	await mkdir(stored, { recursive: true });
 	await pipeline(encodeJsonl(store.export(context)), createWriteStream(join(stored, "archive.jsonl")));
 	// A clean close: the waiting runs are stored `stopped`, resumed by the next host.

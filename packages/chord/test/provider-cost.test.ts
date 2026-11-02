@@ -9,7 +9,7 @@ import { CountingLink, stateFrames } from "./fixtures/counting.ts";
 
 const counts = vi.hoisted(() => ({ encoders: 0, encodes: 0 }));
 
-vi.mock("../src/delta/index.ts", async (importOriginal) => {
+vi.mock("../src/delta/index.ts", async importOriginal => {
 	const original = await importOriginal<typeof delta>();
 	return {
 		...original,
@@ -26,7 +26,7 @@ vi.mock("../src/delta/index.ts", async (importOriginal) => {
 	};
 });
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const List = remote("t.e8-cost", {
 	version: 1,
@@ -44,7 +44,7 @@ describe("provider cost", () => {
 				variant: "main",
 				items,
 				add: (text: string, ctx: Ctx) => {
-					items.change(ctx, (draft) => {
+					items.change(ctx, draft => {
 						draft.push(text);
 					});
 				},
@@ -65,17 +65,17 @@ describe("provider cost", () => {
 			});
 			return { host, link, ref: host.hold(List, {}) };
 		});
-		await Promise.all(clients.map((client) => client.ref.ready));
+		await Promise.all(clients.map(client => client.ref.ready));
 		const encoders = counts.encoders;
 		const encodes = counts.encodes;
-		const before = clients.map((client) => stateFrames(client.link.received).length);
+		const before = clients.map(client => stateFrames(client.link.received).length);
 		await clients[0]!.ref.add("x");
 		await sleep(10);
 		assert.equal(counts.encodes - encodes, K, "one encode per feed");
 		assert.equal(counts.encoders, encoders, "no new streams for a change");
 		const frames = clients.map((client, i) => stateFrames(client.link.received).slice(before[i]));
 		for (const list of frames) assert.equal(list.length, 1);
-		const ops = frames.map((list) => JSON.stringify(list[0]?.ops));
+		const ops = frames.map(list => JSON.stringify(list[0]?.ops));
 		assert.equal(new Set(ops).size, 1, "every link carries the same ops");
 		for (const client of clients) assert.deepEqual(client.ref.items.value, ["x"]);
 		await server.close();

@@ -66,7 +66,7 @@ export function IsUnicodeLabel(value: string): boolean {
 	// RFC 5893 - Bidi Rule (applies whenever this label itself is RTL)
 	if (FormatBidi.HasRightToLeftCharacters(value) && !FormatBidi.SatisfiesBidiRule(value)) return false;
 	const chars = [...value];
-	const codePoints = chars.map((c) => c.codePointAt(0)!);
+	const codePoints = chars.map(c => c.codePointAt(0)!);
 	const length = codePoints.length;
 	// RFC 5891 §4.2.3.2: Hyphen rules
 	if (HasInvalidHyphens(chars)) return false;

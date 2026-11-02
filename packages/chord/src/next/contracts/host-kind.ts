@@ -64,5 +64,5 @@ export function kindParams(kind: { readonly kind: string }): ParamsData {
 
 /** An address's key: the kind's name and each field value in declared order, joined (`joinKey`). */
 export function addressKey(kind: string, params: ParamsData, values: { readonly [field: string]: unknown }): string {
-	return joinKey([kind, ...params.fields.map((field) => String(values[field]))]);
+	return joinKey([kind, ...params.fields.map(field => String(values[field]))]);
 }

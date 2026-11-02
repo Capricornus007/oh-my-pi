@@ -43,13 +43,13 @@ const NotesDoc = defineState("notes", { schema: obj({ list: arr(Note) }), versio
 // A redaction computed once per store element, so a reader's derive keeps unchanged notes identical.
 const redact = mapShared((note: { text: string; author: string }) => ({ text: note.text }));
 
-const facet = defineFacet<P>((host) => {
+const facet = defineFacet<P>(host => {
 	host.serve(NoteStore, (_, self) => {
 		const doc = self.state(NotesDoc);
 		return {
 			notes: self.derive([doc], ([d]) => d.list),
 			add: async (note, ctx) => {
-				await doc.change((draft) => void draft.list.push(note), ctx);
+				await doc.change(draft => void draft.list.push(note), ctx);
 				return null;
 			},
 		};
@@ -76,7 +76,7 @@ const facet = defineFacet<P>((host) => {
 const server = createHost<P>({
 	address: Server(),
 	principal: { kind: "server" },
-	onError: (error) => console.error("server:", error),
+	onError: error => console.error("server:", error),
 });
 await server.load([{ name: "@example/notes", facet }], context);
 
@@ -84,7 +84,7 @@ await server.load([{ name: "@example/notes", facet }], context);
 // the link; the client connects before it loads (its plugins may reference server types).
 const [up, down] = memoryLinkPair();
 server.accept(up, { principal: { kind: "guest", session: "S1" } }, context);
-const client = createHost<P>({ onError: (error) => console.error("client:", error) });
+const client = createHost<P>({ onError: error => console.error("client:", error) });
 client.connect(down, { principal: { kind: "server" } }, context);
 await client.load([], context);
 
@@ -97,11 +97,11 @@ console.log("guest notes:", JSON.stringify(notes.notes.value), "count:", notes.c
 
 // 4. A commit on the server reaches the client as one state message: both members change in the same batch.
 const watch = await notes.notes.watch(context);
-watch.start(async (call) => {
+watch.start(async call => {
 	if (call.kind === "value") console.log("frame:", JSON.stringify(call.value), "ops:", JSON.stringify(call.ops));
 });
 if (own.variant === "editor") await own.add({ text: "world" }, context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("count after the commit:", notes.count.value);
 
 // 5. TypeScript narrows on `variant`: a reader has no `add` (a forged call would fail `invalid/member` at the server).
@@ -113,7 +113,7 @@ if (notes.variant === "reader") {
 // 6. Closing the server closes its links first: the client's reference goes loading and keeps its last values until
 // a new link holds it again (10-drops.ts). Closing the client releases it and ends its watches.
 await server.close(context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("after the server closed:", notes.state.value, "count:", notes.count.value);
 await client.close(context);
 console.log("after the client closed:", notes.state.value, await watch.closed);

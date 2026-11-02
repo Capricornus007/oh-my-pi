@@ -8,7 +8,7 @@ import { DurableObjectSqliteDatabase, openDurableObjectSqliteStorage } from "../
 import { commitWrites } from "../src/testing/commit-writes.ts";
 import { type EntryId, ROOT_CONVERSATION_ID } from "../src/types.ts";
 
-registerStorageConformance({ describe, expect, it }, "SqliteStorage on a prefixed Durable Object", async (use) =>
+registerStorageConformance({ describe, expect, it }, "SqliteStorage on a prefixed Durable Object", async use =>
 	use(await openDurableObjectSqliteStorage(durableObjectStorage(), { prefix: "pi_" })),
 );
 
@@ -30,13 +30,13 @@ describe("Durable Object SQLite adapter", () => {
 		const names = sqlite
 			.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'index') AND name NOT LIKE 'sqlite_%'")
 			.all()
-			.map((row) => String(row.name));
+			.map(row => String(row.name));
 		expect(names).toContain("host_notes");
 		expect(names).toContain("tasks");
 		expect(names).not.toContain("pi_host_notes");
-		const piNames = names.filter((name) => !["host_notes", "tasks"].includes(name));
+		const piNames = names.filter(name => !["host_notes", "tasks"].includes(name));
 		expect(piNames.length).toBeGreaterThan(10);
-		expect(piNames.every((name) => name.startsWith("pi_"))).toBe(true);
+		expect(piNames.every(name => name.startsWith("pi_"))).toBe(true);
 		expect(piNames).toContain("pi_tasks");
 		expect(piNames).toContain("pi_durable_schema");
 	});

@@ -126,7 +126,7 @@ class Recorder implements SqliteTelemetry, TelemetryPropagation {
 	}
 
 	private inert<T>(options: SpanOptions, callback: (span: TelemetrySpan) => T | Promise<T>): Promise<T> {
-		return NOOP_TELEMETRY_CONTEXT.startSpan(options, (noop) =>
+		return NOOP_TELEMETRY_CONTEXT.startSpan(options, noop =>
 			callback({
 				...noop,
 				metrics: this.metrics,
@@ -165,7 +165,7 @@ class Recorder implements SqliteTelemetry, TelemetryPropagation {
 			propagation: this,
 			startSpan: (options, callback) =>
 				settled ? this.inert(options, callback) : this.start(identity, options, callback),
-			addLink: (link) =>
+			addLink: link =>
 				record(() => {
 					const copied = copyLink(link);
 					if (copied) links.push(copied);
@@ -174,11 +174,11 @@ class Recorder implements SqliteTelemetry, TelemetryPropagation {
 				record(() => {
 					events.push({ name, time_ms: performance.now() - clock, attributes: copyAttributes(attrs) });
 				}),
-			setAttributes: (attrs) =>
+			setAttributes: attrs =>
 				record(() => {
 					attributes = { ...attributes, ...copyAttributes(attrs) };
 				}),
-			setStatus: (value) =>
+			setStatus: value =>
 				record(() => {
 					status =
 						value.status === "error" && value.error
@@ -231,7 +231,7 @@ class Recorder implements SqliteTelemetry, TelemetryPropagation {
 				Object.fromEntries(
 					Object.keys(copied)
 						.sort()
-						.map((key) => [key, copied[key]]),
+						.map(key => [key, copied[key]]),
 				),
 			);
 			const key = JSON.stringify([name, kind, unit, encoded]);
@@ -258,9 +258,9 @@ class Recorder implements SqliteTelemetry, TelemetryPropagation {
 	}
 
 	/** Readers use committed rows only; flush first to include newly settled spans. */
-	readonly getTrace: TelemetryStore["getTrace"] = (traceId) => getTrace(this.db, traceId);
-	readonly findTraces: TelemetryStore["findTraces"] = (query) => findTraces(this.db, query);
-	readonly findMetrics: TelemetryStore["findMetrics"] = (query) => findMetrics(this.db, query);
+	readonly getTrace: TelemetryStore["getTrace"] = traceId => getTrace(this.db, traceId);
+	readonly findTraces: TelemetryStore["findTraces"] = query => findTraces(this.db, query);
+	readonly findMetrics: TelemetryStore["findMetrics"] = query => findMetrics(this.db, query);
 
 	flush(): Promise<void> {
 		return this.closing ?? this.drain(false);
@@ -289,7 +289,7 @@ class Recorder implements SqliteTelemetry, TelemetryPropagation {
 		this.inFlightMeasurements = metrics.length;
 		this.writing = Promise.resolve()
 			.then(() =>
-				this.db.transaction(async (tx) => {
+				this.db.transaction(async tx => {
 					for (const span of spans)
 						await tx.run("INSERT INTO telemetry_spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", ...span);
 					for (const metric of metrics)

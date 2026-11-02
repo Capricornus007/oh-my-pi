@@ -249,7 +249,7 @@ export class ChordObject implements Target {
 			batch: host.batch,
 			context,
 			store: store === undefined ? undefined : { store, owner: served.contract.name },
-			fail: (error) => {
+			fail: error => {
 				if (this.#state.kind === "live") this.failLive(this.#state.attempt, { kind: "broken", error });
 			},
 		});
@@ -590,8 +590,8 @@ export class ChordObject implements Target {
 		if (this.#state.kind === "ended") return;
 		const now = Date.now();
 		const jobs = [...this.#jobs.values()];
-		await Promise.all(jobs.map((records) => records.flushHeld(now)));
-		const next = Math.min(...jobs.map((records) => records.nextDeadline()));
+		await Promise.all(jobs.map(records => records.flushHeld(now)));
+		const next = Math.min(...jobs.map(records => records.nextDeadline()));
 		if (Number.isFinite(next)) this.#heldUntil(next);
 	}
 
@@ -845,7 +845,7 @@ export class ChordObject implements Target {
 			const after = parked ? attempt.checked : Promise.resolve();
 			const closing = after
 				.then(() => old.close(RELOAD))
-				.then((failures) => {
+				.then(failures => {
 					old.detach();
 					old.releaseReferences();
 					return failures;
@@ -1009,7 +1009,7 @@ export class ChordObject implements Target {
 		this.#state = { kind: "failed", failure };
 		this.#lastFailure = cause.error;
 		attempt.seal(this.ended());
-		const closing = attempt.close(END).then((failures) => {
+		const closing = attempt.close(END).then(failures => {
 			attempt.detach();
 			// Released once its natives closed (a close may use them, §6, §13).
 			attempt.releaseReferences();
@@ -1083,7 +1083,7 @@ export class ChordObject implements Target {
 		const retarget = (): void => {
 			for (const holder of holders) holder.retarget();
 		};
-		if (holders.some((holder) => holder.following)) this.host.batch.within(retarget, this.#context);
+		if (holders.some(holder => holder.following)) this.host.batch.within(retarget, this.#context);
 		else retarget();
 		for (const holder of holders) holder.moved();
 	}

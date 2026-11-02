@@ -27,7 +27,7 @@ export class RevocationKeys {
 		if (revokedBy === undefined) return false;
 		let keys = this.#keys.get(principal);
 		if (keys === undefined) {
-			keys = new Set(revokedBy(principal).map((revocation) => canonicalJson(revocation, context)));
+			keys = new Set(revokedBy(principal).map(revocation => canonicalJson(revocation, context)));
 			this.#keys.set(principal, keys);
 		}
 		return keys.has(key);

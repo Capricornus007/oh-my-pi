@@ -89,7 +89,7 @@ export async function fleet(
 	const server = createHost<TestPrincipal>({
 		address: Server(),
 		principal: { kind: "server" },
-		onError: (error) => hostErrors.push(error),
+		onError: error => hostErrors.push(error),
 		...(options.heartbeat === undefined ? {} : { heartbeat: options.heartbeat }),
 	});
 	const workers = createWorkers(
@@ -100,19 +100,19 @@ export async function fleet(
 			entry: ENTRY,
 			execArgv: ["--conditions=source", "--experimental-strip-types", "--no-warnings"],
 			authorize: options.authorize ?? (() => true),
-			principal: options.principal ?? ((address) => ({ kind: "worker", id: address.params.id }) as const),
+			principal: options.principal ?? (address => ({ kind: "worker", id: address.params.id }) as const),
 			start: async (address, startContext) => {
 				starts.push(address.key);
 				if (options.start !== undefined) return options.start(address, startContext);
 				return (behaviours.get(address.params.id) ?? {}) as JsonValue;
 			},
-			lock: (address) => `chord-test:${root}:${address.key}`,
+			lock: address => `chord-test:${root}:${address.key}`,
 			idleMs: () => options.idleMs ?? 60_000,
 			plugins,
 			onOutput: (address, stream, chunk) => {
 				if (stream === "stdout") output.push(`${address.key} ${Buffer.from(chunk).toString().trim()}`);
 			},
-			onError: (error) => errors.push(error),
+			onError: error => errors.push(error),
 		},
 		context,
 	);
@@ -135,7 +135,7 @@ export async function fleet(
 		starts,
 		output,
 		behaviours,
-		label: (label) => writeFile(join(root, "notes", "label.ts"), `export const label = ${JSON.stringify(label)};\n`),
+		label: label => writeFile(join(root, "notes", "label.ts"), `export const label = ${JSON.stringify(label)};\n`),
 	};
 }
 
@@ -144,7 +144,7 @@ export async function until(ready: () => boolean, ms = 10_000): Promise<void> {
 	const deadline = Date.now() + ms;
 	while (!ready()) {
 		if (Date.now() > deadline) throw new Error("until: timed out");
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await new Promise(resolve => setTimeout(resolve, 10));
 	}
 }
 

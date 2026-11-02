@@ -126,9 +126,9 @@ class ReopeningStorage implements Storage {
 	}
 }
 
-registerStorageConformance({ describe, expect, it }, "JsonlStorage", async (use) => use(await createStorage()));
+registerStorageConformance({ describe, expect, it }, "JsonlStorage", async use => use(await createStorage()));
 
-registerStorageConformance({ describe, expect, it }, "JsonlStorage across reopen", async (use) => {
+registerStorageConformance({ describe, expect, it }, "JsonlStorage across reopen", async use => {
 	const directory = await tempDirectory("pi-durable-jsonl-conformance-");
 	const current = await JsonlStorage.open(directory, new NodeExecutionEnv({ cwd: directory }), context);
 	const storage = new ReopeningStorage(current, directory);
@@ -373,7 +373,7 @@ describe("Pico JsonlStorage publication and recovery", () => {
 		expect(await fileExists(join(directory, `task-${taskId}.jsonl`))).toBe(false);
 		expect(await fileExists(join(directory, `doc-${documentId}.jsonl`))).toBe(false);
 		const markerTypes = (await readLines(join(directory, "main.jsonl"))).map(
-			(line) => (JSON.parse(line) as { readonly type: string }).type,
+			line => (JSON.parse(line) as { readonly type: string }).type,
 		);
 		expect(markerTypes).toEqual(["commit", "commit", "commit", "commit", "commit", "commit", "commit"]);
 	});
@@ -416,7 +416,7 @@ describe("Pico JsonlStorage publication and recovery", () => {
 		).rejects.toThrow("poisoned");
 		const partial = await readFile(join(directory, `task-${taskId}.jsonl`));
 		expect(partial.at(-1)).not.toBe(0x0a);
-		expect([...partial].filter((byte) => byte === 0x0a)).toHaveLength(1);
+		expect([...partial].filter(byte => byte === 0x0a)).toHaveLength(1);
 
 		const reopened = await openStorage(directory);
 		expect(await reopened.task(taskId, context)).toBeUndefined();
@@ -725,7 +725,7 @@ describe("Pico JsonlStorage publication and recovery", () => {
 			const reopened = await openStorage(directory);
 			expect((await reopened.document(id, "current", context))?.value).toEqual({ count: 2 });
 			expect(await readLines(join(directory, `doc-${id}.jsonl`))).toHaveLength(1);
-			expect((await readdir(directory)).filter((name) => name.endsWith(".reclaim"))).toEqual([]);
+			expect((await readdir(directory)).filter(name => name.endsWith(".reclaim"))).toEqual([]);
 		});
 	}
 
@@ -758,7 +758,7 @@ describe("Pico JsonlStorage publication and recovery", () => {
 			expect(await reopened.document(id, "current", context)).toBeUndefined();
 			expect(await reopened.task(taskId, context)).toEqual(pendingTask(taskId));
 			expect(await fileExists(join(directory, `doc-${id}.jsonl`))).toBe(false);
-			expect((await readdir(directory)).filter((name) => name.endsWith(".reclaim"))).toEqual([]);
+			expect((await readdir(directory)).filter(name => name.endsWith(".reclaim"))).toEqual([]);
 		});
 	}
 
@@ -886,7 +886,7 @@ describe("Pico JsonlStorage publication and recovery", () => {
 			const reopened = await openStorage(directory);
 			expect(await reopened.task(id, context)).toEqual(terminalTask(id));
 			expect(await fileExists(join(directory, `task-${id}.jsonl`))).toBe(false);
-			expect((await readdir(directory)).filter((name) => name.endsWith(".reclaim"))).toEqual([]);
+			expect((await readdir(directory)).filter(name => name.endsWith(".reclaim"))).toEqual([]);
 		});
 	}
 
@@ -1278,7 +1278,7 @@ describe("JsonlStorage batches", () => {
 		const markers = main
 			.slice(before)
 			.split("\n")
-			.filter((line) => line.length > 0);
+			.filter(line => line.length > 0);
 		expect(markers).toHaveLength(3);
 		await storage.close(context);
 		openStorages.delete(storage);

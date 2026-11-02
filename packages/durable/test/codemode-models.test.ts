@@ -128,10 +128,10 @@ async function run(chat: ReturnType<typeof modelsChat>, code: string, env?: Exec
 	]);
 	const { harness, root } = await openChat(new MemoryStorage(), chat.setup, env === undefined ? {} : { env });
 	await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
-	const entry = (await allEntries(root)).find((candidate) => ToolResultEntry.is(candidate))!;
+	const entry = (await allEntries(root)).find(candidate => ToolResultEntry.is(candidate))!;
 	const message = entry.model![0] as { content: { type: string; text?: string }[]; details?: unknown };
 	const text = message.content
-		.map((item) => item.text ?? `<${item.type}>`)
+		.map(item => item.text ?? `<${item.type}>`)
 		.join("")
 		.replace(/^Script (completed|failed)\nWall time [\d.]+ seconds\nOutput:\n/, "");
 	const usage = await harness.snapshot(UsageDoc, root.id, context);
@@ -228,7 +228,7 @@ describe("code mode models.*", () => {
 		class SlowTempFiles extends NodeExecutionEnv {
 			override async createTempDir(prefix: string | undefined, ctx: Context) {
 				chat.gate.open.resolve();
-				await new Promise((resolve) => setTimeout(resolve, 100));
+				await new Promise(resolve => setTimeout(resolve, 100));
 				return super.createTempDir(prefix, ctx);
 			}
 		}
@@ -266,6 +266,6 @@ describe("code mode models.*", () => {
 			image(result.output[0]);`,
 		);
 		expect(shown.text).not.toContain("Note:");
-		expect(shown.message.content.some((item) => item.type === "image")).toBe(true);
+		expect(shown.message.content.some(item => item.type === "image")).toBe(true);
 	});
 });

@@ -146,7 +146,7 @@ export class Job implements JobHandle<JsonValue, unknown, JsonValue | undefined>
 
 	async start(args: JsonValue, context: Context, options: StartOptions = {}): Promise<Run<AnyOutcome>> {
 		const { documents, token } = this.#owner;
-		return documents.tx((tx) => this.stage(tx, args, context, options), token, context);
+		return documents.tx(tx => this.stage(tx, args, context, options), token, context);
 	}
 
 	outcome(id: string, context: Context): Promise<AnyOutcome> {
@@ -241,7 +241,7 @@ export class Job implements JobHandle<JsonValue, unknown, JsonValue | undefined>
 		}
 		const { documents, token, context } = this.#owner;
 		const reserving = documents
-			.tx((tx) => this.#records.reserve(tx, run), token, context)
+			.tx(tx => this.#records.reserve(tx, run), token, context)
 			.then(
 				() => {
 					if (this.#state !== "sealed") {
@@ -289,7 +289,7 @@ export class Job implements JobHandle<JsonValue, unknown, JsonValue | undefined>
 		})();
 		running
 			.then(
-				(result) => this.#settled(run, invocation, ctx, { kind: "done", result }),
+				result => this.#settled(run, invocation, ctx, { kind: "done", result }),
 				(error: unknown) => this.#settled(run, invocation, ctx, this.#failed(run, invocation, error)),
 			)
 			.finally(() => invocation.ended())
@@ -334,7 +334,7 @@ export class Job implements JobHandle<JsonValue, unknown, JsonValue | undefined>
 			for (;;) {
 				try {
 					return await documents.tx(
-						async (tx) => {
+						async tx => {
 							const staging = this.#records.staging(tx);
 							staging.finishing = run;
 							await this.#implementation.finish?.(this.#records.outcomeOf(run, context), tx);
@@ -400,7 +400,7 @@ export class Job implements JobHandle<JsonValue, unknown, JsonValue | undefined>
 				// A change resetting the restart count is stored at once: the reset must be durable (D8).
 				const now = run.restarts === 0 ? persistence : IMMEDIATE;
 				return documents.tx(
-					async (tx) => {
+					async tx => {
 						const value = fn(await tx.draftSlot(states, run.id));
 						records.progressed(tx, run);
 						return value;

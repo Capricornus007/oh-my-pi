@@ -59,7 +59,7 @@ export class Upgrades {
 		context: Context,
 	): void {
 		const { principal, limits } = admission;
-		upgrade(message, stream, head, admission.maxPayload ?? DEFAULT_LINK_PAYLOAD, (socket) => {
+		upgrade(message, stream, head, admission.maxPayload ?? DEFAULT_LINK_PAYLOAD, socket => {
 			const link = webSocketLink(limitedSocket(socket));
 			this.#keep({
 				socket,
@@ -87,7 +87,7 @@ export class Upgrades {
 		failed: (failure: SocketFailure) => void,
 	): void {
 		const { principal, match, request } = admission;
-		upgrade(message, stream, head, match.maxPayload, (socket) => {
+		upgrade(message, stream, head, match.maxPayload, socket => {
 			const closed = new AbortController();
 			const seal = (): void => closed.abort(new Error("http: the socket closed"));
 			socket.once("close", seal);
@@ -103,7 +103,7 @@ export class Upgrades {
 					return;
 				}
 				if (!closed.signal.aborted) {
-					await new Promise((resolve) => closed.signal.addEventListener("abort", resolve, { once: true }));
+					await new Promise(resolve => closed.signal.addEventListener("abort", resolve, { once: true }));
 				}
 			};
 			// The scope sealed (its socket closed, the host closing) is no failure of the handler.
@@ -130,7 +130,7 @@ export class Upgrades {
 		const open = [...this.#open];
 		const closed = open.map(
 			({ socket }) =>
-				new Promise<void>((resolve) => {
+				new Promise<void>(resolve => {
 					if (socket.readyState === socket.CLOSED) resolve();
 					else socket.once("close", () => resolve());
 				}),
@@ -231,7 +231,7 @@ export function limitedSocket(socket: WebSocket): WebSocketLike {
 			// The largest server frame header is 10 bytes.
 			const frame = { bytes: data.byteLength + 10 };
 			unsent.add(frame);
-			socket.send(data, (error) => {
+			socket.send(data, error => {
 				unsent.delete(frame);
 				if (error) socket.terminate();
 			});

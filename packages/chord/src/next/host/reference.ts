@@ -458,7 +458,7 @@ export class Binding implements Holder, UnboundRequest {
 
 	/** Resolves when the reference is live; rejects with a broken failure's error, or its end. Getters wait for it. */
 	live(context: Context): Promise<void> {
-		return this.#until((state) => {
+		return this.#until(state => {
 			if (state.kind === "live") return DONE;
 			const broken = state.kind === "failed" && state.cause.kind === "broken";
 			return broken ? { kind: "failed", error: state.cause.error } : WAIT;
@@ -569,13 +569,13 @@ export class Binding implements Holder, UnboundRequest {
 	 */
 	async firstValues(context: Context): Promise<void> {
 		if (this.#state.kind === "bound" && this.#state.target.hydrated) return;
-		await this.#until((state) => (state.kind === "live" ? DONE : WAIT), context);
+		await this.#until(state => (state.kind === "live" ? DONE : WAIT), context);
 	}
 
 	/** Resolves once the object's members have values; rejects when the reference fails or is released first. */
 	async hydrated(context: Context): Promise<void> {
 		if (this.#state.kind === "bound" && this.#state.target.hydrated) return;
-		await this.#until((state) => {
+		await this.#until(state => {
 			if (state.kind === "live") return DONE;
 			if (state.kind === "failed") return { kind: "failed", error: state.cause.error };
 			return WAIT;
@@ -677,7 +677,7 @@ export class Binding implements Holder, UnboundRequest {
 				keys?.end(error);
 			};
 			// A batch only when something still follows them (an ending object's derives detached already).
-			const used = keys !== undefined || [...(sources?.values() ?? [])].some((source) => source.inUse);
+			const used = keys !== undefined || [...(sources?.values() ?? [])].some(source => source.inUse);
 			if (used) previous.batch.within(end, BACKGROUND_CONTEXT);
 			else end();
 		}
@@ -738,7 +738,7 @@ export class Binding implements Holder, UnboundRequest {
 				if (decision.kind === "done") settle(resolve);
 				else if (decision.kind === "failed") settle(() => reject(decision.error));
 			},
-			end: (error) => settle(() => reject(error)),
+			end: error => settle(() => reject(error)),
 		};
 		const abort = (): void => settle(() => reject(signal?.reason));
 		this.#waiters.add(waiter);

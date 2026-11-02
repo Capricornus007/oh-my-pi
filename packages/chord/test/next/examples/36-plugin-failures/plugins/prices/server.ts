@@ -3,4 +3,4 @@
 import { constant, defineFacet } from "@earendil-works/chord/next";
 import { Price } from "./contract.ts";
 
-export default defineFacet((host) => host.serve(Price, () => ({ cents: constant(250) })));
+export default defineFacet(host => host.serve(Price, () => ({ cents: constant(250) })));

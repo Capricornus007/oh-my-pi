@@ -46,7 +46,7 @@ async function open(storage: ControlledStorage, setup: ChatSetup) {
 /** The partial text of every `pi.live` revision memory adopted, the last one last. */
 function memoryPartials(harness: Harness): string[] {
 	const texts: string[] = [];
-	followCommits(harness, (publication) => {
+	followCommits(harness, publication => {
 		for (const change of publication.changes) {
 			if (change.type !== "document" || change.kind !== "change" || change.record.kind !== LiveDoc.definition.kind)
 				continue;
@@ -77,7 +77,7 @@ async function storedLive(storage: ControlledStorage, conversationId: Conversati
 
 /** The text of a partial message's first text block. */
 function partialText(message: PartialMessage | undefined): string | undefined {
-	const block = message?.content.find((candidate) => candidate.type === "text");
+	const block = message?.content.find(candidate => candidate.type === "text");
 	return block?.type === "text" ? block.text : undefined;
 }
 
@@ -89,8 +89,8 @@ function storedText(live: LiveState | undefined): string | undefined {
 /** Assistant entries: their text and stop reason. */
 function answers(entries: readonly EntryRecord[]): { text: string | undefined; stopReason: string | undefined }[] {
 	return entries
-		.filter((entry) => AssistantEntry.is(entry))
-		.map((entry) => {
+		.filter(entry => AssistantEntry.is(entry))
+		.map(entry => {
 			const message = entry.model![0]!;
 			return { text: textOf(message), stopReason: message.role === "assistant" ? message.stopReason : undefined };
 		});
@@ -106,7 +106,7 @@ describe("generation partials", () => {
 		await (await root.submit({ type: "input", content: "hi" }, context)).wait(context);
 		const writesLive = storage.commits
 			.slice(from)
-			.filter((batch) => batch.some((write) => write.type === "document.change"));
+			.filter(batch => batch.some(write => write.type === "document.change"));
 		// About 2 s of streaming at 100 ms per partial: some 20 partials in memory, a store about every 400 ms.
 		expect(memory.length).toBeGreaterThan(12);
 		expect(writesLive.length).toBeLessThan(memory.length / 1.5);
@@ -121,7 +121,7 @@ describe("generation partials", () => {
 		// A replica fed by observeCommits() alone, as a replication feed would be.
 		let replica = await storedLive(storage, opened.root.id);
 		opened.harness.observeCommits({
-			advance: (publication) => {
+			advance: publication => {
 				for (const change of publication.changes) {
 					if (
 						change.type === "document" &&
@@ -241,7 +241,7 @@ describe("generation partials", () => {
 		opened.harness.resume();
 		const settled = await (await opened.harness.submission(id, context))!.wait(context);
 		if (settled.status !== "done" || settled.type !== "input") throw new Error(`Unexpected ${settled.status}`);
-		const answer = await opened.root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+		const answer = await opened.root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 		expect(textOf(answer?.model?.[0])).toBe("deferred answer");
 		expect(setup.faux.state.deferredFetchCount).toBe(1);
 		await opened.harness.close(context);
@@ -275,7 +275,7 @@ describe("tool output", () => {
 				for (let line = 0; !signal.aborted; line++) {
 					api.output(`line ${line}\n`);
 					state.lines.push(`line ${line}\n`);
-					await new Promise((resolve) => setTimeout(resolve, 20));
+					await new Promise(resolve => setTimeout(resolve, 20));
 				}
 				return aborted(signal);
 			},
@@ -289,11 +289,11 @@ describe("tool output", () => {
 
 	function results(entries: readonly EntryRecord[]): string[] {
 		return entries
-			.filter((entry) => ToolResultEntry.is(entry))
-			.map((entry) => {
+			.filter(entry => ToolResultEntry.is(entry))
+			.map(entry => {
 				const message = entry.model![0]!;
 				if (message.role !== "toolResult") return "";
-				return message.content.map((item) => (item.type === "text" ? item.text : "")).join("|");
+				return message.content.map(item => (item.type === "text" ? item.text : "")).join("|");
 			});
 	}
 
@@ -314,7 +314,7 @@ describe("tool output", () => {
 					runs++;
 					for (let line = 0; !callContext.abortSignal!.aborted; line++) {
 						api.output(`run ${runs} line ${line}\n`);
-						await new Promise((resolve) => setTimeout(resolve, 20));
+						await new Promise(resolve => setTimeout(resolve, 20));
 					}
 					return aborted(callContext.abortSignal!);
 				},
@@ -332,7 +332,7 @@ describe("tool output", () => {
 			);
 			await crash(opened.harness);
 			opened = await open(storage, setup);
-			const tool = (await opened.harness.commit((tx) => tx.scanTasks({ kind: "pi.tool" }, 1), context)).items[0]!;
+			const tool = (await opened.harness.commit(tx => tx.scanTasks({ kind: "pi.tool" }, 1), context)).items[0]!;
 			expect(tool.restarts).toBe(crashes);
 		}
 		await opened.harness.close(context);
@@ -401,7 +401,7 @@ describe("compaction", () => {
 		setup.settings.compaction = { enabled: false, reserveTokens: 1000, keepRecentTokens: 150, backgroundTokens: 0 };
 		const summarizing = deferred();
 		setup.faux.setResponses([
-			...["a1", "a2", "a3"].map((label) => fauxAssistantMessage(`${label} ${"word ".repeat(100)}`)),
+			...["a1", "a2", "a3"].map(label => fauxAssistantMessage(`${label} ${"word ".repeat(100)}`)),
 			async (_request, options) => {
 				summarizing.resolve();
 				return aborted(options!.signal!);
@@ -409,9 +409,9 @@ describe("compaction", () => {
 		]);
 		let opened = await open(storage, setup);
 		for (const label of ["u1", "u2", "u3"]) {
-			await (await opened.root.submit({ type: "input", content: `${label} ${"word ".repeat(100)}` }, context)).wait(
-				context,
-			);
+			await (
+				await opened.root.submit({ type: "input", content: `${label} ${"word ".repeat(100)}` }, context)
+			).wait(context);
 		}
 		const id = await opened.root.compact(undefined, context);
 		await summarizing.promise;
@@ -420,7 +420,7 @@ describe("compaction", () => {
 		setup.faux.setResponses([fauxAssistantMessage("SUMMARY")]);
 		opened = await open(storage, setup);
 		expect((await opened.harness.waitForTask(id, context)).state.outcome.status).toBe("completed");
-		await waitFor(async () => (await allEntries(opened.root)).some((entry) => entry.kind === "pi.compaction"));
+		await waitFor(async () => (await allEntries(opened.root)).some(entry => entry.kind === "pi.compaction"));
 		expect(await opened.harness.snapshot(LiveDoc, opened.root.id, context)).toEqual({});
 		await opened.harness.close(context);
 	});
@@ -436,7 +436,7 @@ describe("reading pi.live in a commit", () => {
 			initial: () => ({ phase: "run" }),
 			phases: {
 				run: async (task, runtime, ctx) => {
-					await runtime.commit(async (tx) => {
+					await runtime.commit(async tx => {
 						const live = await tx.doc(LiveDoc, task.input.conversationId);
 						const text = partialText(live.generation?.message) ?? "";
 						await tx.appendEntry(task.input.conversationId, { kind: "test.audit", data: text });
@@ -453,17 +453,17 @@ describe("reading pi.live in a commit", () => {
 		await waitFor(() => (opened.memory.at(-1)?.length ?? 0) > 40);
 		const conversationId = opened.root.id;
 		const audit = await opened.harness.commit(
-			(tx) => tx.createTask(Audit, { conversationId }, { ownership: { kind: "conversation" }, conversationId }),
+			tx => tx.createTask(Audit, { conversationId }, { ownership: { kind: "conversation" }, conversationId }),
 			context,
 		);
 		await opened.harness.waitForTask(audit, context);
-		const derived = String((await allEntries(opened.root)).find((entry) => entry.kind === "test.audit")!.data);
+		const derived = String((await allEntries(opened.root)).find(entry => entry.kind === "test.audit")!.data);
 		expect(derived.length).toBeGreaterThan(40);
 		// The read stored the partial it saw, in the same storage transaction as the entry.
-		const batch = storage.commits.find((writes) =>
-			writes.some((write) => write.type === "entry" && write.value.kind === "test.audit"),
+		const batch = storage.commits.find(writes =>
+			writes.some(write => write.type === "entry" && write.value.kind === "test.audit"),
 		)!;
-		expect(batch.some((write) => write.type === "document.change")).toBe(true);
+		expect(batch.some(write => write.type === "document.change")).toBe(true);
 		await crash(opened.harness);
 		expect(storedText(await storedLive(storage, conversationId))).toBe(derived);
 

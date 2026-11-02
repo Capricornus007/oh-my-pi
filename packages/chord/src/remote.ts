@@ -358,7 +358,7 @@ export class RemoteBinding {
 	#stateMembers(shape: Shape): string[] {
 		const members = shape.variant === undefined ? undefined : this.contract.description.variants[shape.variant];
 		if (members === undefined) return [];
-		return shape.members.filter((name) => members[name]?.kind === "state");
+		return shape.members.filter(name => members[name]?.kind === "state");
 	}
 
 	/** Applies the pending shape with its snapshots: members outside the variant go, new values are announced. */
@@ -370,7 +370,7 @@ export class RemoteBinding {
 		const wanted = new Set(this.#stateMembers(pending.shape));
 		for (const name of [...this.members.keys()]) if (!wanted.has(name)) this.members.delete(name);
 		for (const [name, state] of pending.values) if (wanted.has(name)) this.members.set(name, state);
-		this.hydrated = this.stateOn && [...wanted].every((name) => this.members.has(name));
+		this.hydrated = this.stateOn && [...wanted].every(name => this.members.has(name));
 		if (this.hydrated) this.#settleHydration();
 		this.status = "live";
 		this.#applied = true;
@@ -600,15 +600,15 @@ export class RemoteRef implements RefCore {
 	}
 
 	#notify(): void {
-		notifyStatus(this.#statusListeners, this.status, this.error, (error) => this.binding.host.report(error));
+		notifyStatus(this.#statusListeners, this.status, this.error, error => this.binding.host.report(error));
 	}
 
 	// ─── members ───
 
 	member(name: string): unknown {
 		const description = Object.values(this.contract.description.variants)
-			.map((members) => members[name])
-			.find((member) => member !== undefined);
+			.map(members => members[name])
+			.find(member => member !== undefined);
 		if (description?.kind === "method") return this.#caller(name);
 		if (description?.kind === "state") {
 			let readable = this.#readables.get(name);
@@ -642,7 +642,7 @@ export class RemoteRef implements RefCore {
 					return Promise.reject(error);
 				}
 				if (ctx === undefined || ctx.holder) {
-					return host.root((root) => this.#call(name, args, root), { signal: ctx?.signal });
+					return host.root(root => this.#call(name, args, root), { signal: ctx?.signal });
 				}
 				return this.#call(name, args, ctx);
 			};

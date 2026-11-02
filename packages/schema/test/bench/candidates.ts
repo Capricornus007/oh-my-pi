@@ -64,7 +64,7 @@ const typebox: Candidate = {
 	name: noEval ? "typebox (no eval: interpreter)" : "typebox",
 	prepare(schema, options) {
 		const validator = typeboxCompile(schema, options, true);
-		return { check: (v) => validator.Check(v), validator };
+		return { check: v => validator.Check(v), validator };
 	},
 };
 
@@ -72,7 +72,7 @@ const typeboxInterpreter: Candidate = {
 	name: "typebox interpreter",
 	prepare(schema, options) {
 		const validator = typeboxCompile(schema, options, false);
-		return { check: (v) => validator.Check(v), validator };
+		return { check: v => validator.Check(v), validator };
 	},
 };
 
@@ -81,7 +81,7 @@ const cfworker: Candidate = {
 	prepare(schema, options) {
 		const validator = new CfValidator(schema as never, options.draft, true);
 		for (const [uri, remote] of Object.entries(options.schemas ?? {})) validator.addSchema(remote as never, uri);
-		return { check: (v) => validator.validate(v).valid, validator };
+		return { check: v => validator.validate(v).valid, validator };
 	},
 };
 
@@ -98,7 +98,7 @@ const omptype: Candidate = {
 				if (!(error instanceof EvalError)) throw error;
 			}
 		}
-		return { check: (v) => validator.allows(v), validator };
+		return { check: v => validator.allows(v), validator };
 	},
 };
 
@@ -145,7 +145,7 @@ const ajv: Candidate = {
 			}
 		}
 		const validator = instance.compile(schema as object);
-		return { check: (v) => validator(v) as boolean, validator };
+		return { check: v => validator(v) as boolean, validator };
 	},
 };
 
@@ -171,7 +171,7 @@ const ata: Candidate = {
 	name: noEval ? "ata (no eval: interpreter)" : "ata",
 	prepare(schema, options) {
 		const validator = ataValidator(schema, options, undefined);
-		return { check: (v) => validator.isValidObject(v), validator };
+		return { check: v => validator.isValidObject(v), validator };
 	},
 };
 
@@ -180,7 +180,7 @@ const ataInterpreter: Candidate = {
 	name: "ata interpreter",
 	prepare(schema, options) {
 		const validator = ataValidator(schema, options, "interpreter");
-		return { check: (v) => validator.isValidObject(v), validator };
+		return { check: v => validator.isValidObject(v), validator };
 	},
 };
 
@@ -192,7 +192,7 @@ const zod: Candidate = {
 		const validator = options.suite
 			? zodFromJsonSchema(schema, options.draft)
 			: (nativeCases.get(schema) ?? nativeZod(schema as Record<string, unknown>));
-		return { check: (v) => validator.safeParse(v).success, validator };
+		return { check: v => validator.safeParse(v).success, validator };
 	},
 };
 
@@ -201,5 +201,5 @@ export const candidates: readonly Candidate[] = [piSchema, typebox, ajv, ata, at
 
 /** Candidates by name, including TypeBox's interpreter (what TypeBox runs when eval is unavailable). */
 export const byName: ReadonlyMap<string, Candidate> = new Map(
-	[...candidates, typeboxInterpreter].map((c) => [c.name.split(" (")[0], c]),
+	[...candidates, typeboxInterpreter].map(c => [c.name.split(" (")[0], c]),
 );

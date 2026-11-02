@@ -152,7 +152,7 @@ export function currentVariants(contract: Contract): ReadonlyMap<string, Variant
 /** The variants of version `version` of a contract's history (an older consumer's binding, Q10). */
 export function variantsAt(contract: Contract, version: number): ReadonlyMap<string, VariantData> {
 	// Callers name a version the provider binds (`binds`): its history has it.
-	return contractData(contract).versions.find((data) => data.version === version)!.variants;
+	return contractData(contract).versions.find(data => data.version === version)!.variants;
 }
 
 /** A variant's names as links index them (2b): its state members and its methods, each sorted. */

@@ -28,21 +28,21 @@ describe("reading a cell", () => {
 	const v2 = new JsonColumn(MetaV2, 2, (old, from) => ({ tags: (old as { tag: string }).tag, n: from }));
 
 	it("parses a cell of the current version with no check", async () => {
-		const counts = await counted((context) => {
+		const counts = await counted(context => {
 			expect(v2.read('{"tags":"a","n":1}', 2, "t.meta", context)).toEqual({ tags: "a", n: 1 });
 		});
 		expect(counts.validations).toBe(0);
 	});
 
 	it("migrates an older cell and checks the result once (R8)", async () => {
-		const counts = await counted((context) => {
+		const counts = await counted(context => {
 			expect(v2.read('{"tag":"x"}', 1, "t.meta", context)).toEqual({ tags: "x", n: 1 });
 		});
 		expect(counts.validations).toBe(1);
 	});
 
 	it("refuses a newer cell, a missing or throwing migrate and an invalid result", async () => {
-		await counted((context) => {
+		await counted(context => {
 			expect(() => v2.read("{}", 3, "t.meta", context)).toThrow("newer than 2");
 			expect(() => new JsonColumn(MetaV2, 2, undefined).read("{}", 1, "t.meta", context)).toThrow("no migrate");
 			const throwing = new JsonColumn(MetaV2, 2, () => {

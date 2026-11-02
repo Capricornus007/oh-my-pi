@@ -65,11 +65,11 @@ async function served(persisted: boolean) {
 	const waiting: ((parked: Parked) => void)[] = [];
 	let jobs: JobHandle<{ path: string }, { count: number }, Progress> | undefined;
 	const host = createHost({ store, onError: () => {} });
-	const facet = defineFacet((h) =>
+	const facet = defineFacet(h =>
 		h.serve(Worker, (_, self) => {
 			jobs = self.job(persisted ? PersistedImport : InMemoryImport, {
 				run: (_args, ctx) =>
-					new Promise((resolve) => {
+					new Promise(resolve => {
 						const run = { state: ctx.state, end: () => resolve({ count: ctx.state.value.done }) };
 						const next = waiting.shift();
 						if (next === undefined) parked.push(run);
@@ -84,7 +84,7 @@ async function served(persisted: boolean) {
 	return {
 		jobs: jobs!,
 		/** The parked `run` of the next run invoked. */
-		next: () => new Promise<Parked>((resolve) => waiting.push(resolve)),
+		next: () => new Promise<Parked>(resolve => waiting.push(resolve)),
 		close: async () => {
 			reference.release();
 			await host.close(context);
@@ -105,7 +105,7 @@ async function bursts(
 	const times: number[] = [];
 	for (let run = -1; run < RUNS; run++) {
 		const worker = await served(persisted);
-		await burst(worker, async (operation) => {
+		await burst(worker, async operation => {
 			const before = performance.now();
 			await operation();
 			if (run >= 0) times.push(performance.now() - before);
@@ -139,7 +139,7 @@ function changes(persisted: boolean, deferred: boolean) {
 		for (let index = 0; index < OPERATIONS; index++) {
 			await time(() =>
 				state.change(
-					(draft) => {
+					draft => {
 						draft.done = index + 1;
 					},
 					context,

@@ -70,10 +70,10 @@ export function planSystemEntries(
 	timestamp: number,
 ): SystemDraft[] {
 	const head = view.head;
-	if (head !== undefined && !view.entries.some((entry) => SystemEntry.is(entry) && entry.id > head.id)) {
+	if (head !== undefined && !view.entries.some(entry => SystemEntry.is(entry) && entry.id > head.id)) {
 		const edits: ContextEdit[] = view.entries
-			.filter((entry) => SystemEntry.is(entry))
-			.map((entry) => ({ target: entry.id, action: "omit" }));
+			.filter(entry => SystemEntry.is(entry))
+			.map(entry => ({ target: entry.id, action: "omit" }));
 		const baseline = systemEntry(
 			Object.fromEntries(desired),
 			{ toolsRemoved: [], toolsAdded: tools.map(toToolDeclaration) },
@@ -84,7 +84,7 @@ export function planSystemEntries(
 	const sections = planSections(replaySections(view.messages), desired);
 	const changes = planTools(getCurrentTools(view.messages), tools);
 	if (changes.toolsRemoved.length === 0 && changes.toolsAdded.length === 0) {
-		return sections.map((patch) => systemEntry(patch, undefined, timestamp));
+		return sections.map(patch => systemEntry(patch, undefined, timestamp));
 	}
 	if (sections.length === 0) return [systemEntry(undefined, changes, timestamp)];
 	return sections.map((patch, index) =>
@@ -98,22 +98,22 @@ export function planSystemEntries(
  * every desired tool re-added in order.
  */
 function planTools(offered: readonly Tool[], desired: readonly Tool[]): ToolChanges {
-	const wanted = new Map(desired.map((tool) => [tool.name, tool]));
-	const kept = offered.filter((tool) => {
+	const wanted = new Map(desired.map(tool => [tool.name, tool]));
+	const kept = offered.filter(tool => {
 		const next = wanted.get(tool.name);
 		return next !== undefined && declarationsEqual(tool, next);
 	});
-	const keptNames = new Set(kept.map((tool) => tool.name));
-	const added = desired.filter((tool) => !keptNames.has(tool.name));
+	const keptNames = new Set(kept.map(tool => tool.name));
+	const added = desired.filter(tool => !keptNames.has(tool.name));
 	const replayed = [...kept, ...added];
 	if (replayed.some((tool, index) => tool.name !== desired[index]!.name)) {
 		return {
-			toolsRemoved: offered.map((tool) => ({ name: tool.name })),
+			toolsRemoved: offered.map(tool => ({ name: tool.name })),
 			toolsAdded: desired.map(toToolDeclaration),
 		};
 	}
 	return {
-		toolsRemoved: offered.filter((tool) => !keptNames.has(tool.name)).map((tool) => ({ name: tool.name })),
+		toolsRemoved: offered.filter(tool => !keptNames.has(tool.name)).map(tool => ({ name: tool.name })),
 		toolsAdded: added.map(toToolDeclaration),
 	};
 }
@@ -124,12 +124,12 @@ function planSections(
 	desired: ReadonlyMap<string, string>,
 ): Record<string, string | null>[] {
 	const patchedOrder = [
-		...[...shown.keys()].filter((key) => desired.has(key)),
-		...[...desired.keys()].filter((key) => !shown.has(key)),
+		...[...shown.keys()].filter(key => desired.has(key)),
+		...[...desired.keys()].filter(key => !shown.has(key)),
 	];
 	const desiredOrder = [...desired.keys()];
 	if (patchedOrder.some((key, index) => key !== desiredOrder[index])) {
-		return [Object.fromEntries([...shown.keys()].map((key) => [key, null])), Object.fromEntries(desired)];
+		return [Object.fromEntries([...shown.keys()].map(key => [key, null])), Object.fromEntries(desired)];
 	}
 
 	const patch: Record<string, string | null> = {};

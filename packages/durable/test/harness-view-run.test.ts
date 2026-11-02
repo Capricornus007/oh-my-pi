@@ -56,7 +56,7 @@ async function listen(conversation: Conversation, check = true) {
 const liveOf = (view: ConversationView) => (view.docs["pi.live"] ?? {}) as LiveState;
 
 async function drained(): Promise<void> {
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	await new Promise(resolve => setTimeout(resolve, 0));
 }
 
 function slow(): ChatSetup {
@@ -66,7 +66,7 @@ function slow(): ChatSetup {
 /** Committed partials of the Harness's generations, one per commit that has one. */
 function partialsOf(harness: Harness): AssistantMessage[] {
 	const partials: AssistantMessage[] = [];
-	followCommits(harness, (publication) => {
+	followCommits(harness, publication => {
 		for (const change of documentValues(publication)) {
 			const message = (change.value as LiveState)?.generation?.message as AssistantMessage | undefined;
 			if (change.record.kind === "pi.live" && message !== undefined) partials.push(message);
@@ -103,7 +103,7 @@ describe("a run as the conversation view shows it", () => {
 		expect(partials.length).toBeGreaterThan(1);
 		expect(partialsIn(states).map(textOf)).toEqual(partials.map(textOf));
 		// The run shows from the input's commit until the commit that appends the answer and clears the partial.
-		const started = states.findIndex((state) => state.run !== undefined);
+		const started = states.findIndex(state => state.run !== undefined);
 		expect(states[started]!.run).toEqual({
 			taskId: expect.any(Number),
 			inputs: [submission.id],
@@ -130,7 +130,7 @@ describe("a run as the conversation view shows it", () => {
 				parameters: obj({ n: num() }),
 				execute: async (_args, api) => {
 					api.output("one\n");
-					await new Promise((resolve) => setTimeout(resolve, 150));
+					await new Promise(resolve => setTimeout(resolve, 150));
 					api.output("two\n");
 					await gate.promise;
 					return {};
@@ -149,14 +149,14 @@ describe("a run as the conversation view shows it", () => {
 		await submission.wait(context);
 		history.detach();
 		const slots = slotsOf(history.live(), "c1");
-		const listed = slots.findIndex((slot) => slot !== undefined);
+		const listed = slots.findIndex(slot => slot !== undefined);
 		// Listed pending with the tool-calling answer, in the same commit.
 		expect(slots[listed]).toEqual({ callId: "c1", name: "print", status: "pending", taskId: expect.any(Number) });
 		expect(history.views[listed]!.entries.at(-1)!.kind).toBe("pi.assistant");
-		const outputs = slots.flatMap((slot) => (slot?.status === "running" ? [slot.output ?? ""] : []));
+		const outputs = slots.flatMap(slot => (slot?.status === "running" ? [slot.output ?? ""] : []));
 		expect([...new Set(outputs)]).toEqual(["", "one\n", "one\ntwo\n"]);
 		// Done with its result entry, appended in the same commit.
-		const done = slots.findIndex((slot) => slot?.status === "done");
+		const done = slots.findIndex(slot => slot?.status === "done");
 		expect(slots[done]).toEqual({
 			callId: "c1",
 			name: "print",
@@ -166,7 +166,7 @@ describe("a run as the conversation view shows it", () => {
 		});
 		expect(history.views[done]!.entries.at(-1)!.model![0]).toMatchObject({ role: "toolResult", toolCallId: "c1" });
 		// The run's two generations, the tool round and the answer, hand the run over.
-		const runTasks = new Set(history.live().flatMap((state) => (state.run === undefined ? [] : [state.run.taskId])));
+		const runTasks = new Set(history.live().flatMap(state => (state.run === undefined ? [] : [state.run.taskId])));
 		expect(runTasks.size).toBe(2);
 		await harness.close(context);
 	});
@@ -192,9 +192,9 @@ describe("a run as the conversation view shows it", () => {
 		await followUp.wait(context);
 		history.detach();
 		const states = history.live();
-		expect(states.some((state) => state.generation?.retry?.error === "503 Service Unavailable")).toBe(true);
-		const retried = states.findIndex((state) => state.generation?.retry !== undefined);
-		expect(states.slice(retried).some((state) => state.generation?.attempt === 2)).toBe(true);
+		expect(states.some(state => state.generation?.retry?.error === "503 Service Unavailable")).toBe(true);
+		const retried = states.findIndex(state => state.generation?.retry !== undefined);
+		expect(states.slice(retried).some(state => state.generation?.attempt === 2)).toBe(true);
 		const runs = states.flatMap((state, index) =>
 			state.run !== undefined && state.run.inputs !== states[index - 1]?.run?.inputs ? [state.run.inputs] : [],
 		);
@@ -222,7 +222,7 @@ describe("a run as the conversation view shows it", () => {
 		const observation = await harness.observeConversation(
 			root.id,
 			{
-				advance: (call) => {
+				advance: call => {
 					if (call.kind !== "value") return;
 					views.push(call.value);
 					ops.push([...call.ops]);
@@ -243,11 +243,11 @@ describe("a run as the conversation view shows it", () => {
 		}
 		expect(replayed).toEqual(views.at(-1));
 		expect(partials.length).toBeGreaterThan(2);
-		expect(rebuilt.map((partial) => (partial as AssistantMessage).content)).toEqual(
-			partials.map((partial) => partial.content),
+		expect(rebuilt.map(partial => (partial as AssistantMessage).content)).toEqual(
+			partials.map(partial => partial.content),
 		);
 		// Growing text and thinking travel as appends.
-		const appends = ops.flat().filter((op) => op[0] === "a" && op[1][2] === "generation");
+		const appends = ops.flat().filter(op => op[0] === "a" && op[1][2] === "generation");
 		expect(appends.length).toBeGreaterThan(2);
 		await harness.close(context);
 	});
@@ -265,7 +265,7 @@ describe("a run as the conversation view shows it", () => {
 				execute: async (_args, api) => {
 					for (let line = 0; line < 6; line++) {
 						api.output(`line ${line}\n`);
-						await new Promise((resolve) => setTimeout(resolve, 120));
+						await new Promise(resolve => setTimeout(resolve, 120));
 					}
 					await gate.promise;
 					return {};
@@ -278,7 +278,7 @@ describe("a run as the conversation view shows it", () => {
 		]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const outputs: string[] = [];
-		followCommits(harness, (publication) => {
+		followCommits(harness, publication => {
 			for (const change of documentValues(publication)) {
 				const output = (change.value as LiveState)?.tools?.[0]?.output;
 				if (change.record.kind === "pi.live" && output !== undefined && output !== outputs.at(-1)) {
@@ -300,7 +300,7 @@ describe("a run as the conversation view shows it", () => {
 			if (output !== undefined && output !== shown.at(-1)) shown.push(output);
 		}
 		expect(shown).toEqual(outputs);
-		expect(frames.some((frame) => frame.ops.some((op) => op[0] === "t"))).toBe(true);
+		expect(frames.some(frame => frame.ops.some(op => op[0] === "t"))).toBe(true);
 		await harness.close(context);
 	});
 
@@ -320,12 +320,12 @@ describe("a run as the conversation view shows it", () => {
 		await followUp.wait(context);
 		history.detach();
 		const states = history.live();
-		const boundary = states.findIndex((state) => state.run?.inputs[0] === followUp.id);
+		const boundary = states.findIndex(state => state.run?.inputs[0] === followUp.id);
 		expect(states[boundary - 1]!.run?.inputs).toEqual([input.id]);
 		const before = history.views[boundary - 1]!;
 		const after = history.views[boundary]!;
 		const appended = after.entries.slice(before.entries.length);
-		expect(appended.map((entry) => [entry.kind, textOf(entry.model?.[0])])).toEqual([
+		expect(appended.map(entry => [entry.kind, textOf(entry.model?.[0])])).toEqual([
 			["pi.assistant", "first"],
 			["pi.user", "f"],
 		]);
@@ -352,7 +352,7 @@ describe("a run as the conversation view shows it", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const history = await viewHistory(harness, root.id);
 		const submission = await root.submit({ type: "input", content: "go" }, context);
-		await waitFor(() => slotsOf(history.live(), "c2").some((slot) => slot?.status === "running"));
+		await waitFor(() => slotsOf(history.live(), "c2").some(slot => slot?.status === "running"));
 		// Aborting the generation aborts its round: the tool ends with its aborted result first (spec §8.5).
 		await harness.abortTask((await harness.snapshot(LiveDoc, root.id, context))!.run!.taskId, context);
 		await submission.wait(context);
@@ -360,14 +360,14 @@ describe("a run as the conversation view shows it", () => {
 		const states = history.live();
 		// #11043: the call not offered is listed pending with its task in the commit of its calling answer, and its task
 		// ends it done with its result entry.
-		const listed = slotsOf(states, "c1").findIndex((slot) => slot !== undefined);
+		const listed = slotsOf(states, "c1").findIndex(slot => slot !== undefined);
 		expect(slotsOf(states, "c1")[listed]).toMatchObject({ status: "pending", unoffered: true });
 		expect(slotsOf(states, "c1")[listed]!.taskId).toBeDefined();
 		expect(history.views[listed]!.entries.at(-1)!.kind).toBe("pi.assistant");
-		const ended = slotsOf(states, "c1").findIndex((slot) => slot?.status === "done");
+		const ended = slotsOf(states, "c1").findIndex(slot => slot?.status === "done");
 		expect(slotsOf(states, "c1")[ended]!.entry).toBe(history.views[ended]!.entries.at(-1)!.id);
 		// The aborted tool ends with its result entry, then the run ends without an answer.
-		const done = slotsOf(states, "c2").findIndex((slot) => slot?.status === "done");
+		const done = slotsOf(states, "c2").findIndex(slot => slot?.status === "done");
 		expect(slotsOf(states, "c2")[done]!.entry).toBe(history.views[done]!.entries.at(-1)!.id);
 		expect(states.at(-1)!.runFailure).toMatchObject({ inputs: [submission.id], reason: "aborted" });
 		await harness.close(context);
@@ -396,10 +396,10 @@ describe("a run as the conversation view shows it", () => {
 		const other = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 		const history = await viewHistory(harness, root.id);
 		const input = await root.submit({ type: "input", content: "a" }, context);
-		await waitFor(() => slotsOf(history.live(), "c1").some((slot) => slot?.status === "running"));
+		await waitFor(() => slotsOf(history.live(), "c1").some(slot => slot?.status === "running"));
 		const steer = await root.submit({ type: "input", content: "s", whenBusy: "steer" }, context);
 		const count = history.views.length;
-		await other.commit((tx) => tx.appendEntry(other.id, { kind: "note" }), context);
+		await other.commit(tx => tx.appendEntry(other.id, { kind: "note" }), context);
 		expect(history.views.length).toBe(count);
 		gate.resolve();
 		await input.wait(context);
@@ -407,9 +407,9 @@ describe("a run as the conversation view shows it", () => {
 		history.detach();
 		const states = history.live();
 		// One run: the steer joined it.
-		const runs = new Set(states.flatMap((state) => (state.run === undefined ? [] : [state.run.inputs[0]])));
+		const runs = new Set(states.flatMap(state => (state.run === undefined ? [] : [state.run.inputs[0]])));
 		expect([...runs]).toEqual([input.id]);
-		expect(states.some((state) => state.run?.inputs.includes(steer.id))).toBe(true);
+		expect(states.some(state => state.run?.inputs.includes(steer.id))).toBe(true);
 		// The reset is appended in place, with no run.
 		expect(history.views.at(-1)!.entries.at(-1)!.kind).toBe("pi.reset");
 		expect(states.at(-1)!.run).toBeUndefined();
@@ -422,7 +422,7 @@ describe("a run as the conversation view shows it", () => {
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
 		const history = await viewHistory(harness, root.id);
 		const submission = await root.submit({ type: "input", content: "hi" }, context);
-		await waitFor(() => history.live().some((state) => state.generation?.message !== undefined));
+		await waitFor(() => history.live().some(state => state.generation?.message !== undefined));
 		const live = await harness.snapshot(LiveDoc, root.id, context);
 		await harness.abortTask(live!.run!.taskId, context);
 		await submission.wait(context);
@@ -431,7 +431,7 @@ describe("a run as the conversation view shows it", () => {
 		const ended = states.findIndex((state, index) => index > 0 && state.run === undefined);
 		expect(states[ended - 1]!.generation?.message).toBeDefined();
 		const appended = history.views[ended]!.entries.slice(history.views[ended - 1]!.entries.length);
-		expect(appended.map((entry) => entry.kind)).toEqual(["pi.assistant"]);
+		expect(appended.map(entry => entry.kind)).toEqual(["pi.assistant"]);
 		expect(appended[0]!.model![0]).toMatchObject({ role: "assistant", stopReason: "aborted" });
 		expect(states[ended]!.runFailure).toMatchObject({ reason: "aborted" });
 		await harness.close(context);
@@ -442,13 +442,13 @@ describe("a run as the conversation view shows it", () => {
 		const partial = fauxAssistantMessage([fauxText("hel")]);
 		const watch = await root.watch(context, { min: 1, max: 1 });
 		const change = (edit: (live: Draft<LiveState>) => void) =>
-			root.commit(async (tx) => edit(await tx.doc(LiveDoc, root.id)), context);
-		await change((live) => {
+			root.commit(async tx => edit(await tx.doc(LiveDoc, root.id)), context);
+		await change(live => {
 			live.generation = { attempt: 1, message: JSON.parse(JSON.stringify(partial)) };
 		});
 		// Past 10,000 pending operations: an append, a splice, and a `before` per commit.
 		for (let index = 0; index < 3400; index++) {
-			await root.commit((tx) => tx.appendEntry(root.id, { kind: "note" }), context);
+			await root.commit(tx => tx.appendEntry(root.id, { kind: "note" }), context);
 		}
 		const frames: Frame[] = [];
 		watch.start(
@@ -458,7 +458,7 @@ describe("a run as the conversation view shows it", () => {
 		);
 		await drained();
 		expect(frames[0]!.ops).toEqual([["r", frames[0]!.value]]);
-		await change((live) => {
+		await change(live => {
 			(live.generation!.message!.content[0] as { text: string }).text += "lo";
 		});
 		await drained();
@@ -515,25 +515,25 @@ describe("streamed partials", () => {
 		const ops: Op[] = [];
 		const observation = await harness.observeConversation(
 			root.id,
-			{ advance: (call) => call.kind === "value" && ops.push(...call.ops), end: () => {} },
+			{ advance: call => call.kind === "value" && ops.push(...call.ops), end: () => {} },
 			context,
 		);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		observation.detach();
 		const MESSAGE = ["docs", "pi.live", "generation", "message"];
 		// Operations on the in-flight message, with their paths relative to it.
-		const onMessage = ops.flatMap((op) => {
+		const onMessage = ops.flatMap(op => {
 			const path = op[0] === "r" ? [] : (op[1] as readonly (string | number)[]);
 			return MESSAGE.every((segment, index) => path[index] === segment)
 				? [{ kind: op[0], path: path.slice(MESSAGE.length) }]
 				: [];
 		});
-		const argumentAppends = onMessage.filter((op) => op.kind === "a" && op.path[2] === "arguments");
+		const argumentAppends = onMessage.filter(op => op.kind === "a" && op.path[2] === "arguments");
 		expect(argumentAppends.length).toBeGreaterThan(10);
-		expect(argumentAppends.every((op) => ["path", "content"].includes(String(op.path.at(-1))))).toBe(true);
+		expect(argumentAppends.every(op => ["path", "content"].includes(String(op.path.at(-1))))).toBe(true);
 		// The call is set whole only when a member appears (at most once per argument); growing strings are appends.
 		// With the raw argument text on the block, every commit resent the whole call.
-		const blockSets = onMessage.filter((op) => op.kind !== "a" && op.path.length === 2);
+		const blockSets = onMessage.filter(op => op.kind !== "a" && op.path.length === 2);
 		expect(blockSets.length).toBeLessThanOrEqual(2);
 		// The committed partials carry only the parsed arguments, never the raw argument text.
 		for (const partial of partials) {

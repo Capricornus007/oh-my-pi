@@ -30,7 +30,7 @@ const types = Array.from({ length: PLUGINS }, (_, index) =>
 
 /** Plugin `index`'s facet at code version `code`; with `native`, each object opens a native. */
 function facet(index: number, code: number, native: boolean): Facet<never> {
-	return defineFacet((h) =>
+	return defineFacet(h =>
 		h.serve(types[index]!, (_, self) => {
 			const counter = self.state(Counter);
 			if (native)
@@ -42,7 +42,7 @@ function facet(index: number, code: number, native: boolean): Facet<never> {
 				n: self.derive([counter], ([value]) => value.n),
 				label: constant(code),
 				bump: async (ctx: Context) => {
-					await counter.change((draft) => {
+					await counter.change(draft => {
 						draft.n++;
 					}, ctx);
 					return counter.value.n;
@@ -55,7 +55,7 @@ function facet(index: number, code: number, native: boolean): Facet<never> {
 /** Whole-heap use after full collections. */
 async function heap(): Promise<number> {
 	for (let round = 0; round < 5; round++) {
-		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise(resolve => setImmediate(resolve));
 		gc();
 	}
 	return process.memoryUsage().heapUsed;
@@ -72,7 +72,7 @@ function median(values: readonly number[]): number {
  * plugin 0 a native object (restarts) instead of a pure one (swaps).
  */
 async function run(name: string, counts: readonly number[], native: boolean): Promise<void> {
-	const host: Host = createHost({ onError: (error) => console.log("onError", error.kind) });
+	const host: Host = createHost({ onError: error => console.log("onError", error.kind) });
 	const facets = Array.from({ length: PLUGINS }, (_, index) => facet(index, 0, native && index === 0));
 	await host.load(
 		facets.map((each, index) => ({ name: `@bench/p${index}`, facet: each as Facet<never> as never })),
@@ -92,8 +92,8 @@ async function run(name: string, counts: readonly number[], native: boolean): Pr
 		const started = performance.now();
 		await host.reload(set, context);
 		const resolved = performance.now();
-		while (reloaded.some((ref) => ref.state.value.kind !== "live" || ref.label.value !== round)) {
-			await new Promise((resolve) => setImmediate(resolve));
+		while (reloaded.some(ref => ref.state.value.kind !== "live" || ref.label.value !== round)) {
+			await new Promise(resolve => setImmediate(resolve));
 		}
 		const allLive = performance.now();
 		if (round > 2) {

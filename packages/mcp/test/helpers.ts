@@ -14,12 +14,12 @@ export async function readBody(request: IncomingMessage): Promise<string> {
 export async function listen(handler: HttpHandler): Promise<string> {
 	let origin = "";
 	const server = createServer((request, response) => {
-		void handler(request, response, origin).catch((error) => {
+		void handler(request, response, origin).catch(error => {
 			response.statusCode = 500;
 			response.end(String(error));
 		});
 	});
-	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+	await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
 	const address = server.address();
 	if (!address || typeof address === "string") throw new Error("HTTP test server did not bind to TCP");
 	origin = `http://127.0.0.1:${address.port}`;
@@ -30,10 +30,10 @@ export async function listen(handler: HttpHandler): Promise<string> {
 export async function closeServers(): Promise<void> {
 	await Promise.all(
 		servers.splice(0).map(
-			(server) =>
+			server =>
 				new Promise<void>((resolve, reject) => {
 					server.closeAllConnections();
-					server.close((error) => (error ? reject(error) : resolve()));
+					server.close(error => (error ? reject(error) : resolve()));
 				}),
 		),
 	);

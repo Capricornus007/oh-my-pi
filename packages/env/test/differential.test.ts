@@ -96,7 +96,7 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 			() => {
 				const n = nameValue();
 				const c = contentValue();
-				return (env) => env.writeFile(n, c, context);
+				return env => env.writeFile(n, c, context);
 			},
 		],
 		[
@@ -104,21 +104,21 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 			() => {
 				const n = nameValue();
 				const c = contentValue();
-				return (env) => env.appendFile(n, c, context);
+				return env => env.appendFile(n, c, context);
 			},
 		],
 		[
 			"readTextFile",
 			() => {
 				const n = nameValue();
-				return (env) => env.readTextFile(n, context);
+				return env => env.readTextFile(n, context);
 			},
 		],
 		[
 			"readBinaryFile",
 			() => {
 				const n = nameValue();
-				return (env) => env.readBinaryFile(n, context);
+				return env => env.readBinaryFile(n, context);
 			},
 		],
 		[
@@ -126,28 +126,28 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 			() => {
 				const n = nameValue();
 				const m = small(4);
-				return (env) => env.readTextLines(n, { maxLines: m }, context);
+				return env => env.readTextLines(n, { maxLines: m }, context);
 			},
 		],
 		[
 			"fileInfo",
 			() => {
 				const n = nameValue();
-				return (env) => env.fileInfo(n, context);
+				return env => env.fileInfo(n, context);
 			},
 		],
 		[
 			"exists",
 			() => {
 				const n = nameValue();
-				return (env) => env.exists(n, context);
+				return env => env.exists(n, context);
 			},
 		],
 		[
 			"listDir",
 			() => {
 				const n = nameValue();
-				return (env) => env.listDir(n, context);
+				return env => env.listDir(n, context);
 			},
 		],
 		[
@@ -155,7 +155,7 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 			() => {
 				const n = nameValue();
 				const r = flagValue();
-				return (env) => env.createDir(n, { recursive: r }, context);
+				return env => env.createDir(n, { recursive: r }, context);
 			},
 		],
 		[
@@ -164,7 +164,7 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 				const n = nameValue();
 				const r = flagValue();
 				const f = flagValue();
-				return (env) => env.remove(n, { recursive: r, force: f }, context);
+				return env => env.remove(n, { recursive: r, force: f }, context);
 			},
 		],
 		[
@@ -172,7 +172,7 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 			() => {
 				const a = nameValue();
 				const b = nameValue();
-				return (env) => env.renameFile(a, b, context);
+				return env => env.renameFile(a, b, context);
 			},
 		],
 		[
@@ -180,21 +180,21 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 			() => {
 				const n = nameValue();
 				const size = small(10);
-				return (env) => env.truncateFile(n, size, context);
+				return env => env.truncateFile(n, size, context);
 			},
 		],
 		[
 			"flushFile",
 			() => {
 				const n = nameValue();
-				return (env) => env.flushFile(n, context);
+				return env => env.flushFile(n, context);
 			},
 		],
 		[
 			"canonicalPath",
 			() => {
 				const n = nameValue();
-				return (env) => env.canonicalPath(n, context);
+				return env => env.canonicalPath(n, context);
 			},
 		],
 		[
@@ -204,7 +204,7 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 				const noFollow = flagValue();
 				const offset = small(8);
 				const length = small(8);
-				return async (env) => {
+				return async env => {
 					const reader = await env.openBinaryReader(n, { noFollow }, context);
 					if (!reader.ok) return reader;
 					try {
@@ -221,7 +221,7 @@ function randomOperation(next: () => number): { label: string; run: Operation } 
 	];
 	const [label, make] = choices[Math.floor(next() * choices.length)]!;
 	const run = make();
-	return { label: `${label}(${args.map((arg) => JSON.stringify(arg)).join(", ")})`, run };
+	return { label: `${label}(${args.map(arg => JSON.stringify(arg)).join(", ")})`, run };
 }
 
 describe("RemoteExecutionEnv against NodeExecutionEnv", () => {
@@ -293,7 +293,7 @@ describe("RemoteExecutionEnv against NodeExecutionEnv", () => {
 				const reader = await env.openDirReader(".", context);
 				const pages: unknown[] = [];
 				if (reader.ok) {
-					for (let done = false; !done; ) {
+					for (let done = false; !done;) {
 						const page = await reader.value.next(2, context);
 						pages.push(page);
 						done = !page.ok || page.value.done;

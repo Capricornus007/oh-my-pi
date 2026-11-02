@@ -92,7 +92,7 @@ export function crossedReport(report: ReloadReport): CrossedReport {
 	return {
 		plugins: report.plugins,
 		failed: report.failed.map(({ plugin, error }) => ({ plugin, error: crossed(error) })),
-		objects: report.objects.map((each) =>
+		objects: report.objects.map(each =>
 			each.kind === "parked"
 				? {
 						object: each.object,

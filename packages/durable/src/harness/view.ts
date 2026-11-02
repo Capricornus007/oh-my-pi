@@ -88,7 +88,7 @@ const MOUNTED = [
 	ProviderDoc,
 	UsageDoc,
 ] as unknown as readonly ConversationDocToken<JsonObject>[];
-const MOUNTED_KINDS: ReadonlySet<string> = new Set(MOUNTED.map((token) => token.definition.kind));
+const MOUNTED_KINDS: ReadonlySet<string> = new Set(MOUNTED.map(token => token.definition.kind));
 const SCAN_PAGE_SIZE = 256;
 
 /** One observer of a mount and its window: the bounds and the revision it was last given. */
@@ -152,8 +152,7 @@ export class ConversationViews {
 		this.#session = session;
 		VIEWS.set(session, this);
 		session.followCommits((publication, context) => {
-			for (const [id, mount] of this.#mounts)
-				advance(id, mount, publication, context, (error) => this.report(error));
+			for (const [id, mount] of this.#mounts) advance(id, mount, publication, context, error => this.report(error));
 		});
 		session.subscribeClose(() => {
 			this.#closed = true;
@@ -162,7 +161,7 @@ export class ConversationViews {
 				for (const windowed of [...mount.observers]) {
 					contained(
 						() => windowed.observer.end(closeEndOf(windowed.observer, ends)),
-						(error) => this.report(error),
+						error => this.report(error),
 					);
 				}
 			this.#mounts.clear();
@@ -190,7 +189,7 @@ export class ConversationViews {
 			window,
 			(current, release) => {
 				value = current;
-				return guardObserver(observer, release, (error) => this.report(error));
+				return guardObserver(observer, release, error => this.report(error));
 			},
 			context,
 		);
@@ -211,7 +210,7 @@ export class ConversationViews {
 		const { observer } = await this.attach(
 			id,
 			window,
-			(value, release) => new Watch<ConversationView>(value, release, (error) => this.#session.report(error)),
+			(value, release) => new Watch<ConversationView>(value, release, error => this.#session.report(error)),
 			context,
 		);
 		const signal = context.abortSignal;
@@ -234,7 +233,7 @@ export class ConversationViews {
 		context: Context,
 	): Promise<{ observer: O; detach: () => void }> {
 		const bounds = resolveWindow(window);
-		return this.#session.readOnLine(async (storage) => {
+		return this.#session.readOnLine(async storage => {
 			const mount = this.#mounts.get(id) ?? (await this.#build(storage, id, context));
 			const { entries, before } = await loadWindow(storage, id, bounds, context);
 			const value = view(mount.conversation, entries, before, mount.docs);

@@ -424,7 +424,7 @@ describe("delta tracker competing changes", () => {
 		for (const winner of [0, 1, 2]) {
 			const tracker = track({ value: 0, rows: [{ value: 0 }] });
 			const changes = [tracker.beginChange(), tracker.beginChange(), tracker.beginChange()];
-			const held = changes.map((change) => change.state.rows[0]!);
+			const held = changes.map(change => change.state.rows[0]!);
 			held.forEach((row, index) => {
 				row.value = index + 1;
 			});
@@ -470,7 +470,7 @@ describe("delta tracker policy view", () => {
 		expect(Array.isArray(change.state.values)).toBe(true);
 		expect(change.state.values.length).toBe(4);
 		expect([...change.state.values]).toEqual([1, 4, 5, 3]);
-		expect(change.state.values.map((value) => value * 2)).toEqual([2, 8, 10, 6]);
+		expect(change.state.values.map(value => value * 2)).toEqual([2, 8, 10, 6]);
 		expect(Object.keys(change.state.values)).toEqual(["0", "1", "2", "3"]);
 		expect(Object.getOwnPropertyDescriptor(change.state.values, "2")?.value).toBe(5);
 		expect(Object.keys(change.state.object)).toEqual(["a", "b"]);
@@ -522,13 +522,13 @@ describe("delta tracker policy view", () => {
 
 	it("emits deletion and supports root arrays", () => {
 		const objectTracker = track({ keep: 1, remove: 2 } as { keep: number; remove?: number });
-		settle(objectTracker, (draft) => {
+		settle(objectTracker, draft => {
 			delete draft.remove;
 		});
 		expect(objectTracker.value).toEqual({ keep: 1 });
 
 		const arrayTracker = track([1, 2, 3]);
-		settle(arrayTracker, (draft) => {
+		settle(arrayTracker, draft => {
 			draft.reverse();
 			draft.push(4);
 		});
@@ -638,11 +638,11 @@ describe("delta tracker policy view", () => {
 			const native = [1, 2, 3];
 			mutateNative(native);
 			const tracker = track({ values: [1, 2, 3] });
-			settle(tracker, (draft) => mutateDraft(draft.values));
+			settle(tracker, draft => mutateDraft(draft.values));
 			expect(tracker.value.values).toEqual(native);
 		};
 		compare(
-			(values) => {
+			values => {
 				values.splice(
 					{
 						valueOf() {
@@ -654,7 +654,7 @@ describe("delta tracker policy view", () => {
 					9,
 				);
 			},
-			(values) => {
+			values => {
 				values.splice(
 					{
 						valueOf() {
@@ -668,7 +668,7 @@ describe("delta tracker policy view", () => {
 			},
 		);
 		compare(
-			(values) => {
+			values => {
 				values.fill(7, {
 					valueOf() {
 						values.push(4);
@@ -676,7 +676,7 @@ describe("delta tracker policy view", () => {
 					},
 				} as unknown as number);
 			},
-			(values) => {
+			values => {
 				values.fill(7, {
 					valueOf() {
 						values.push(4);
@@ -686,7 +686,7 @@ describe("delta tracker policy view", () => {
 			},
 		);
 		compare(
-			(values) => {
+			values => {
 				values.copyWithin(
 					{
 						valueOf() {
@@ -698,7 +698,7 @@ describe("delta tracker policy view", () => {
 					2,
 				);
 			},
-			(values) => {
+			values => {
 				values.copyWithin(
 					{
 						valueOf() {
@@ -722,7 +722,7 @@ describe("delta tracker policy view", () => {
 
 	it("keeps repeated identical writes instead of reverting their pending override", () => {
 		const tracker = track({ value: 0, values: [0] as Array<number | null> });
-		settle(tracker, (draft) => {
+		settle(tracker, draft => {
 			draft.value = 1;
 			draft.value = 1;
 			draft.values[0] = null;
@@ -754,7 +754,7 @@ describe("delta tracker policy view", () => {
 
 	it("supports optional deletion, explicit null length growth, shrinking, and default sort", () => {
 		const tracker = track({ optional: "remove" as string | undefined, values: [3, 1, 2] as Array<number | null> });
-		settle(tracker, (draft) => {
+		settle(tracker, draft => {
 			draft.optional = undefined;
 			draft.values.length = 5;
 			expect(draft.values).toEqual([3, 1, 2, null, null]);
@@ -948,7 +948,7 @@ describe("delta tracker by-value placements", () => {
 		const second = tracker.beginChange();
 		second.state.rows[1]!.child.value = 4;
 		const secondPrepared = second.prepare();
-		expect(secondPrepared.value.rows.map((row) => row.child.value)).toEqual([1, 4]);
+		expect(secondPrepared.value.rows.map(row => row.child.value)).toEqual([1, 4]);
 		expect(replay(base, secondPrepared.ops)).toEqual(secondPrepared.value);
 		expectAliasFree(secondPrepared.value);
 		tracker.adopt(secondPrepared);
@@ -1051,7 +1051,7 @@ describe("delta tracker piece arrays", () => {
 
 	it("emits removals from the end backwards, then inserts, when kept elements keep their order", () => {
 		const tracker = track({ values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] });
-		const values = settle(tracker, (draft) => {
+		const values = settle(tracker, draft => {
 			draft.values.shift(); // gap before the first kept element
 			draft.values.splice(1, 2, 20); // gap between kept elements, with an insert
 			draft.values.splice(5, 1); // another gap
@@ -1086,7 +1086,7 @@ describe("delta tracker piece arrays", () => {
 			const change = tracker.beginChange();
 			mutate(change.state.values);
 			const prepared = change.prepare();
-			expect(prepared.ops.some((operation) => operation[0] === "m")).toBe(true);
+			expect(prepared.ops.some(operation => operation[0] === "m")).toBe(true);
 			expect(replay(tracker.value, prepared.ops)).toEqual({ values: expected });
 		}
 	});
@@ -1096,7 +1096,7 @@ describe("delta tracker piece arrays", () => {
 		const change = tracker.beginChange();
 		change.state.values.sort((left, right) => left - right);
 		const prepared = change.prepare();
-		const permutation = prepared.ops.find((operation) => operation[0] === "m");
+		const permutation = prepared.ops.find(operation => operation[0] === "m");
 		if (permutation?.[0] !== "m") throw new Error("expected permutation");
 		permutation[2].reverse();
 		tracker.adopt(prepared);
@@ -1223,8 +1223,8 @@ describe("delta tracker piece arrays", () => {
 			return left.rank - right.rank;
 		});
 		const prepared = change.prepare();
-		expect(prepared.value.values.map((value) => value.rank)).toEqual([1, 2, 3]);
-		expect(prepared.value.values.map((value) => value.comparisons)).toEqual([1, 1, 0]);
+		expect(prepared.value.values.map(value => value.rank)).toEqual([1, 2, 3]);
+		expect(prepared.value.values.map(value => value.comparisons)).toEqual([1, 1, 0]);
 		expect(replay(base, prepared.ops)).toEqual(prepared.value);
 		tracker.adopt(prepared);
 	});
@@ -1251,9 +1251,9 @@ describe("delta tracker piece arrays", () => {
 			return left.rank - right.rank;
 		});
 		const prepared = change.prepare();
-		expect(prepared.value.values.map((value) => value.rank)).toEqual([1, 2, 1]);
-		expect(prepared.value.values.map((value) => value.edited)).toEqual([10, 20, 10]);
-		expect(prepared.value.values.map((value) => value.nested.value)).toEqual([100, 200, 100]);
+		expect(prepared.value.values.map(value => value.rank)).toEqual([1, 2, 1]);
+		expect(prepared.value.values.map(value => value.edited)).toEqual([10, 20, 10]);
+		expect(prepared.value.values.map(value => value.nested.value)).toEqual([100, 200, 100]);
 		expect(prepared.value.values[0]).not.toBe(prepared.value.values[2]);
 		expect(prepared.value.values[0]!.nested).not.toBe(prepared.value.values[2]!.nested);
 		expect(replay(base, prepared.ops)).toEqual(prepared.value);
@@ -1292,7 +1292,7 @@ describe("delta tracker piece arrays", () => {
 		change.state.rows[0]!.nested.value = -1;
 		for (let index = 500; index < 1_000; index++) change.state.rows[index]!.nested.value = -index;
 		const prepared = change.prepare();
-		const splice = prepared.ops.find((operation) => operation[0] === "p");
+		const splice = prepared.ops.find(operation => operation[0] === "p");
 		expect(splice?.slice(0, 4)).toEqual(["p", ["rows"], 500, 500]);
 		if (splice?.[0] !== "p") throw new Error("expected regional splice");
 		expect(splice[4]).toHaveLength(500);
@@ -1349,8 +1349,8 @@ describe("delta tracker piece arrays", () => {
 		for (let index = 100; index < 356; index++) change.state.values[index]!.value = -index - 1;
 		for (let index = 900; index < 1_156; index++) change.state.values[index]!.value = -index - 1;
 		const prepared = change.prepare();
-		const splices = prepared.ops.filter((operation) => operation[0] === "p");
-		expect(splices.map((operation) => operation.slice(0, 4))).toEqual([
+		const splices = prepared.ops.filter(operation => operation[0] === "p");
+		expect(splices.map(operation => operation.slice(0, 4))).toEqual([
 			["p", ["values"], 100, 256],
 			["p", ["values"], 900, 256],
 		]);
@@ -1382,7 +1382,7 @@ describe("delta tracker piece arrays", () => {
 		const expected = clone(tracker.value);
 		const base = clone(tracker.value);
 		const change = tracker.beginChange();
-		const held = [1, 1_001, 5_001, 10_001, 15_001, 19_999].map((index) => change.state.values[index]!);
+		const held = [1, 1_001, 5_001, 10_001, 15_001, 19_999].map(index => change.state.values[index]!);
 		for (let index = 0; index < size; index += 2) {
 			change.state.values.splice(index, 1, { value: -index - 1 });
 			expected.values.splice(index, 1, { value: -index - 1 });
@@ -1412,7 +1412,7 @@ describe("delta tracker piece arrays", () => {
 
 	it("handles null sparse overrides without confusing absence", () => {
 		const tracker = track({ values: Array.from({ length: 10_000 }, (_, value): number | null => value) });
-		settle(tracker, (draft) => {
+		settle(tracker, draft => {
 			draft.values[17] = null;
 			draft.values[9_000] = null;
 		});
@@ -1422,18 +1422,18 @@ describe("delta tracker piece arrays", () => {
 
 	it("supports self-overlapping fill and copyWithin by value", () => {
 		const tracker = track({ values: [{ n: 0 }, { n: 1 }, { n: 2 }, { n: 3 }] });
-		settle(tracker, (draft) => {
+		settle(tracker, draft => {
 			draft.values.copyWithin(1, 0, 3);
 			draft.values.fill(draft.values[1]!, 0, 2);
 			draft.values[0]!.n = 9;
 		});
-		expect(tracker.value.values.map((value) => value.n)).toEqual([9, 0, 1, 2]);
+		expect(tracker.value.values.map(value => value.n)).toEqual([9, 0, 1, 2]);
 		expect(tracker.value.values[0]).not.toBe(tracker.value.values[1]);
 	});
 
 	it.each(["unshift", "splice"] as const)(
 		"inserts 100,000 items with %s",
-		(method) => {
+		method => {
 			const tracker = track({ values: [-1] });
 			const base = clone(tracker.value);
 			const change = tracker.beginChange();
@@ -1573,7 +1573,7 @@ describe("delta tracker security and storage-style cloning", () => {
 			configurable: true,
 		});
 		try {
-			settle(tracker, (draft) => {
+			settle(tracker, draft => {
 				draft.trap = 1;
 			});
 			expect(tracker.value).toEqual({ trap: 1 });

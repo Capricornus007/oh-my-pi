@@ -58,7 +58,7 @@ describe("staging: a throw keeps the plugin on its old code, reported", () => {
 		],
 		[
 			"a declaration error",
-			serveStore("v2", (self) => {
+			serveStore("v2", self => {
 				self.state(defineState("d", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 0 }) }));
 				self.state(defineState("d", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 0 }) }));
 			}),
@@ -66,14 +66,14 @@ describe("staging: a throw keeps the plugin on its old code, reported", () => {
 		],
 		[
 			"a document at an older version than the object's",
-			serveStore("v2", (self) =>
+			serveStore("v2", self =>
 				self.state(defineState("doc", { schema: obj({ n: int() }), version: 1, initial: () => ({ n: 0 }) })),
 			),
 			"version 1 is older than its documents' (2)",
 		],
 		[
 			"a broken accepts table",
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Store, () => ({ label: constant("x"), bump: async () => 0 }), {
 					accepts: { 7: {} } as never,
 				}),
@@ -90,7 +90,7 @@ describe("staging: a throw keeps the plugin on its old code, reported", () => {
 				initial: () => ({ n: 0 }),
 				migrate: () => ({ n: 0 }),
 			});
-			await host.load([{ name: "@test/app", facet: serveStore("v1", (self) => self.state(v2)) }], context);
+			await host.load([{ name: "@test/app", facet: serveStore("v1", self => self.state(v2)) }], context);
 			const store = await host.get(Store, {}, context);
 			expect((await failedReload(host, [{ name: "@test/app", facet }])).message).toContain(message);
 			expect(store.label.value).toBe("v1");
@@ -109,7 +109,7 @@ describe("staging: a throw keeps the plugin on its old code, reported", () => {
 		});
 		const host = createHost({ principal: { kind: "server" }, onError: () => {} });
 		await host.load([], context);
-		const facet = defineFacet((h) => h.serve(Remote, () => ({ variant: "v", members: { n: constant(1) } })));
+		const facet = defineFacet(h => h.serve(Remote, () => ({ variant: "v", members: { n: constant(1) } })));
 		expect((await failedReload(host, [{ name: "@test/app", facet }])).message).toContain(
 			"a host without an address serves only local types",
 		);
@@ -124,7 +124,7 @@ describe("staging: recorded declarations decide the fate", () => {
 		const host = createHost({ onError: () => {} });
 		await host.load([{ name: "@test/app", facet: serveStore("v1") }], context);
 		const store = await host.get(Store, {}, context);
-		const facet = serveStore("v2", (self) => {
+		const facet = serveStore("v2", self => {
 			self.open(
 				async () => void opened.push("opened"),
 				() => {},
@@ -145,17 +145,14 @@ describe("staging: recorded declarations decide the fate", () => {
 	it("a table of the new factory at a newer version than the store's restarts the object (its eager migration)", async () => {
 		const store = await memoryStore();
 		const V1 = defineTable("items", { version: 1, columns: { id: str(), name: str() }, key: ["id"] });
-		const V2 = evolveTable(V1, (t) => t.rename("name", "title"));
+		const V2 = evolveTable(V1, t => t.rename("name", "title"));
 		const host = createHost({ store, onError: () => {} });
-		await host.load([{ name: "@test/app", facet: serveStore("v1", (self) => self.table(V1)) }], context);
+		await host.load([{ name: "@test/app", facet: serveStore("v1", self => self.table(V1)) }], context);
 		await host.get(Store, {}, context);
-		const same = await host.reload(
-			[{ name: "@test/app", facet: serveStore("v2", (self) => self.table(V1)) }],
-			context,
-		);
+		const same = await host.reload([{ name: "@test/app", facet: serveStore("v2", self => self.table(V1)) }], context);
 		expect(same.objects).toEqual([{ object: "app.store", kind: "swapped" }]);
 		const newer = await host.reload(
-			[{ name: "@test/app", facet: serveStore("v3", (self) => self.table(V2)) }],
+			[{ name: "@test/app", facet: serveStore("v3", self => self.table(V2)) }],
 			context,
 		);
 		expect(newer.objects).toEqual([{ object: "app.store", kind: "restarted" }]);
@@ -168,9 +165,9 @@ describe("staging: recorded declarations decide the fate", () => {
 		const Job1b = defineJob("app.job", { version: 1, args: obj({ x: int() }), result: int() });
 		const host = createHost({ onError: () => {} });
 		const run = { run: async () => 1 };
-		await host.load([{ name: "@test/app", facet: serveStore("v1", (self) => void self.job(Job1, run)) }], context);
+		await host.load([{ name: "@test/app", facet: serveStore("v1", self => void self.job(Job1, run)) }], context);
 		await host.get(Store, {}, context);
-		const facet = serveStore("v2", (self) => void self.job(Job1b, run));
+		const facet = serveStore("v2", self => void self.job(Job1b, run));
 		expect((await failedReload(host, [{ name: "@test/app", facet }])).message).toContain(
 			"schema changed without a version bump",
 		);
@@ -182,7 +179,7 @@ describe("staging: recorded declarations decide the fate", () => {
 		const Page = local("app.page", { version: 1, params: { id: int() }, members: { id: int() } });
 		const host = createHost({ onError: () => {} });
 		const page = (contribute: boolean) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Page, ({ id }, self) => {
 					if (contribute) (self as unknown as StoreSelf).contribute(Names, "x");
 					return { id: constant(id) };
@@ -200,8 +197,8 @@ describe("staging: recorded declarations decide the fate", () => {
 describe("staging: declaration parity with an attempt (fix round 1)", () => {
 	it("refuses retryOn of an attempt-owned writable, the plugin kept on its old code", async () => {
 		const T = local("astra.staging", { version: 1, params: {}, members: { n: int() } });
-		const oldFacet = defineFacet((h) => h.serve(T, () => ({ n: constant(1) })));
-		const newFacet = defineFacet((h) =>
+		const oldFacet = defineFacet(h => h.serve(T, () => ({ n: constant(1) })));
+		const newFacet = defineFacet(h =>
 			h.serve(T, (_, self) => {
 				self.retryOn(self.writable(0));
 				return { n: constant(2) };
@@ -229,14 +226,14 @@ describe("staging per plugin (slice 7c §4)", () => {
 
 	/** The notes provider at `version`, labelled through its count. */
 	const notes = (version: 1 | 2, count: number) =>
-		defineFacet((h) =>
+		defineFacet(h =>
 			version === 1
 				? h.serve(NotesV1, () => ({ count: constant(count) }))
 				: h.serve(NotesV2, () => ({ count: constant(count), title: constant("t") })),
 		);
 	/** A consumer of the notes at `version`, labelled `label` and the count it reads. */
 	const view = (version: 1 | 2, label: string) =>
-		defineFacet((h) =>
+		defineFacet(h =>
 			h.serve(View, (_, self) => {
 				const count = (version === 1 ? self.get(NotesV1, {}) : self.get(NotesV2, {})).count;
 				return { label: self.derive([count], ([n]) => `${label} ${n}`) };
@@ -397,7 +394,7 @@ describe("staging per plugin (slice 7c §4)", () => {
 			});
 		const Consumer = local("app.consumer", { version: 1, params: {}, members: { n: int() } });
 		const consumer = (id: number) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Consumer, (_, self) => ({ n: self.derive([self.get(placed(false), { id }).n], ([n]) => n) })),
 			);
 		const host = createHost({ address: Here(), principal: { kind: "owner" }, onError: () => {} });
@@ -406,7 +403,7 @@ describe("staging per plugin (slice 7c §4)", () => {
 				// The provider's own code places every id but 1 on another host.
 				{
 					name: "@test/provider",
-					facet: defineFacet((h) =>
+					facet: defineFacet(h =>
 						h.serve(placed(true), ({ id }) => ({ variant: "main", members: { n: constant(id) } })),
 					),
 				},
@@ -432,9 +429,9 @@ describe("staging per plugin (slice 7c §4)", () => {
 		const Top = local("app.top", { version: 1, params: {}, members: { n: int() } });
 		const host = createHost({ onError: () => {} });
 		const middle = (needs: boolean) =>
-			defineFacet((h) => h.serve(Middle, (_, self) => ({ n: needs ? self.get(Extra, {}).n : constant(0) })));
+			defineFacet(h => h.serve(Middle, (_, self) => ({ n: needs ? self.get(Extra, {}).n : constant(0) })));
 		const top = (needs: boolean) =>
-			defineFacet((h) => h.serve(Top, (_, self) => ({ n: needs ? self.get(Middle, {}).n : constant(0) })));
+			defineFacet(h => h.serve(Top, (_, self) => ({ n: needs ? self.get(Middle, {}).n : constant(0) })));
 		await host.load(
 			[
 				{ name: "@test/middle", facet: middle(false) },

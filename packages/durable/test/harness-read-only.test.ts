@@ -67,9 +67,9 @@ describe("read-only Harness", () => {
 		const before = head(path);
 		const wakes: Wake[] = [];
 
-		const viewer = await openReadOnly(path, chatSetup(), (wake) => wakes.push(wake));
+		const viewer = await openReadOnly(path, chatSetup(), wake => wakes.push(wake));
 		const root = await viewer.root(context);
-		expect((await allEntries(root)).map((entry) => entry.kind)).toEqual([UserEntry.kind]);
+		expect((await allEntries(root)).map(entry => entry.kind)).toEqual([UserEntry.kind]);
 		const run = (await viewer.snapshot(LiveDoc, root.id, context))?.run;
 		expect(run).toBeDefined();
 		expect((await viewer.getTask(run!.taskId, context))?.state.status).toBe("running");
@@ -95,7 +95,7 @@ describe("read-only Harness", () => {
 		const viewerSetup = chatSetup();
 		const viewer = await openReadOnly(path, viewerSetup);
 		const root = await viewer.root(context);
-		await expect(root.commit((tx) => tx.appendEntry(root.id, { kind: "app.note" }), context)).rejects.toBeInstanceOf(
+		await expect(root.commit(tx => tx.appendEntry(root.id, { kind: "app.note" }), context)).rejects.toBeInstanceOf(
 			ReadOnlySession,
 		);
 		await expect(root.submit({ type: "input", content: "again" }, context)).rejects.toBeInstanceOf(ReadOnlySession);

@@ -6,7 +6,7 @@ import { Http } from "@earendil-works/chord/next/http";
 export default defineFacet((_host, self) =>
 	self.contribute(Http, {
 		routes: {
-			"GET /notes": async (request) => ({ kind: "json", value: { notes: ["buy milk"], via: request.origin } }),
+			"GET /notes": async request => ({ kind: "json", value: { notes: ["buy milk"], via: request.origin } }),
 		},
 	}),
 );

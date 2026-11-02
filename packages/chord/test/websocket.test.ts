@@ -36,7 +36,7 @@ describe("WebSocket links", () => {
 				variant: "main",
 				notes,
 				add: (text, ctx) => {
-					notes.change(ctx, (draft) => {
+					notes.change(ctx, draft => {
 						draft.push(text);
 					});
 				},
@@ -44,7 +44,7 @@ describe("WebSocket links", () => {
 			};
 		});
 		const wss = new WebSocketServer({ port: 0, host: "127.0.0.1" });
-		await new Promise<void>((resolve) => wss.once("listening", () => resolve()));
+		await new Promise<void>(resolve => wss.once("listening", () => resolve()));
 		acceptWebSockets(wss as never, server, {
 			principal: (request: IncomingMessage) => {
 				const token = new URL(request.url ?? "/", "http://x").searchParams.get("token");
@@ -67,10 +67,10 @@ describe("WebSocket links", () => {
 			const browser = open("ok");
 			const board = browser.hold(Board, {});
 			const seen: unknown[] = [];
-			board.notes.subscribe((value) => seen.push(value));
+			board.notes.subscribe(value => seen.push(value));
 			await board.add("hello");
 			assert.deepEqual(await board.who(), { guest: "web" });
-			for (let i = 0; i < 50 && board.notes.value?.length !== 1; i++) await new Promise((r) => setTimeout(r, 5));
+			for (let i = 0; i < 50 && board.notes.value?.length !== 1; i++) await new Promise(r => setTimeout(r, 5));
 			assert.deepEqual(board.notes.value, ["hello"]);
 			assert.deepEqual(seen.at(-1), ["hello"]);
 			await browser.close();
@@ -86,10 +86,10 @@ describe("WebSocket links", () => {
 				onError: () => {},
 			});
 			await assert.rejects(
-				impostor.root((ctx) => impostor.hold(Board, {}).add("x", ctx), {
+				impostor.root(ctx => impostor.hold(Board, {}).add("x", ctx), {
 					signal: AbortSignal.timeout(150),
 				}),
-				(error) => isChordError(error, "aborted"),
+				error => isChordError(error, "aborted"),
 			);
 			await impostor.close();
 
@@ -97,12 +97,12 @@ describe("WebSocket links", () => {
 			const denied = refused.hold(Board, {});
 			// The server closes unauthenticated sockets; calls wait for a reconnect until their ctx gives up.
 			await assert.rejects(
-				refused.root((ctx) => denied.add("x", ctx), { signal: AbortSignal.timeout(100) }),
-				(error) => isChordError(error, "aborted"),
+				refused.root(ctx => denied.add("x", ctx), { signal: AbortSignal.timeout(100) }),
+				error => isChordError(error, "aborted"),
 			);
 			await refused.close();
 		} finally {
-			await new Promise<void>((resolve) => wss.close(() => resolve()));
+			await new Promise<void>(resolve => wss.close(() => resolve()));
 		}
 	});
 });
@@ -116,13 +116,13 @@ describe("WebSocket links: packed payloads", () => {
 			return { variant: "main", notes: state, add: () => {}, who: () => notes };
 		});
 		const wss = new WebSocketServer({ port: 0, host: "127.0.0.1" });
-		await new Promise<void>((resolve) => wss.once("listening", () => resolve()));
+		await new Promise<void>(resolve => wss.once("listening", () => resolve()));
 		acceptWebSockets(wss as never, server, { principal: () => ({ guest: "web" }) });
 		const url = `ws://127.0.0.1:${(wss.address() as { port: number }).port}/`;
 		try {
 			const binary: Uint8Array[] = [];
 			const socket = new WebSocket(url);
-			socket.addEventListener("message", (event) => {
+			socket.addEventListener("message", event => {
 				if (typeof event.data !== "string") binary.push(new Uint8Array(event.data as ArrayBuffer));
 			});
 			const browser = createHost({
@@ -135,24 +135,24 @@ describe("WebSocket links: packed payloads", () => {
 			const board = browser.hold(Board, {});
 			assert.deepEqual(await board.who(), notes);
 			board.notes.subscribe(() => {});
-			for (let i = 0; i < 100 && board.notes.value === undefined; i++) await new Promise((r) => setTimeout(r, 5));
+			for (let i = 0; i < 100 && board.notes.value === undefined; i++) await new Promise(r => setTimeout(r, 5));
 			assert.deepEqual(board.notes.value, notes);
 			assert(binary.length >= 2, "the result and the snapshot came as binary messages");
 			// A text-only transport (the TUI launcher) turns a packed message back into its text frame.
-			const frames = binary.map((message) => JSON.parse(inflateMessage(message)) as Record<string, unknown>);
-			assert(frames.some((frame) => frame.t === "result" && JSON.stringify(frame.value) === JSON.stringify(notes)));
-			assert(frames.some((frame) => frame.t === "state" && JSON.stringify(frame.value) === JSON.stringify(notes)));
+			const frames = binary.map(message => JSON.parse(inflateMessage(message)) as Record<string, unknown>);
+			assert(frames.some(frame => frame.t === "result" && JSON.stringify(frame.value) === JSON.stringify(notes)));
+			assert(frames.some(frame => frame.t === "state" && JSON.stringify(frame.value) === JSON.stringify(notes)));
 			await browser.close();
 
 			// A client's binary message is a protocol error: the server closes the socket.
 			const raw = new WebSocket(url);
 			raw.binaryType = "arraybuffer";
-			await new Promise<void>((resolve) => raw.addEventListener("open", () => resolve()));
-			const closed = new Promise<void>((resolve) => raw.addEventListener("close", () => resolve()));
+			await new Promise<void>(resolve => raw.addEventListener("open", () => resolve()));
+			const closed = new Promise<void>(resolve => raw.addEventListener("close", () => resolve()));
 			raw.send(new Uint8Array([0, 0, 0, 2, 123, 125]));
 			await closed;
 		} finally {
-			await new Promise<void>((resolve) => wss.close(() => resolve()));
+			await new Promise<void>(resolve => wss.close(() => resolve()));
 		}
 	});
 });

@@ -108,24 +108,24 @@ async function opened(
 ): Promise<Opened> {
 	const errors: HostError[] = [];
 	const finished: ImportOutcome[] = [];
-	const host = createHost({ store, onError: (error) => errors.push(error), closeTimeout: 200 });
+	const host = createHost({ store, onError: error => errors.push(error), closeTimeout: 200 });
 	let found: Pick<Opened, "imports" | "abandoned" | "self"> | undefined;
 	await host.load(
 		[
 			{
 				name: "notes",
-				facet: defineFacet((h) =>
+				facet: defineFacet(h =>
 					h.serve(Store, (_, self) => {
 						const imports = self.job(declared, {
 							run,
-							finish: async (outcome) => {
+							finish: async outcome => {
 								finish?.(outcome);
 								finished.push(outcome);
 							},
 						});
 						const abandoned = self.job(Abandoned, {
 							run: async () => ({ count: 0 }),
-							finish: async (outcome) => void finished.push(outcome as unknown as ImportOutcome),
+							finish: async outcome => void finished.push(outcome as unknown as ImportOutcome),
 						});
 						found = { imports, abandoned, self };
 						return {};
@@ -152,7 +152,7 @@ async function opened(
 /** The stored revisions of the run state documents, in seq order: their kinds and contents. */
 async function stateRevisions(store: ChordStore): Promise<[string, unknown][]> {
 	const rows = await store.read(
-		(executor) =>
+		executor =>
 			executor.all<{ kind: string; content: string }>(
 				`SELECT r.kind, r.content FROM chord_revisions r JOIN chord_documents d ON d.id = r.document_id
 					WHERE d.namespace = 'chord.job-states' ORDER BY r.seq`,
@@ -164,13 +164,13 @@ async function stateRevisions(store: ChordStore): Promise<[string, unknown][]> {
 
 /** Waits `ms` of real time (a drain's bound passing, a wait that must not settle). */
 function sleepMs(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /** The records the store keeps of `namespace`'s documents: their kinds and keys. */
 async function stored(store: ChordStore, namespace: string): Promise<unknown[]> {
 	return store.read(
-		(executor) => executor.all("SELECT kind, key FROM chord_documents WHERE namespace = ? ORDER BY id", namespace),
+		executor => executor.all("SELECT kind, key FROM chord_documents WHERE namespace = ? ORDER BY id", namespace),
 		context,
 	);
 }
@@ -178,7 +178,7 @@ async function stored(store: ChordStore, namespace: string): Promise<unknown[]> 
 /** The current record of run `id`. */
 async function record(store: ChordStore, id: string): Promise<Record<string, unknown> | undefined> {
 	const row = await store.read(
-		(executor) =>
+		executor =>
 			executor.get<{ content: string }>(
 				`SELECT r.content FROM chord_revisions r JOIN chord_documents d ON d.id = r.document_id
 					WHERE d.namespace = 'chord.jobs' AND d.key = ? ORDER BY r.seq DESC LIMIT 1`,
@@ -194,7 +194,7 @@ describe("records", () => {
 		const open = await storeFile();
 		const gate = Promise.withResolvers<void>();
 		const jobs = await opened(await open(), async (_args, ctx) => {
-			await ctx.state.change((draft) => {
+			await ctx.state.change(draft => {
 				draft.done = 3;
 			}, ctx);
 			await gate.promise;
@@ -250,7 +250,7 @@ describe("crashes and restarts (D6)", () => {
 		await jobs.crash();
 		jobs = await opened(await open(), async (_args, ctx) => {
 			await ctx.state.change(
-				(draft) => {
+				draft => {
 					draft.done = 1;
 				},
 				ctx,
@@ -275,7 +275,7 @@ describe("crashes and restarts (D6)", () => {
 		jobs = await opened(await open(), async () => ({ count: 0 }));
 		await delivered();
 		await delivered();
-		expect(jobs.finished.filter((outcome) => outcome.id === run.id)).toMatchObject([
+		expect(jobs.finished.filter(outcome => outcome.id === run.id)).toMatchObject([
 			{ kind: "failed", error: { kind: "aborted", reason: "restart" } },
 		]);
 		await jobs.close();
@@ -427,7 +427,7 @@ describe("a seal during the reservation (review regressions)", () => {
 			const committed = commit(writes, fence, ctx);
 			if (++commits !== 2) return committed;
 			entered.resolve();
-			return committed.then(async (seq) => {
+			return committed.then(async seq => {
 				await gate.promise;
 				return seq;
 			});
@@ -515,7 +515,7 @@ describe("invocations after a seal (R3, review regressions)", () => {
 			if (++invocations > 1) return next(ctx);
 			await old.promise;
 			const wrote = await ctx.state
-				.change((draft) => {
+				.change(draft => {
 					draft.done = 99;
 				}, ctx)
 				.then(
@@ -569,7 +569,7 @@ describe("invocations after a seal (R3, review regressions)", () => {
 		await jobs.retry();
 		await sleepMs(20);
 		let settled = false;
-		const aborting = jobs.imports.abort(run.id, context).then((answer) => {
+		const aborting = jobs.imports.abort(run.id, context).then(answer => {
 			settled = true;
 			return answer;
 		});
@@ -641,7 +641,7 @@ describe("loading (review regressions)", () => {
 		const ProgressV2 = defineState("import.progress", {
 			schema: obj({ done: int() }),
 			version: 2,
-			migrate: (old) => {
+			migrate: old => {
 				if (failing.fail) throw new Error("migrate failed");
 				return old as { done: number };
 			},
@@ -679,18 +679,18 @@ describe("finish failures", () => {
 			},
 		);
 		const run = await jobs.imports.start({ path: "a" }, context);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(await record(jobs.store, run.id)).toMatchObject({ phase: "finishing", finishFailures: 1 });
 		await jobs.crash();
 		const failing = () => {
 			throw new Error("finish failed");
 		};
 		jobs = await opened(await open(), async () => ({ count: 1 }), failing);
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 50));
 		expect(await record(jobs.store, run.id)).toMatchObject({ phase: "finishing", finishFailures: 2 });
 		await jobs.crash();
 		jobs = await opened(await open(), async () => ({ count: 1 }));
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(jobs.finished).toMatchObject([{ kind: "done", result: { count: 1 } }]);
 		await jobs.close();
 	});
@@ -702,7 +702,7 @@ describe("abort (D7)", () => {
 		const jobs = await opened(
 			await open(),
 			(_args, ctx) =>
-				new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", () => resolve({ count: -1 }))),
+				new Promise(resolve => ctx.abortSignal?.addEventListener("abort", () => resolve({ count: -1 }))),
 		);
 		const run = await jobs.imports.start({ path: "a" }, context);
 		await delivered();
@@ -776,7 +776,7 @@ describe("pinning", () => {
 		const gate = Promise.withResolvers<void>();
 		const values: number[] = [];
 		const jobs = await opened(await open(), async (_args, ctx) => {
-			await ctx.state.change((draft) => {
+			await ctx.state.change(draft => {
 				draft.done = 3;
 			}, ctx);
 			await gate.promise;
@@ -810,7 +810,7 @@ describe("deferred state (D8)", () => {
 		let seen: number | undefined;
 		const jobs = await opened(await open(), async (_args, ctx) => {
 			await ctx.state.change(
-				(draft) => {
+				draft => {
 					draft.done = 1;
 				},
 				ctx,
@@ -826,7 +826,7 @@ describe("deferred state (D8)", () => {
 		await delivered();
 		expect(seen).toBe(1);
 		const state = await jobs.store.read(
-			(executor) =>
+			executor =>
 				executor.all(
 					"SELECT r.kind FROM chord_revisions r JOIN chord_documents d ON d.id = r.document_id WHERE d.namespace = 'chord.job-states'",
 				),
@@ -844,20 +844,20 @@ describe("deferred state (D8)", () => {
 		const jobs = await opened(await open(), async (_args, ctx) => {
 			const deferred = { persistence: { kind: "deferred", withinMs: Infinity } } as const;
 			await ctx.state.change(
-				(draft) => {
+				draft => {
 					draft.done = 1;
 				},
 				ctx,
 				deferred,
 			);
 			await ctx.state.change(
-				(draft) => {
+				draft => {
 					draft.done = 2;
 				},
 				ctx,
 				deferred,
 			);
-			await ctx.state.change((draft) => {
+			await ctx.state.change(draft => {
 				draft.done = 3;
 			}, ctx);
 			await gate.promise;
@@ -867,7 +867,7 @@ describe("deferred state (D8)", () => {
 		await delivered();
 		await delivered();
 		const revisions = await jobs.store.read(
-			(executor) =>
+			executor =>
 				executor.all<{ kind: string; content: string }>(
 					"SELECT r.kind, r.content FROM chord_revisions r JOIN chord_documents d ON d.id = r.document_id WHERE d.namespace = 'chord.job-states' ORDER BY r.seq",
 				),
@@ -897,14 +897,14 @@ describe("deferred state (D8)", () => {
 		const jobs = await opened(store, async (_args, ctx) => {
 			for (let n = 1; n <= 100; n++) {
 				await ctx.state.change(
-					(draft) => {
+					draft => {
 						draft.done = n;
 					},
 					ctx,
 					deferred,
 				);
 			}
-			await ctx.state.change((draft) => {
+			await ctx.state.change(draft => {
 				draft.done = 101;
 			}, ctx);
 			changed.resolve();
@@ -943,14 +943,14 @@ describe("deferred state (D8)", () => {
 				// One leaf each: nothing folds, and the queue passes its bound.
 				for (let n = 0; n <= MAX_PENDING_OPS; n++) {
 					await state.change(
-						(draft) => {
+						draft => {
 							draft.items[n] = 1;
 						},
 						ctx,
 						deferred,
 					);
 				}
-				await state.change((draft) => {
+				await state.change(draft => {
 					draft.done = 1;
 				}, ctx);
 				changed.resolve();
@@ -970,7 +970,7 @@ describe("deferred state (D8)", () => {
 		const open = await storeFile();
 		let jobs = await opened(await open(), async (_args, ctx) => {
 			await ctx.state.change(
-				(draft) => {
+				draft => {
 					draft.done = 4;
 				},
 				ctx,
@@ -985,7 +985,7 @@ describe("deferred state (D8)", () => {
 		jobs = await opened(await open(), async (_args, ctx) => {
 			expect(ctx.state.value).toEqual({ done: 4 });
 			await ctx.state.change(
-				(draft) => {
+				draft => {
 					draft.done = 5;
 				},
 				ctx,
@@ -993,13 +993,13 @@ describe("deferred state (D8)", () => {
 			);
 			return new Promise(() => {});
 		});
-		await new Promise((resolve) => setTimeout(resolve, 60));
+		await new Promise(resolve => setTimeout(resolve, 60));
 		await jobs.crash();
 		jobs = await opened(await open(), async (_args, ctx) => {
 			expect(ctx.state.value).toEqual({ done: 5 });
 			return { count: 0 };
 		});
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(jobs.finished).toMatchObject([{ kind: "done", state: { done: 5 } }]);
 		await jobs.close();
 	});
@@ -1032,7 +1032,7 @@ describe("GC", () => {
 			attempted.splice(0);
 			const jobs = await opened(await open(), async (_args, ctx) => {
 				await ctx.state.change(
-					(draft) => {
+					draft => {
 						draft.done = 1;
 					},
 					ctx,
@@ -1075,11 +1075,11 @@ describe("versions resolved by a reload (slice 7b §8)", () => {
 		const store = await open();
 		const finished: ImportOutcome[] = [];
 		const serve = (declared: typeof Import) =>
-			defineFacet((h) =>
+			defineFacet(h =>
 				h.serve(Store, (_, self) => {
 					self.job(declared, {
 						run: async () => ({ count: 7 }),
-						finish: async (outcome) => void finished.push(outcome),
+						finish: async outcome => void finished.push(outcome),
 					});
 					return {};
 				}),

@@ -64,7 +64,7 @@ describe("generation recovery", () => {
 		expect(await checkpoint(opened.harness, taskId)).toEqual({ phase: "prepare", attempt: 1 });
 		opened.harness.resume();
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
-		expect((await allEntries(opened.root)).map((entry) => entry.kind)).toEqual([
+		expect((await allEntries(opened.root)).map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.system",
 			"pi.assistant",
@@ -85,7 +85,7 @@ describe("generation recovery", () => {
 				return aborted(options!.signal!);
 			},
 			(request, options) => {
-				sent.push(request.messages.map((message) => message.role));
+				sent.push(request.messages.map(message => message.role));
 				timeouts.push(options?.timeoutMs);
 				return fauxAssistantMessage("answer");
 			},
@@ -114,7 +114,7 @@ describe("generation recovery", () => {
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
 		expect(sent).toEqual([["system", "user"]]);
 		expect(timeouts).toEqual([1234]);
-		expect((await allEntries(opened.root)).map((entry) => entry.kind)).toEqual([
+		expect((await allEntries(opened.root)).map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.system",
 			"pi.assistant",
@@ -142,8 +142,8 @@ describe("generation recovery", () => {
 		const setup = chatSetup();
 		const sent: string[][] = [];
 		setup.faux.setResponses([
-			(request) => {
-				sent.push(request.messages.map((message) => message.role));
+			request => {
+				sent.push(request.messages.map(message => message.role));
 				return fauxAssistantMessage("answer");
 			},
 		]);
@@ -156,7 +156,7 @@ describe("generation recovery", () => {
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
 		expect(sent).toEqual([["user"]]);
 		const entries = await allEntries(opened.root);
-		expect(entries.map((entry) => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.assistant"]);
+		expect(entries.map(entry => entry.kind)).toEqual(["pi.user", "pi.assistant", "pi.assistant"]);
 		const converted = entries[1]!.model![0] as AssistantMessage;
 		expect(converted.stopReason).toBe("aborted");
 		expect(textOf(converted)).toBe(partial);
@@ -194,7 +194,7 @@ describe("generation recovery", () => {
 		expect(opened.harness.wake()).toEqual({ active: false, at: 61_000 });
 		// An early wake retries nothing.
 		opened.harness.resume();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await new Promise(resolve => setTimeout(resolve, 20));
 		expect(setup.faux.state.callCount).toBe(1);
 		expect(await opened.harness.snapshot(LiveDoc, opened.root.id, context)).toEqual({
 			run: { taskId, inputs: [id], turns: 0, first: expect.any(Number) },
@@ -203,7 +203,7 @@ describe("generation recovery", () => {
 		now = 61_000;
 		opened.harness.resume();
 		expect((await (await opened.harness.submission(id, context))!.wait(context)).status).toBe("done");
-		expect((await allEntries(opened.root)).map((entry) => entry.kind)).toEqual([
+		expect((await allEntries(opened.root)).map(entry => entry.kind)).toEqual([
 			"pi.user",
 			"pi.assistant",
 			"pi.assistant",
@@ -283,7 +283,7 @@ describe("generation recovery", () => {
 		opened.harness.resume();
 		const settled = await (await opened.harness.submission(id, context))!.wait(context);
 		if (settled.status !== "done" || settled.type !== "input") throw new Error(`Unexpected ${settled.status}`);
-		const answer = await opened.root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+		const answer = await opened.root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 		expect(textOf(answer?.model?.[0])).toBe("deferred answer");
 		expect(setup.faux.state.deferredFetchCount).toBe(1);
 		await opened.harness.close(context);
@@ -320,7 +320,7 @@ describe("generation recovery", () => {
 		opened.harness.resume();
 		const settled = await (await opened.harness.submission(id, context))!.wait(context);
 		if (settled.status !== "done" || settled.type !== "input") throw new Error(`Unexpected ${settled.status}`);
-		const answer = (await opened.root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context))?.model?.[0];
+		const answer = (await opened.root.commit(tx => tx.entry(AssistantEntry, settled.answer), context))?.model?.[0];
 		expect(textOf(answer)).toBe("deferred answer");
 		expect(answer).not.toHaveProperty("thinkingLevel");
 		await opened.harness.close(context);
@@ -380,13 +380,13 @@ describe("generation recovery", () => {
 		const submission = await opened.root.submit({ type: "input", content: "answer?" }, context);
 		const settled = await submission.wait(context);
 		if (settled.status !== "done" || settled.type !== "input") throw new Error(`Unexpected ${settled.status}`);
-		const answer = await opened.root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+		const answer = await opened.root.commit(tx => tx.entry(AssistantEntry, settled.answer), context);
 		expect(textOf(answer?.model?.[0])).toBe("42");
 		await opened.harness.close(context);
 
 		opened = await open(path, setup);
 		expect(await (await opened.harness.submission(submission.id, context))!.status(context)).toEqual(settled);
-		expect(await opened.root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context)).toEqual(answer);
+		expect(await opened.root.commit(tx => tx.entry(AssistantEntry, settled.answer), context)).toEqual(answer);
 		await opened.harness.close(context);
 	});
 });

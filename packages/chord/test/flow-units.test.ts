@@ -18,7 +18,7 @@ import {
 } from "../src/index.ts";
 import { CountingLink, stateFrames } from "./fixtures/counting.ts";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean, attempts = 400): Promise<void> {
 	for (let i = 0; i < attempts && !check(); i++) await sleep(2);
 	assert.ok(check(), "condition not reached");
@@ -46,7 +46,7 @@ function serveBlob(host: Host, size: (name: string) => number): void {
 			variant: "main",
 			lines: state,
 			push: (line: string, ctx: Ctx) => {
-				state.change(ctx, (draft) => {
+				state.change(ctx, draft => {
 					draft.push(line);
 				});
 			},
@@ -66,17 +66,17 @@ function client(server: Host, window: number, pendingCap?: number) {
 		upstream: { link, principal: { kind: "server" } },
 		onError: () => {},
 	});
-	const connection = () => [...(server as HostImpl).connections].find((candidate) => candidate.role === "downstream")!;
+	const connection = () => [...(server as HostImpl).connections].find(candidate => candidate.role === "downstream")!;
 	return { host, link, connection };
 }
 
 describe("flow control with units", () => {
 	it("with large streams waiting behind a full window, a new get resolves at once and calls are answered", async () => {
 		const server = createHost({ self: { kind: "host" }, name: "server", onError: () => {} });
-		serveBlob(server, (name) => (name === "small" ? 1 : 500));
+		serveBlob(server, name => (name === "small" ? 1 : 500));
 		const { host, link } = client(server, 64 * 1024);
-		const bigs = ["a", "b", "c"].map((name) => host.hold(Blob, { name }));
-		await Promise.all(bigs.map((big) => big.ready));
+		const bigs = ["a", "b", "c"].map(name => host.hold(Blob, { name }));
+		await Promise.all(bigs.map(big => big.ready));
 		link.paused = true;
 		// Changes to every large stream now wait for acknowledgements that do not come.
 		for (const big of bigs) for (let i = 0; i < 50; i++) await big.push(`${i}:${"y".repeat(2000)}`);
@@ -86,7 +86,7 @@ describe("flow control with units", () => {
 		assert.equal(await bigs[0]!.ping(), "pong");
 		assert.ok(bigs[0]!.lines.value.length < 550, "the large streams still wait");
 		link.release();
-		await until(() => bigs.every((big) => big.lines.value.length === 550));
+		await until(() => bigs.every(big => big.lines.value.length === 550));
 		await server.close();
 	});
 
@@ -118,9 +118,9 @@ describe("flow control with units", () => {
 				down.send(frame);
 				return undefined;
 			},
-			receive: (handler) => down.receive(handler),
-			onClose: (handler) => down.onClose(handler),
-			close: (reason) => down.close(reason),
+			receive: handler => down.receive(handler),
+			onClose: handler => down.onClose(handler),
+			close: reason => down.close(reason),
 		};
 		server.accept(unsized, { principal: { user: "u" }, window: 1 });
 		const link = new CountingLink(up);
@@ -146,7 +146,7 @@ describe("flow control with units", () => {
 		const { host, link, connection } = client(server, 1024, cap);
 		const K = 6;
 		const blobs = Array.from({ length: K }, (_, i) => host.hold(Blob, { name: `s${i}` }));
-		await Promise.all(blobs.map((blob) => blob.ready));
+		await Promise.all(blobs.map(blob => blob.ready));
 		link.paused = true;
 		let peak = 0;
 		for (let round = 0; round < 30; round++) {
@@ -156,8 +156,8 @@ describe("flow control with units", () => {
 		assert.ok(peak <= cap, `waiting ops ${peak} exceed the cap ${cap}`);
 		const before = link.received.length;
 		link.release();
-		await until(() => blobs.every((blob) => blob.lines.value.length === 31));
-		const resets = stateFrames(link.received.slice(before)).filter((frame) => frame.as === "reset");
+		await until(() => blobs.every(blob => blob.lines.value.length === 31));
+		const resets = stateFrames(link.received.slice(before)).filter(frame => frame.as === "reset");
 		const per = new Map<number, number>();
 		for (const frame of resets) per.set(frame.hold, (per.get(frame.hold) ?? 0) + 1);
 		assert.ok(resets.length >= 1, "dropped streams came back as resets");
@@ -179,9 +179,9 @@ describe("relay topology", () => {
 		let worker: HostImpl | undefined;
 		let toWorker: CountingLink | undefined;
 		server.route("session:", {
-			principal: (name) => ({ host: name }),
+			principal: name => ({ host: name }),
 			authorize: () => true,
-			resolve: async (name) => {
+			resolve: async name => {
 				if (toWorker !== undefined) return toWorker;
 				const [down, up] = memoryLinkPair();
 				const created = new HostImpl({
@@ -221,7 +221,7 @@ describe("relay topology", () => {
 		const served = () => [...(worker?.upstream?.served.values() ?? [])];
 		const relayed = () =>
 			[...(server as HostImpl).connections]
-				.filter((connection) => connection.peer.kind === "host")
+				.filter(connection => connection.peer.kind === "host")
 				.reduce((sum, connection) => sum + connection.relayedRefs.size, 0);
 		return { server, browser, served, relayed, toWorker: () => toWorker! };
 	}
@@ -258,7 +258,7 @@ describe("relay topology", () => {
 		await Promise.all([stalled.ready, live.ready]);
 		slow.link.paused = true;
 		const seen: number[] = [];
-		live.n.subscribe((value) => seen.push(value));
+		live.n.subscribe(value => seen.push(value));
 		for (let i = 0; i < 200; i++) await live.add(1);
 		await until(() => live.n.value === 200);
 		assert.ok(seen.length > 100, "the fast tab saw the changes as they came");

@@ -63,7 +63,7 @@ async function load(key: string, definition: AnyDefinition, at: typeof context) 
 async function outboxKinds(): Promise<string[][]> {
 	const commits = await store.outbox!.read(0, 100, context);
 	return commits.map(({ writes }) =>
-		writes.map((write) => (write.kind === "document.change" ? `change:${write.content.kind}` : write.kind)),
+		writes.map(write => (write.kind === "document.change" ? `change:${write.content.kind}` : write.kind)),
 	);
 }
 
@@ -73,7 +73,7 @@ describe("loads", () => {
 		const stored = await change(
 			"a",
 			undefined,
-			(d) => {
+			d => {
 				d.title = "x";
 			},
 			undefined,
@@ -97,7 +97,7 @@ describe("loads", () => {
 		await change(
 			"a",
 			undefined,
-			(d) => {
+			d => {
 				d.title = "x";
 			},
 			undefined,
@@ -107,7 +107,7 @@ describe("loads", () => {
 			schema: obj({ title: str(), n: int() }),
 			version: 2,
 			initial: () => ({ title: "", n: 0 }),
-			migrate: (old) => ({ title: String(old.title), n: 7 }),
+			migrate: old => ({ title: String(old.title), n: 7 }),
 			persist: true,
 			checkpointWhen: () => false,
 		});
@@ -122,7 +122,7 @@ describe("loads", () => {
 			version: 2,
 			initial: () => ({ title: "", n: 0 }),
 			// A migrate returning a wrong shape: the load is refused.
-			migrate: (old) => ({ title: String(old.title) }) as { title: string; n: number },
+			migrate: old => ({ title: String(old.title) }) as { title: string; n: number },
 			persist: true,
 			checkpointWhen: () => false,
 		});
@@ -133,7 +133,7 @@ describe("loads", () => {
 		await change(
 			"a",
 			undefined,
-			(d) => {
+			d => {
 				d.title = "x";
 			},
 			undefined,
@@ -162,7 +162,7 @@ describe("loads", () => {
 			await change(
 				key,
 				undefined,
-				(d) => {
+				d => {
 					d.n = 1;
 				},
 				undefined,
@@ -181,7 +181,7 @@ describe("staged writes", () => {
 		let stored = await change(
 			"a",
 			undefined,
-			(d) => {
+			d => {
 				d.n = 1;
 			},
 			undefined,
@@ -192,7 +192,7 @@ describe("staged writes", () => {
 			stored = await change(
 				"a",
 				value,
-				(d) => {
+				d => {
 					d.n = n;
 				},
 				stored,
@@ -209,7 +209,7 @@ describe("staged writes", () => {
 		const stored = await change(
 			"a",
 			undefined,
-			(d) => {
+			d => {
 				d.n = 1;
 			},
 			undefined,
@@ -218,14 +218,14 @@ describe("staged writes", () => {
 			schema: obj({ title: str(), n: int() }),
 			version: 2,
 			initial: () => ({ title: "", n: 0 }),
-			migrate: (old) => old as { title: string; n: number },
+			migrate: old => old as { title: string; n: number },
 			persist: true,
 			checkpointWhen: () => false,
 		});
 		const after = await change(
 			"a",
 			{ title: "", n: 1 },
-			(d) => {
+			d => {
 				d.n = 2;
 			},
 			stored,
@@ -240,7 +240,7 @@ describe("staged writes", () => {
 		const stored = await change(
 			"a",
 			undefined,
-			(d) => {
+			d => {
 				d.n = 1;
 			},
 			undefined,

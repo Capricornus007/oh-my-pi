@@ -107,7 +107,7 @@ export class OAuthCallbackServer {
 		}
 		this.pending.clear();
 		await new Promise<void>((resolve, reject) => {
-			this.server.close((error) => (error ? reject(error) : resolve()));
+			this.server.close(error => (error ? reject(error) : resolve()));
 		});
 	}
 

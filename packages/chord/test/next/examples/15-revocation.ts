@@ -41,7 +41,7 @@ const Notes = remote("example.notes", {
 
 const NotesDoc = defineState("notes", { schema: obj({ list: arr(str()) }), version: 1, initial: () => ({ list: [] }) });
 
-const notesFacet = defineFacet<P>((host) => {
+const notesFacet = defineFacet<P>(host => {
 	host.serve(Notes, (_, principal, self) => {
 		const doc = self.state(NotesDoc);
 		console.log(`  worker: Notes for ${principal.kind}${principal.kind === "guest" ? ` ${principal.grant}` : ""}`);
@@ -50,12 +50,12 @@ const notesFacet = defineFacet<P>((host) => {
 			members: {
 				notes: self.derive([doc], ([d]) => d.list),
 				add: async ({ text }, ctx) => {
-					await doc.change((draft) => void draft.list.push(text), ctx);
+					await doc.change(draft => void draft.list.push(text), ctx);
 					return null;
 				},
 				// A long-running call: it ends when its context is aborted, and says why.
-				follow: async (ctx) => {
-					await new Promise((resolve) => ctx.abortSignal?.addEventListener("abort", resolve));
+				follow: async ctx => {
+					await new Promise(resolve => ctx.abortSignal?.addEventListener("abort", resolve));
 					const { code, reason } = ctx.abortSignal!.reason as ChordError;
 					console.log(`  worker: ${principal.kind}'s follow aborted: ${code}/${reason}`);
 					return null;
@@ -77,7 +77,7 @@ server.route(
 	Session,
 	{
 		authorize: (p, address) => p.kind === "owner" || (p.kind === "guest" && p.session === address.params.id),
-		resolve: async (address) => {
+		resolve: async address => {
 			const [up, down] = memoryLinkPair();
 			const worker = createHost<P, Revocation>({
 				address,
@@ -117,13 +117,13 @@ const ownerNotes = await owner.get(Notes, { session: "S1" }, context);
 await guestNotes.add({ text: "from the guest" }, context);
 const following = guestNotes.follow(context).catch((error: ChordError) => error.code);
 // The call reaches the worker and runs there.
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("worker S1 references:", workers[0]!.references(Notes).value.length);
 
 // 3. Revoke the grant: the worker gets `revoke { grant: "g1" }` and ends the guest's objects there (their running
 // calls aborted with forbidden/revoked), and both guest tabs' links close.
 server.revoke({ grant: "g1" }, context);
-await new Promise((resolve) => setTimeout(resolve, 10));
+await new Promise(resolve => setTimeout(resolve, 10));
 console.log("guest tab:", guestNotes.state.value.kind, "(its link closed; a new one needs a new authentication)");
 console.log("guest's follow call:", await following);
 // The owner's Notes is its own object (identities include the principal), untouched.
@@ -137,6 +137,6 @@ console.log(
 const s2 = await owner.get(Notes, { session: "S2" }, context);
 console.log("owner on S2:", s2.state.value.kind);
 
-await Promise.all([one, two, owner].map((host) => host.close(context)));
+await Promise.all([one, two, owner].map(host => host.close(context)));
 await server.close(context);
-await Promise.all(workers.map((worker) => worker.close(context)));
+await Promise.all(workers.map(worker => worker.close(context)));

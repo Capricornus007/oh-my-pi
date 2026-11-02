@@ -22,17 +22,17 @@ import { PRELUDE_SOURCE } from "../src/runtime/prelude-source.ts";
  */
 const INTERRUPT_BUDGET = 20_000;
 const BACKENDS: Record<string, (options: CodemodeSandboxBaseOptions) => CodemodeSandboxBase> = {
-	worker: (options) => new CodemodeSandbox(options),
-	inline: (options) =>
+	worker: options => new CodemodeSandbox(options),
+	inline: options =>
 		new InlineCodemodeSandbox({ ...options, wasm: loadQuickJSWasm(), interruptBudget: INTERRUPT_BUDGET }),
-	remote: (options) =>
+	remote: options =>
 		new RemoteCodemodeSandbox({
 			...options,
 			remote: () => ({
 				execute: (request, exchange) =>
 					serveCodemodeRemote(
 						structuredClone(request),
-						async (messages) => structuredClone(await exchange(structuredClone(messages))),
+						async messages => structuredClone(await exchange(structuredClone(messages))),
 						{ wasm: loadQuickJSWasm(), maxInterruptBudget: INTERRUPT_BUDGET },
 					),
 			}),
@@ -53,10 +53,10 @@ function createSandbox(tools: CodemodeTool[] = [], timeoutMs = 10_000): Codemode
 }
 
 afterEach(async () => {
-	await Promise.all(sandboxes.splice(0).map((sandbox) => sandbox.close()));
+	await Promise.all(sandboxes.splice(0).map(sandbox => sandbox.close()));
 });
 
-const echo: CodemodeTool = { name: "echo", execute: (args) => args };
+const echo: CodemodeTool = { name: "echo", execute: args => args };
 
 // Base64 of the leading bytes of each format. image() only inspects the signature.
 const PNG = "iVBORw0KGgo=";
@@ -70,7 +70,7 @@ describe("embedded sources", () => {
 	});
 });
 
-describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
+describe.each(Object.keys(BACKENDS))("%s backend", name => {
 	beforeEach(() => {
 		backend = name;
 	});
@@ -267,7 +267,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 			const sandbox = createSandbox([
 				{
 					name: "add",
-					execute: (args) => {
+					execute: args => {
 						seen.push(args);
 						const { a, b } = args as { a: number; b: number };
 						return { sum: a + b };
@@ -284,17 +284,17 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 				{ a: 1, b: 2 },
 				{ a: 3, b: 10 },
 			]);
-			expect(result.calls.map((call) => [call.name, call.status])).toEqual([
+			expect(result.calls.map(call => [call.name, call.status])).toEqual([
 				["add", "ok"],
 				["add", "ok"],
 			]);
-			expect(result.calls.every((call) => call.durationMs >= 0)).toBe(true);
+			expect(result.calls.every(call => call.durationMs >= 0)).toBe(true);
 		});
 
 		it("runs concurrent calls and lists tool names", async () => {
 			const sandbox = createSandbox([
 				echo,
-				{ name: "delay", execute: (args) => new Promise((resolve) => setTimeout(() => resolve(args), 20)) },
+				{ name: "delay", execute: args => new Promise(resolve => setTimeout(() => resolve(args), 20)) },
 			]);
 			const result = await sandbox.execute(`
 				const [a, b, c] = await Promise.all([tools.delay(1), tools.delay(2), tools.echo(3)]);
@@ -329,7 +329,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 		});
 
 		it("passes undefined arguments and results through", async () => {
-			const sandbox = createSandbox([{ name: "noop", execute: (args) => args }]);
+			const sandbox = createSandbox([{ name: "noop", execute: args => args }]);
 			const result = await sandbox.execute("return [await tools.noop(), await tools.noop(null)]");
 			expect(result).toMatchObject({ ok: true, value: [null, null] });
 		});
@@ -401,7 +401,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 			const sandbox = createSandbox();
 			sandbox.registerTool(echo);
 			expect(() => sandbox.registerTool(echo)).toThrow(/already registered/);
-			expect(sandbox.tools.map((tool) => tool.name)).toEqual(["echo"]);
+			expect(sandbox.tools.map(tool => tool.name)).toEqual(["echo"]);
 			expect(await sandbox.execute("return await tools.echo('a')")).toMatchObject({ ok: true, value: "a" });
 			expect(sandbox.unregisterTool("echo")).toBe(true);
 			expect(await sandbox.execute("return 'echo' in tools")).toMatchObject({ ok: true, value: false });
@@ -478,7 +478,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 			const seen: unknown[] = [];
 			const sandbox = newSandbox({
 				tools: [echo],
-				globals: [{ name: "attach", execute: (args) => void seen.push(args) }],
+				globals: [{ name: "attach", execute: args => void seen.push(args) }],
 			});
 			const result = await sandbox.execute(`
 				await attach({ ref: 1 });
@@ -486,7 +486,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 				return [typeof attach, typeof globalThis.attach, await tools.echo(2)];
 			`);
 			expect(result).toMatchObject({ ok: true, value: ["function", "function", 2] });
-			expect(result.calls.map((call) => call.name)).toEqual(["echo"]);
+			expect(result.calls.map(call => call.name)).toEqual(["echo"]);
 			// Messages are handled in order, so an unawaited global still runs before the script settles.
 			expect(seen).toEqual([{ ref: 1 }, "not awaited"]);
 		});
@@ -495,8 +495,8 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 			const seen: unknown[] = [];
 			const sandbox = newSandbox({
 				globals: [
-					{ name: "models.list", spread: true, execute: (args) => void seen.push(args) },
-					{ name: "models.first", execute: (args) => args },
+					{ name: "models.list", spread: true, execute: args => void seen.push(args) },
+					{ name: "models.first", execute: args => args },
 				],
 			});
 			const result = await sandbox.execute(`
@@ -556,14 +556,14 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 
 		it("runs without a deadline when timeoutMs is Infinity", async () => {
 			const sandbox = createSandbox([
-				{ name: "wait", execute: () => new Promise((r) => setTimeout(() => r("late"), 50)) },
+				{ name: "wait", execute: () => new Promise(r => setTimeout(() => r("late"), 50)) },
 			]);
 			const result = await sandbox.execute("return await tools.wait()", { timeoutMs: Number.POSITIVE_INFINITY });
 			expect(result).toMatchObject({ ok: true, value: "late" });
 		});
 
 		it("fails a script that waits on a promise nothing can settle", async () => {
-			const sandbox = createSandbox([{ name: "echo", execute: (args) => args }]);
+			const sandbox = createSandbox([{ name: "echo", execute: args => args }]);
 			const result = await sandbox.execute("await tools.echo(1); await new Promise(() => {}); return 'never'", {
 				timeoutMs: Number.POSITIVE_INFINITY,
 			});
@@ -590,7 +590,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 			// Resolves on each call, so the test waits for the worker instead of a fixed delay.
 			let called: () => void = () => {};
 			const nextCall = () =>
-				new Promise<void>((resolve) => {
+				new Promise<void>(resolve => {
 					called = resolve;
 				});
 			const sandbox = createSandbox([
@@ -668,7 +668,7 @@ describe.each(Object.keys(BACKENDS))("%s backend", (name) => {
 				sandbox.execute("globalThis.shared = 'b'; await null; return globalThis.shared"),
 				sandbox.execute("return typeof globalThis.shared"),
 			]);
-			expect(results.map((result) => (result.ok ? result.value : result.error))).toEqual(["a", "b", "undefined"]);
+			expect(results.map(result => (result.ok ? result.value : result.error))).toEqual(["a", "b", "undefined"]);
 		});
 
 		it("turns deep recursion into a catchable RangeError", async () => {

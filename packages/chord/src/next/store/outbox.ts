@@ -72,7 +72,7 @@ export class Outbox {
 			throw invalid("args", `outbox: read after ${afterSeq}, outside ${this.#floor}..${this.#store.lastSeq}`);
 		}
 		const rows = await this.#store.read(
-			(executor) =>
+			executor =>
 				executor.all<{
 					readonly seq: number;
 					readonly format: number;
@@ -96,7 +96,7 @@ export class Outbox {
 
 	async #trim(throughSeq: number): Promise<void> {
 		if (throughSeq <= this.#floor) return;
-		await this.#store.maintain(async (executor) => {
+		await this.#store.maintain(async executor => {
 			await executor.run(`DELETE FROM ${TABLES.outbox} WHERE seq <= ?`, throughSeq);
 			await executor.run(`UPDATE ${TABLES.meta} SET outbox_floor = ? WHERE singleton = 1`, throughSeq);
 		});
