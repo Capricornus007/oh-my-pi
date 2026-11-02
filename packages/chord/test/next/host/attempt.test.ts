@@ -8,7 +8,6 @@ import {
 	createHost,
 	defineFacet,
 	type HostError,
-	type Reference,
 	type Self,
 	type StoreSelf,
 } from "../../../src/next/host/index.ts";
@@ -315,7 +314,6 @@ describe("ending", () => {
 	it("drains a handler that releases its object's last reference before it returns its promise", async () => {
 		const events: string[] = [];
 		const proceed = Promise.withResolvers<void>();
-		let page: Reference<typeof Page> | undefined;
 		const { host } = await loaded((h) =>
 			h.serve(Page, (_, self) => {
 				self.open(
@@ -335,7 +333,7 @@ describe("ending", () => {
 				};
 			}),
 		);
-		page = await host.get(Page, { id: 1 }, context);
+		const page = await host.get(Page, { id: 1 }, context);
 		const call = page.slow(context);
 		await expect(call).rejects.toThrow("app.page(1): ended");
 		await flushed();

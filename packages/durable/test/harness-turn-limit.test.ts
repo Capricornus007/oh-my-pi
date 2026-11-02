@@ -191,7 +191,6 @@ describe("turn limit", () => {
 	// #11043
 	it("applies a changed limit at the end of the round; null removes it", async () => {
 		const setup = chatSetup();
-		let root!: Conversation;
 		let rounds = 0;
 		addTool(
 			setup.registry,
@@ -204,7 +203,7 @@ describe("turn limit", () => {
 		);
 		setup.faux.setResponses([round("c1"), round("c2"), round("c3"), DONE]);
 		const opened = await openChat(new MemoryStorage(), setup);
-		root = opened.root;
+		const root = opened.root;
 		await root.configure({ maxTurns: 5 }, context);
 		const settled = await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(settled).toMatchObject({ status: "unanswered", reason: "turn_limit", detail: "2 turns" });

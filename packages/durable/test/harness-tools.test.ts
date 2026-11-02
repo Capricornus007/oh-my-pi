@@ -241,7 +241,6 @@ describe("tool round", () => {
 
 	it("produces tool_unavailable when the implementation is unregistered before its task runs", async () => {
 		const setup = chatSetup();
-		let second!: Installed;
 		addTool(
 			setup.registry,
 			tool(
@@ -253,7 +252,7 @@ describe("tool round", () => {
 				{ executionMode: "sequential" },
 			),
 		);
-		second = addTool(
+		const second = addTool(
 			setup.registry,
 			tool("second", async () => ({ output: [{ type: "text", text: "ran" }] })),
 		);

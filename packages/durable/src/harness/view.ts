@@ -238,7 +238,6 @@ export class ConversationViews {
 			const mount = this.#mounts.get(id) ?? (await this.#build(storage, id, context));
 			const { entries, before } = await loadWindow(storage, id, bounds, context);
 			const value = view(mount.conversation, entries, before, mount.docs);
-			let windowed: Windowed | undefined;
 			const detach = (): void => {
 				if (windowed !== undefined) mount.observers.delete(windowed);
 				if (mount.observers.size === 0 && this.#mounts.get(id) === mount) this.#mounts.delete(id);
@@ -247,7 +246,7 @@ export class ConversationViews {
 			// Close or cancellation may begin while the mount hydrates; register nothing then.
 			if (this.#closed) throw closedError(this.#session);
 			context.abortSignal?.throwIfAborted();
-			windowed = { min: bounds.min, max: bounds.max, value, observer };
+			const windowed = { min: bounds.min, max: bounds.max, value, observer };
 			this.#mounts.set(id, mount);
 			mount.observers.add(windowed);
 			return { observer, detach };

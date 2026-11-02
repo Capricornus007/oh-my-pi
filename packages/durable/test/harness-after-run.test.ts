@@ -399,7 +399,6 @@ describe("afterRun", () => {
 		const dropped = chatSetup();
 		const second = probe();
 		install(dropped, second);
-		let root2: Awaited<ReturnType<typeof openChat>>["root"] | undefined;
 		dropped.registry.install(
 			defineExtension({
 				name: "steering",
@@ -416,7 +415,7 @@ describe("afterRun", () => {
 		);
 		dropped.faux.setResponses([fauxAssistantMessage("1"), fauxAssistantMessage("2")]);
 		const opened = await openChat(new MemoryStorage(), dropped);
-		root2 = opened.root;
+		const root2 = opened.root;
 		await (await opened.root.submit({ type: "input", content: "go" }, context)).wait(context);
 		await opened.root.waitForIdle(context);
 		expect(second.asked).toHaveLength(2);
@@ -924,7 +923,6 @@ describe("afterRun", () => {
 		const setup = chatSetup();
 		const state = probe();
 		install(setup, state);
-		let root: Awaited<ReturnType<typeof openChat>>["root"] | undefined;
 		setup.registry.install(
 			defineExtension({
 				name: "legacy",
@@ -943,7 +941,7 @@ describe("afterRun", () => {
 		);
 		setup.faux.setResponses([fauxAssistantMessage("done")]);
 		const opened = await openChat(new MemoryStorage(), setup);
-		root = opened.root;
+		const root = opened.root;
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		await root.waitForIdle(context);
 		const answer = kindOf(await allEntries(root), "pi.assistant").at(-1)!;

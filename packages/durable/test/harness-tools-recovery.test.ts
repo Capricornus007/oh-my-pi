@@ -141,7 +141,6 @@ describe("tool recovery", () => {
 			setup.settings.progress = { persistWithinMs: Number.POSITIVE_INFINITY };
 			const started = deferred();
 			let runs = 0;
-			let reopened: Harness | undefined;
 			const seen: (string | undefined)[] = [];
 			addTool(
 				setup.registry,
@@ -181,7 +180,7 @@ describe("tool recovery", () => {
 			if (sibling) await waitFor(async () => (await slot(crashed.harness, "quick"))?.status === "done");
 			// The process dies here: another one opens the same database, without the held presentation.
 			const next = await openChat(await openNodeSqliteStorage(path), setup);
-			reopened = next.harness;
+			const reopened = next.harness;
 			expect((await next.harness.getTask(workId, context))?.state).toMatchObject({
 				checkpoint: { phase: "execute" },
 			});

@@ -784,7 +784,6 @@ describe("definition handover", () => {
 		const storage = new ControlledStorage();
 		let held: ReturnType<ControlledStorage["holdCommits"]> | undefined;
 		let oldRuntime: TaskRuntime<null, Handover, null, object> | undefined;
-		let harnessRef: OpenHarness | undefined;
 		const registry = createRegistry();
 		const Old = defineTask<null, Handover, null>({
 			name: "test.handover",
@@ -808,7 +807,7 @@ describe("definition handover", () => {
 		});
 		addTask(registry, Old);
 		const { harness } = await openTasks(storage, [], { registry });
-		harnessRef = harness;
+		const harnessRef = harness;
 		const id = await createIn(harness, Old);
 		harness.resume();
 		await eventually(() => oldRuntime !== undefined);

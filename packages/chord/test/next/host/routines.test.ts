@@ -981,7 +981,6 @@ describe("routines and the end", () => {
 
 	it("never start a routine call once the object ended in its first turn: no call, no report, no rejection", async () => {
 		const calls: string[] = [];
-		let held: { release(): void } | undefined;
 		const { host, errors } = await loaded((h) =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
@@ -994,7 +993,7 @@ describe("routines and the end", () => {
 				return { n: self.derive([doc], ([d]) => d.n), bump: async (ctx) => bump(doc, ctx) };
 			}),
 		);
-		held = host.hold(Item, { id: 1 }, context);
+		const held = host.hold(Item, { id: 1 }, context);
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		expect({ calls, errors }).toEqual({ calls: ["onLive #1"], errors: [] });
 	});
@@ -1002,7 +1001,6 @@ describe("routines and the end", () => {
 	it("are in the drain before their handler runs: a handler releasing the last reference keeps natives open", async () => {
 		const gate = Promise.withResolvers<void>();
 		const events: string[] = [];
-		let held: { release(): void } | undefined;
 		const { host } = await loaded((h) =>
 			h.serve(Item, (_, self) => {
 				const doc = self.state(Doc);
@@ -1021,7 +1019,7 @@ describe("routines and the end", () => {
 			}),
 		);
 		const item = await host.get(Item, { id: 1 }, context);
-		held = item;
+		const held = item;
 		await flushed();
 		// The call may see its object end: its own routine ends it.
 		await item.bump(context).catch(() => {});

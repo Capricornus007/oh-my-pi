@@ -706,7 +706,6 @@ export class NodeExecutionEnv implements ExecutionEnv {
 			let callbackError: ExecutionError | undefined;
 			let spillError: ExecutionError | undefined;
 			let child: ReturnType<typeof spawn> | undefined;
-			let timeoutId: ReturnType<typeof setTimeout> | undefined;
 			const spillPrefix: SpillChunk[] = [];
 			let spillPath: string | undefined;
 			const spillQueue: SpillChunk[] = [];
@@ -827,7 +826,7 @@ export class NodeExecutionEnv implements ExecutionEnv {
 				return;
 			}
 
-			timeoutId =
+			const timeoutId =
 				timeoutMs === undefined
 					? undefined
 					: setTimeout(() => {

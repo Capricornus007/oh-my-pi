@@ -158,7 +158,6 @@ describe("afterTool on results the call phase decides", () => {
 				return { ...result, output: [{ type: "text", text: `hooked ${call.id}` }], details: { by: "hook" } };
 			},
 		});
-		let root!: Awaited<ReturnType<typeof openChat>>["root"];
 		setup.faux.setResponses([
 			async () => {
 				// The tool is offered but no longer resolves when its task runs.
@@ -173,7 +172,7 @@ describe("afterTool on results the call phase decides", () => {
 			DONE,
 		]);
 		const opened = await openChat(new MemoryStorage(), setup);
-		root = opened.root;
+		const root = opened.root;
 		const settled = await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(settled.status).toBe("done");
 		expect(ran).toBe(0);
@@ -210,7 +209,6 @@ describe("afterTool on results the call phase decides", () => {
 				output: [{ type: "text", text: call.id === "c2" ? "x".repeat(100) : "y".repeat(60 * 1024) }],
 			}),
 		});
-		let root!: Awaited<ReturnType<typeof openChat>>["root"];
 		setup.faux.setResponses([
 			async () => {
 				await root.configure({ tools: [] }, context);
@@ -219,7 +217,7 @@ describe("afterTool on results the call phase decides", () => {
 			DONE,
 		]);
 		const opened = await openChat(new MemoryStorage(), setup);
-		root = opened.root;
+		const root = opened.root;
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		await root.configure({ tools: null }, context);
 		setup.faux.setResponses([calls(["small", {}, "c2"]), DONE]);

@@ -661,7 +661,6 @@ describe("task runtime", () => {
 		let before: Promise<void> | undefined;
 		let after: Promise<void> | undefined;
 		let held: ReturnType<ControlledStorage["holdCommits"]> | undefined;
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		const Detached = oneStep<string>("test.detached", async (_task, runtime) => {
 			// Hold the line, queue a commit without awaiting it, and return; the step queues behind that commit.
 			held = storage.holdCommits();
@@ -675,7 +674,7 @@ describe("task runtime", () => {
 			}, 0);
 		});
 		const { harness, root } = await openRoot([Detached], { storage });
-		harnessRef = harness;
+		const harnessRef = harness;
 		const id = await start(root, Detached);
 		harness.resume();
 		await eventually(() => held !== undefined);
@@ -699,7 +698,6 @@ describe("task runtime", () => {
 		const storage = new ControlledStorage();
 		let watching: Promise<unknown> | undefined;
 		let held: ReturnType<ControlledStorage["holdCommits"]> | undefined;
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		const Late = oneStep("test.late-watch", async (_task, runtime) => {
 			held = storage.holdCommits();
 			void harnessRef!.commit(async (tx) => {
@@ -711,7 +709,7 @@ describe("task runtime", () => {
 			}, 0);
 		});
 		const { harness, root } = await openRoot([Late], { storage });
-		harnessRef = harness;
+		const harnessRef = harness;
 		await harness.commit(async (tx) => {
 			(await tx.doc(Notes)).text = "x";
 		}, context);
@@ -1006,7 +1004,6 @@ describe("task abort", () => {
 	it("aborts waiting work before its wait ends and faults abort handlers that throw or settle nothing", async () => {
 		const gate = deferred();
 		const First = gated("test.dependency", gate.promise);
-		let first: TaskId | undefined;
 		const wait = async (_task: unknown, runtime: StepRuntime<null>, ctx: Context): Promise<void> => {
 			const checkpoint = { phase: "run" } as const;
 			await runtime.commit(() => ({ status: "waiting", checkpoint, on: [first!], policy: "allSettled" }), ctx);
@@ -1016,7 +1013,7 @@ describe("task abort", () => {
 			throw new Error("abort failed");
 		});
 		const { harness, root } = await openRoot([First, Lazy, Throwing]);
-		first = await start(root, First);
+		const first = await start(root, First);
 		const lazy = await start(root, Lazy);
 		const throwing = await start(root, Throwing);
 		harness.resume();
@@ -1123,7 +1120,6 @@ describe("task abort", () => {
 		const storage = new ControlledStorage();
 		let marking: Promise<unknown> | undefined;
 		let held: ReturnType<ControlledStorage["holdCommits"]> | undefined;
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		const Racing = oneStep("test.racing-fault", async (task) => {
 			held = storage.holdCommits();
 			marking = harnessRef!.abortTask(task.id, context);
@@ -1132,7 +1128,7 @@ describe("task abort", () => {
 			throw new Error("would fault");
 		});
 		const { harness, root } = await openRoot([Racing], { storage });
-		harnessRef = harness;
+		const harnessRef = harness;
 		const id = await start(root, Racing);
 		harness.resume();
 		await eventually(() => held !== undefined);
@@ -1210,7 +1206,6 @@ describe("task close", () => {
 		});
 		const reached = deferred();
 		let fromListener: Promise<unknown> | undefined;
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		let watchEnd: unknown;
 		const Stubborn = oneStep("test.stubborn", async (_task, runtime) => {
 			// Uses a context close does not cancel, then waits for the watch to close.
@@ -1222,7 +1217,7 @@ describe("task close", () => {
 			watchEnd = await watch!.closed;
 		});
 		const { harness, root } = await openRoot([Stubborn]);
-		harnessRef = harness;
+		const harnessRef = harness;
 		await harness.commit(async (tx) => {
 			(await tx.doc(Notes)).text = "x";
 		}, context);
@@ -1237,14 +1232,13 @@ describe("task close", () => {
 	it("writes no fault when close seals while the step after a failed phase is queued", async () => {
 		const storage = new ControlledStorage();
 		let held: ReturnType<typeof holdLine> | undefined;
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		const Throws = oneStep("test.close-fault", async () => {
 			// The step after this phase queues behind a job that holds the line.
 			held = holdLine(harnessRef!);
 			throw new Error("would fault");
 		});
 		const { harness, root } = await openRoot([Throws], { storage });
-		harnessRef = harness;
+		const harnessRef = harness;
 		const id = await start(root, Throws);
 		harness.resume();
 		await eventually(() => held !== undefined);
@@ -1296,7 +1290,6 @@ describe("task close", () => {
 		const storage = new ControlledStorage();
 		let queued: Promise<unknown> | undefined;
 		let held: ReturnType<typeof holdLine> | undefined;
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		const proceed = deferred();
 		const Queued = oneStep("test.close-queued-commit", async (_task, runtime) => {
 			held = holdLine(harnessRef!);
@@ -1305,7 +1298,7 @@ describe("task close", () => {
 			await proceed.promise;
 		});
 		const { harness, root } = await openRoot([Queued], { storage });
-		harnessRef = harness;
+		const harnessRef = harness;
 		const id = await start(root, Queued);
 		harness.resume();
 		await eventually(() => held !== undefined);
@@ -1330,7 +1323,6 @@ describe("task close", () => {
 	it("starts no next phase when close seals during a step that decided to continue", async () => {
 		const phases: string[] = [];
 		const registry = createRegistry();
-		let harnessRef: Awaited<ReturnType<typeof openRoot>>["harness"] | undefined;
 		let closing: Promise<void> | undefined;
 		let closeOnSnapshot = false;
 		// The step refreshes the snapshot after progress, inside its line callback and after its closing check.
@@ -1362,7 +1354,7 @@ describe("task close", () => {
 		});
 		addTask(registry, Two);
 		const harness = await Harness.open(new MemoryStorage(), { models: createModels(), registry: reader }, context);
-		harnessRef = harness;
+		const harnessRef = harness;
 		const root = await harness.root(context);
 		await root.commit((tx) => tx.createTask(Two, null, { ownership: { kind: "conversation" } }), context);
 		harness.resume();

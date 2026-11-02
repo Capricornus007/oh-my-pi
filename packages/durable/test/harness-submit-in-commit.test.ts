@@ -174,7 +174,6 @@ describe("whenIdle reject", () => {
 	// #11149
 	it("rejects through a tool's conversation handle", async () => {
 		const setup = chatSetup();
-		let other: Conversation | undefined;
 		let rejection: unknown;
 		addTool(
 			setup.registry,
@@ -195,7 +194,7 @@ describe("whenIdle reject", () => {
 			fauxAssistantMessage([fauxText("ok")]),
 		]);
 		const { harness, root } = await openChat(new ControlledStorage(), setup);
-		other = await harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: MODEL } }, context);
+		const other = await harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: MODEL } }, context);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		expect(rejection).toBeInstanceOf(ConversationIdle);
 		expect((await harness.snapshot(LiveDoc, other.id, context))?.run).toBeUndefined();
@@ -519,7 +518,6 @@ describe("submit inside the caller's commit", () => {
 	// #11149
 	it("admits atomically from a tool's commit through its conversation handle", async () => {
 		const setup = chatSetup();
-		let other: Conversation | undefined;
 		let toolTask: number | undefined;
 		addTool(
 			setup.registry,
@@ -548,7 +546,7 @@ describe("submit inside the caller's commit", () => {
 		};
 		setup.faux.setResponses([reply, reply, reply]);
 		const { harness, root } = await openChat(new ControlledStorage(), setup);
-		other = await harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: MODEL } }, context);
+		const other = await harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: MODEL } }, context);
 		const run = await root.submit({ type: "input", content: "delegate" }, context);
 		expect(await run.wait(context)).toMatchObject({ status: "done" });
 		await harness.waitForIdle(context);
@@ -602,7 +600,6 @@ describe("submit inside the caller's commit", () => {
 	// #11149
 	it("rejects through a handle once its invocation is aborted, and once it ended", async () => {
 		const setup = chatSetup();
-		let other: Conversation | undefined;
 		let handle: ConversationHandle | undefined;
 		const started = deferred();
 		const abortSeen = deferred();
@@ -627,7 +624,7 @@ describe("submit inside the caller's commit", () => {
 			fauxAssistantMessage([fauxText("ok")]),
 		]);
 		const { harness, root } = await openChat(new ControlledStorage(), setup);
-		other = await harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: MODEL } }, context);
+		const other = await harness.createConversation({ ownership: { kind: "ownerless" }, agent: { model: MODEL } }, context);
 		const run = await root.submit({ type: "input", content: "go" }, context);
 		await started.promise;
 		const tool = (await harness.inspect(context)).tasks.find((task) => task.record.kind === "pi.tool")!.record;

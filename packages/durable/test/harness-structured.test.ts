@@ -479,7 +479,6 @@ describe("waiting", () => {
 		}
 		// A child waiting on its owner could never resume.
 		let child: TaskId | undefined;
-		let parent: TaskId | undefined;
 		script("child", { run: (runtime, ctx) => runtime.commit(() => waitOn([parent!], "allSettled"), ctx) });
 		script("parent", {
 			run: (runtime, ctx) =>
@@ -488,7 +487,7 @@ describe("waiting", () => {
 					return waitOn([child], "allSettled");
 				}, ctx),
 		});
-		parent = await start(root, "parent");
+		const parent = await start(root, "parent");
 		expect((await harness.waitForTask(parent, context)).state.outcome.status).toBe("completed");
 		expect((await harness.waitForTask(child!, context)).state.outcome).toMatchObject({
 			status: "faulted",
@@ -868,10 +867,9 @@ describe("abort order", () => {
 	}
 
 	it("runs abort handlers bottom-up across three levels, each after the level below is terminal", async () => {
-		let opened: Opened | undefined;
 		const b = chain(() => opened!.harness, "a", "b");
 		const c = chain(() => opened!.harness, "b", "c");
-		opened = await openNodes();
+		const opened = await openNodes();
 		const { harness, root } = opened;
 		const a = await start(root, "a");
 		await until(() => log.includes("run:c"));
@@ -1303,7 +1301,6 @@ describe("tool rounds", () => {
 			}),
 		);
 		// An extension's hook starts work owned by the generation, which holds it while the next turn runs.
-		let opened: Harness | undefined;
 		addHooks(setup.registry, GenerationTask, {
 			afterTools: async (_assistant, _results, api, callContext) => {
 				await opened!.commit((tx) => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
@@ -1311,7 +1308,7 @@ describe("tool rounds", () => {
 		});
 		setup.faux.setResponses([toolCalls(["noop", "c1"]), fauxAssistantMessage([fauxText("done")])]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
-		opened = harness;
+		const opened = harness;
 		const graph = await graphHistory(harness);
 		const history = await viewHistory(harness, root.id);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
@@ -1830,7 +1827,6 @@ describe("tool rounds as the view shows them", () => {
 				execute: async () => ({ output: [] }),
 			}),
 		);
-		let opened: Harness | undefined;
 		addHooks(setup.registry, GenerationTask, {
 			afterTools: async (_assistant, _results, api, callContext) => {
 				await opened!.commit((tx) => tx.createTask(Node, { name: "hooked" }, owned(api.taskId)), callContext);
@@ -1838,7 +1834,7 @@ describe("tool rounds as the view shows them", () => {
 		});
 		setup.faux.setResponses([toolCalls(["noop", "c1"]), fauxAssistantMessage([fauxText("done")])]);
 		const { harness, root } = await openChat(new MemoryStorage(), setup);
-		opened = harness;
+		const opened = harness;
 		const early = await graphHistory(harness);
 		await (await root.submit({ type: "input", content: "go" }, context)).wait(context);
 		const late = await graphHistory(harness);

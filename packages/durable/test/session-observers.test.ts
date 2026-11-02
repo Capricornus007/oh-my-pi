@@ -497,8 +497,7 @@ describe("observeDoc detached during a commit", () => {
 		const { session, conversationId, recreate } = await retiring();
 		const changes: WatchCall<Readonly<Counter>>[] = [];
 		const ends: unknown[] = [];
-		let observation: Observation<Readonly<Counter>> | undefined;
-		observation = await session.observeDoc(
+		const observation = await session.observeDoc(
 			ConversationCounter,
 			conversationId,
 			{
@@ -519,7 +518,6 @@ describe("observeDoc detached during a commit", () => {
 
 	it("gets nothing of the commit when another observer's call detached it first, and pins nothing", async () => {
 		const { storage, session, conversationId, recreate } = await retiring();
-		let second: Observation<Readonly<Counter>> | undefined;
 		const first = (await session.observeDoc(
 			ConversationCounter,
 			conversationId,
@@ -530,7 +528,7 @@ describe("observeDoc detached during a commit", () => {
 			context,
 		))!;
 		const detached = recorder(storage);
-		second = await session.observeDoc(ConversationCounter, conversationId, detached.observer, context);
+		const second = await session.observeDoc(ConversationCounter, conversationId, detached.observer, context);
 		await recreate();
 		expect(detached.calls).toEqual([]);
 		// Only the first observer pins the new incarnation; its detach leaves nothing pinned.

@@ -53,7 +53,6 @@ function notesPlugin(banner: string) {
 	);
 }
 
-let slowReindex: PromiseWithResolvers<void> | undefined;
 
 /** The search plugin: its engine is a native, so every reload of it restarts the object. */
 function searchPlugin(engine: string) {
@@ -128,7 +127,7 @@ console.log("   list:", notes.list.value, "banner", notes.banner.value, "(same d
 
 // 3. A restart: the search object holds a native. Its running call drains first, then the native closes (reload).
 const index = await host.get(Search, {}, context);
-slowReindex = Promise.withResolvers();
+const slowReindex = Promise.withResolvers<void>();
 const reindexing = index.reindex(context);
 await new Promise((resolve) => setTimeout(resolve, 0));
 const restart = await host.reload(

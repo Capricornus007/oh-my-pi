@@ -380,7 +380,6 @@ class WorkersComponent implements Workers<HostKind> {
 	#fork(routed: Routed): Child {
 		const { address } = routed;
 		const onOutput = this.#options.onOutput;
-		let child!: Child;
 		const process = new WorkerProcess(
 			{
 				entry: this.#options.entry,
@@ -395,7 +394,7 @@ class WorkersComponent implements Workers<HostKind> {
 				exited: (exit) => this.#exited(routed, child, exit),
 			},
 		);
-		child = {
+		const child: Child = {
 			process,
 			status: "starting",
 			stopping: false,
