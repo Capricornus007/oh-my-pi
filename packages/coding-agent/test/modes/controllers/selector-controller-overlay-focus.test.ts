@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
+import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { SessionSelectorComponent } from "@oh-my-pi/pi-tui/overlays/session-selector";
 import { SelectorController } from "@oh-my-pi/pi-coding-agent/modes/controllers/selector-controller";
 import { initTheme } from "@oh-my-pi/pi-tui/theme";
@@ -38,6 +39,7 @@ function createCtx(slot: EditorSlot, editor: unknown, focused: unknown = editor)
 	const ctx = {
 		editor,
 		editorContainer: slot,
+		settings: Settings.isolated(),
 		ui: {
 			getFocused: vi.fn(() => focused),
 			setFocus,
@@ -140,6 +142,7 @@ describe("SelectorController session replacement overlay", () => {
 		const ctx = {
 			editor,
 			editorContainer,
+			settings: Settings.isolated(),
 			sessionManager: {
 				getCwd: () => "/tmp",
 				getSessionDir: () => "/tmp",
