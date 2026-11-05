@@ -8,7 +8,7 @@ import { isPromise } from "node:util/types";
 import type { AgentEvent, AgentMessage, AgentToolResult, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
 import type { ImageContent, Model } from "@oh-my-pi/pi-ai";
-import { isRecord, ptree, readJsonl } from "@oh-my-pi/pi-utils";
+import { isRecord, ptree, readJsonl, toError } from "@oh-my-pi/pi-utils";
 import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
 import type { TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
 import type { FileSink } from "bun";
@@ -16,6 +16,7 @@ import type { BashResult } from "../../exec/bash-executor";
 import type { AgentSessionEvent, SessionStats } from "../../session/agent-session";
 import type { CacheWarmingMode } from "../../session/cache-warmer";
 import type { SessionEntry, SessionTreeNode } from "../../session/session-entries";
+import type { SessionLeaseReport } from "../../session/session-storage";
 import { MAX_RPC_FRAME_BYTES, MAX_RPC_REASSEMBLED_BYTES, RpcFrameDecoder, type RpcProtocolVersion } from "./rpc-frame";
 import type { RpcGoalOp, RpcGoalResult } from "./rpc-goal";
 import {
@@ -32,6 +33,7 @@ import type {
 	RpcBtwRecordFrame,
 	RpcAvailableSlashCommand,
 	RpcCommand,
+	RpcDictationFrame,
 	RpcExtensionUIRequest,
 	RpcExtensionUIResponse,
 	RpcHandoffResult,
@@ -117,6 +119,7 @@ export type RpcAvailableCommandsUpdateListener = (commands: RpcAvailableSlashCom
 export type RpcPromptResultListener = (result: RpcPromptResultFrame) => void;
 export type RpcSessionSettledListener = () => void;
 export type RpcLiveListener = (frame: RpcLiveFrame) => void;
+export type RpcDictationListener = (frame: RpcDictationFrame) => void;
 
 export interface RpcClientToolContext<TDetails = unknown> {
 	toolCallId: string;
@@ -162,6 +165,8 @@ const sessionEventTypes = new Set<AgentSessionEvent["type"]>([
 	...agentEventTypes,
 	"auto_compaction_start",
 	"auto_compaction_end",
+	"manual_compaction_start",
+	"manual_compaction_end",
 	"auto_retry_start",
 	"auto_retry_end",
 	"cache_warming_start",
@@ -250,6 +255,16 @@ function isRpcLiveFrame(value: unknown): value is RpcLiveFrame {
 	return isRecord(value) && typeof value.type === "string" && Object.hasOwn(LIVE_FRAME_TYPES, value.type);
 }
 
+const DICTATION_FRAME_TYPES: Record<string, true> = {
+	dictation_state: true,
+	dictation_transcript: true,
+	dictation_end: true,
+};
+
+function isRpcDictationFrame(value: unknown): value is RpcDictationFrame {
+	return isRecord(value) && typeof value.type === "string" && Object.hasOwn(DICTATION_FRAME_TYPES, value.type);
+}
+
 function isRpcAvailableCommandsUpdateFrame(value: unknown): value is RpcAvailableCommandsUpdateFrame {
 	if (!isRecord(value)) return false;
 	return value.type === "available_commands_update" && Array.isArray(value.commands);
@@ -336,6 +351,7 @@ export class RpcClient {
 	#promptResultListeners = new Set<RpcPromptResultListener>();
 	#sessionSettledListeners = new Set<RpcSessionSettledListener>();
 	#liveListeners = new Set<RpcLiveListener>();
+	#dictationListeners = new Set<RpcDictationListener>();
 	/** `promptAndWait` completions keyed by request id; registered before the prompt is sent. */
 	#promptResultWaiters = new Map<string, (result: RpcPromptResultFrame) => void>();
 	/** Same-id failures that arrive after the success ack removed the pending request. */
@@ -475,7 +491,7 @@ export class RpcClient {
 							});
 			await reapAfterOutputFailure(error);
 		})().catch(async (cause: unknown) => {
-			const error = cause instanceof Error ? cause : new Error(String(cause));
+			const error = toError(cause);
 			if (!readySettled) {
 				readySettled = true;
 				readyReject(error);
@@ -527,7 +543,7 @@ export class RpcClient {
 		} catch (cause) {
 			// Startup failed after spawning the child. Reap it before returning
 			// so a retry cannot inherit a live worker or its session lock.
-			const error = cause instanceof Error ? cause : new Error(String(cause));
+			const error = toError(cause);
 			await reapAfterOutputFailure(error);
 			throw cause;
 		} finally {
@@ -683,6 +699,14 @@ export class RpcClient {
 		this.#liveListeners.add(listener);
 		return () => {
 			this.#liveListeners.delete(listener);
+		};
+	}
+
+	/** Subscribe to draft-only dictation state, full preview, and terminal frames. */
+	onDictation(listener: RpcDictationListener): () => void {
+		this.#dictationListeners.add(listener);
+		return () => {
+			this.#dictationListeners.delete(listener);
 		};
 	}
 
@@ -867,6 +891,25 @@ export class RpcClient {
 		return this.#getData(response);
 	}
 
+	/**
+	 * Start a GPT live voice session whose audio runs on the caller's own WebRTC peer
+	 * (one Opus audio track plus an `oai-events` data channel). Send the peer's SDP offer and
+	 * apply the returned answer; omp keeps signaling, delegation and transcripts, and opens
+	 * no host microphone or speaker. Frames arrive through {@link onLive}; `live_levels` are not sent.
+	 */
+	async liveConnect(
+		sdpOffer: string,
+		options?: { voice?: string; instructions?: string },
+	): Promise<{ voice: string; sdpAnswer: string }> {
+		const response = await this.#send({
+			type: "live_connect",
+			sdpOffer,
+			voice: options?.voice,
+			instructions: options?.instructions,
+		});
+		return this.#getData(response);
+	}
+
 	/** Stop the live voice session, if any; resolves once it has stopped. */
 	async liveStop(): Promise<void> {
 		const response = await this.#send({ type: "live_stop" });
@@ -876,6 +919,26 @@ export class RpcClient {
 	/** Set microphone mute, or toggle it when `muted` is omitted. Fails without an active session. */
 	async liveMute(muted?: boolean): Promise<{ muted: boolean }> {
 		const response = await this.#send({ type: "live_mute", muted });
+		return this.#getData(response);
+	}
+
+	/**
+	 * Start draft-only dictation; resolves once recording, with frames delivered to onDictation.
+	 * The deadline defaults to 10 minutes for cold model initialization. A timeout does not
+	 * cancel the server operation; call dictationStop() to stop a pending or active capture.
+	 */
+	async dictationStart(captureId: string, timeoutMs = 600_000): Promise<void> {
+		const response = await this.#send({ type: "dictation_start", captureId }, timeoutMs);
+		this.#getData(response);
+	}
+
+	/**
+	 * Stop and flush dictation, returning the accumulated draft. The deadline defaults to
+	 * 10 minutes for transcription; a timeout does not cancel the server operation, and
+	 * its terminal transcript can still be received via onDictation().
+	 */
+	async dictationStop(timeoutMs = 600_000): Promise<{ text: string }> {
+		const response = await this.#send({ type: "dictation_stop" }, timeoutMs);
 		return this.#getData(response);
 	}
 
@@ -1081,6 +1144,15 @@ export class RpcClient {
 	 */
 	async getSessionStats(): Promise<SessionStats> {
 		const response = await this.#send({ type: "get_session_stats" });
+		return this.#getData(response);
+	}
+
+	/**
+	 * Which of `sessionIds` a running process (this one included) owns, probed
+	 * without taking ownership. Ids in neither list are free.
+	 */
+	async getSessionLease(sessionIds: string[]): Promise<SessionLeaseReport> {
+		const response = await this.#send({ type: "get_session_lease", sessionIds });
 		return this.#getData(response);
 	}
 
@@ -1541,6 +1613,13 @@ export class RpcClient {
 			return;
 		}
 
+		if (isRpcDictationFrame(data)) {
+			for (const listener of this.#dictationListeners) {
+				listener(data);
+			}
+			return;
+		}
+
 		if (isRpcSessionSettledFrame(data)) {
 			for (const listener of this.#sessionSettledListeners) {
 				listener();
@@ -1629,7 +1708,7 @@ export class RpcClient {
 		try {
 			this.#writeFrame(fullCommand, fail);
 		} catch (err) {
-			fail(err instanceof Error ? err : new Error(String(err)));
+			fail(toError(err));
 		}
 		return promise;
 	}
@@ -1702,7 +1781,7 @@ export class RpcClient {
 		const line = `${JSON.stringify(frame)}\n`;
 		// A broken stdin pipe is terminal: fail this frame's request, then stop so start() can relaunch.
 		const failed = (err: unknown) => {
-			onError?.(err instanceof Error ? err : new Error(String(err)));
+			onError?.(toError(err));
 			if (this.#process === child) void this.stop();
 		};
 		try {

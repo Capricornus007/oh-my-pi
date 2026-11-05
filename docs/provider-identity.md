@@ -32,7 +32,7 @@ OMP_PROVIDER_IDENTITY=mycli omp            # or just for one invocation
 
 A token expands to:
 
-- User-Agent — `<token>/<version> (<platform>; <runtime>; <arch>)`, e.g. `mycli/18.13.1 (linux; bun/1.4.2; x64)`
+- User-Agent — `<token>/<version> (<platform>; <runtime>; <arch>)`, e.g. `mycli/18.16.0 (linux; bun/1.4.4; x64)`
 - attribution app name — `<token>`
 - attribution homepage — omitted (no `omp.sh` left on the wire), unless the token is `omp` itself
 

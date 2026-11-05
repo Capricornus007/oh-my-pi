@@ -19,6 +19,7 @@ import type {
 import type { BashResult } from "../../exec/bash-executor";
 import type { ContextUsage } from "../../extensibility/extensions/types";
 import type { AgentSessionEvent, SessionStats } from "../../session/agent-session";
+import type { SessionLeaseReport } from "../../session/session-storage";
 import type { RestoredQueuedMessage } from "../../session/agent-session-types";
 import type { CacheWarmingMode } from "../../session/cache-warmer";
 import type { FileEntry, SessionEntry, SessionTreeNode } from "../../session/session-entries";
@@ -86,8 +87,13 @@ export type RpcCommand =
 	| { id?: string; type: "steer_subagent"; subagentId: string; message: string }
 	// Live voice (GPT live bound to this session)
 	| { id?: string; type: "live_start"; voice?: string; instructions?: string }
+	| { id?: string; type: "live_connect"; sdpOffer: string; voice?: string; instructions?: string }
 	| { id?: string; type: "live_stop" }
 	| { id?: string; type: "live_mute"; muted?: boolean }
+
+	// Draft-only speech-to-text
+	| { id?: string; type: "dictation_start"; captureId: string }
+	| { id?: string; type: "dictation_stop" }
 
 	// Model
 	| { id?: string; type: "set_model"; provider: string; modelId: string }
@@ -121,6 +127,7 @@ export type RpcCommand =
 
 	// Session
 	| { id?: string; type: "get_session_stats" }
+	| { id?: string; type: "get_session_lease"; sessionIds: string[] }
 	| { id?: string; type: "export_html"; outputPath?: string }
 	| { id?: string; type: "switch_session"; sessionPath: string; provider?: string; modelId?: string }
 	| { id?: string; type: "branch"; entryId: string }
@@ -305,6 +312,30 @@ export interface RpcLiveEndFrame {
 }
 
 export type RpcLiveFrame = RpcLivePhaseFrame | RpcLiveLevelsFrame | RpcLiveTranscriptFrame | RpcLiveEndFrame;
+
+/** Draft-only dictation frames bypass the session event filter. */
+export interface RpcDictationStateFrame {
+	type: "dictation_state";
+	captureId: string;
+	state: "starting" | "recording" | "transcribing";
+}
+
+/** Full accumulated preview, replacing the previous preview for this capture. */
+export interface RpcDictationTranscriptFrame {
+	type: "dictation_transcript";
+	captureId: string;
+	text: string;
+}
+
+/** Exactly one terminal frame per capture, including any failure. */
+export interface RpcDictationEndFrame {
+	type: "dictation_end";
+	captureId: string;
+	text: string;
+	error?: string;
+}
+
+export type RpcDictationFrame = RpcDictationStateFrame | RpcDictationTranscriptFrame | RpcDictationEndFrame;
 
 /** `open_session` result: `resumed` is false when a fresh session was started in the directory. */
 export interface RpcOpenSessionResult {
@@ -563,6 +594,7 @@ export type RpcResponse =
 
 	// Session
 	| { id?: string; type: "response"; command: "get_session_stats"; success: true; data: SessionStats }
+	| { id?: string; type: "response"; command: "get_session_lease"; success: true; data: SessionLeaseReport }
 	| { id?: string; type: "response"; command: "export_html"; success: true; data: { path: string } }
 	| { id?: string; type: "response"; command: "switch_session"; success: true; data: { cancelled: boolean } }
 	| { id?: string; type: "response"; command: "branch"; success: true; data: { text: string; cancelled: boolean } }
@@ -587,8 +619,18 @@ export type RpcResponse =
 	| { id?: string; type: "response"; command: "set_session_name"; success: true }
 	// Live voice
 	| { id?: string; type: "response"; command: "live_start"; success: true; data: { voice: string } }
+	| {
+			id?: string;
+			type: "response";
+			command: "live_connect";
+			success: true;
+			data: { voice: string; sdpAnswer: string };
+	  }
 	| { id?: string; type: "response"; command: "live_stop"; success: true }
 	| { id?: string; type: "response"; command: "live_mute"; success: true; data: { muted: boolean } }
+	// Draft-only speech-to-text
+	| { id?: string; type: "response"; command: "dictation_start"; success: true }
+	| { id?: string; type: "response"; command: "dictation_stop"; success: true; data: { text: string } }
 	| { id?: string; type: "response"; command: "handoff"; success: true; data: RpcHandoffResult | null }
 
 	// Messages

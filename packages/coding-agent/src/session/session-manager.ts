@@ -25,8 +25,10 @@ import {
 	toError,
 } from "@oh-my-pi/pi-utils";
 import { isTaskToolDetails, type StructuredSubagentSchemaMode } from "@oh-my-pi/pi-tui/tools/task";
+import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
 import * as snapcompact from "@oh-my-pi/snapcompact";
 import { moveFileAcrossDevices } from "../utils/atomic-file";
+import { hasAnnotationDraftsSync } from "../extensibility/custom-commands/bundled/annotate/draft-store";
 import { ArtifactManager } from "./artifacts";
 import { type BlobPutOptions, type BlobPutResult, BlobStore, lazyImageDataSync } from "./blob-store";
 import type { CompactionMethod } from "./compaction-methods";
@@ -57,6 +59,7 @@ import {
 	type CustomEntry,
 	type CustomMessageEntry,
 	EPHEMERAL_MODEL_CHANGE_ROLE,
+	PREWALK_MODEL_CHANGE_ROLE,
 	type FileEntry,
 	type LabelEntry,
 	type ModeChangeEntry,
@@ -81,13 +84,15 @@ import {
 } from "./session-entries";
 import { currentRuntimeIdentity, type RuntimeIdentity } from "./runtime-identity";
 import {
-	filterSessionsForPicker,
 	findMostRecentNonEmptySession,
 	findRecentSessionContinuation,
 	findSessionContinuation,
 	isEmptySession,
 	listAllSessions,
+	listAllSessionsForPicker,
 	listSessions,
+	listSessionsForPicker,
+	type PickerListing,
 	type SessionContinuation,
 	type SessionInfo,
 } from "./session-listing";
@@ -730,6 +735,7 @@ export type ReadonlySessionManager = Pick<
 	| "getSessionFile"
 	| "getSessionName"
 	| "getArtifactsDir"
+	| "ensureOnDisk"
 	| "getArtifactManager"
 	| "allocateArtifactPath"
 	| "saveArtifact"
@@ -2919,7 +2925,10 @@ export class SessionManager {
 		// must skip this opportunistic cleanup rather than risk data loss.
 		if (!this.#storage.deleteSessionWithArtifactsIf) return;
 		try {
+			const artifactsDir = this.getArtifactsDir();
 			const deleted = await this.#storage.deleteSessionWithArtifactsIf(sessionFile, content => {
+				// An `/annotate` draft is work in progress the session must keep.
+				if (artifactsDir && hasAnnotationDraftsSync(artifactsDir, this.#header.id)) return false;
 				const onDisk = parseSessionContent(content);
 				return (
 					!onDisk.invalidHeader &&
@@ -3447,6 +3456,50 @@ export class SessionManager {
 	}
 
 	/**
+	 * Rename a session file that is not loaded in this process, e.g. from the
+	 * resume picker. Returns the title as stored (the session canonicalizes
+	 * it), or null when the rename did not happen.
+	 *
+	 * The cross-process ownership lease is claimed before the transcript is
+	 * loaded and held until the write is done. Claiming first is what makes
+	 * the rename safe: another process appending between our load and our
+	 * write would leave us parenting the title entry to a stale leaf, so the
+	 * reopened session followed the older branch and hid the other process's
+	 * turn. Holding the lease from before the load keeps the loaded leaf
+	 * stable until the title is written.
+	 */
+	static async renameSessionTitle(
+		sessionPath: string,
+		title: string,
+		options?: { cwd?: string },
+	): Promise<string | null> {
+		const storage = new FileSessionStorage();
+		// The header id is what the lease is keyed on; a null claim means
+		// another live process owns the session, so leave it alone.
+		const sessionId = await readSessionHeaderId(sessionPath);
+		if (!sessionId) return null;
+		const probe = storage.claimSession(sessionId, sessionPath);
+		if (!probe) return null;
+		let manager: SessionManager | undefined;
+		try {
+			manager = await SessionManager.open(sessionPath, undefined, storage, {
+				initialCwd: options?.cwd,
+				suppressBreadcrumb: true,
+				throwIfMissing: true,
+			});
+			if (manager.getSessionFile() !== sessionPath) return null;
+			if (!(await manager.setSessionName(title, "user"))) return null;
+			return manager.getSessionName() ?? null;
+		} finally {
+			try {
+				await manager?.close();
+			} finally {
+				probe();
+			}
+		}
+	}
+
+	/**
 	 * Journal an idle recap for this session in history.db. Recaps never enter
 	 * the session file or LLM context; in-memory sessions are not journaled.
 	 */
@@ -3605,9 +3658,13 @@ export class SessionManager {
 		systemPrompt: string[];
 		task: string;
 		tools: string[];
+		mountedTools?: string[];
 		agent?: string;
 		modelRole?: string;
 		resolvedModel?: string;
+		perCallModel?: boolean;
+		perCallModelIdentity?: string;
+		perCallThinkingLevel?: ConfiguredThinkingLevel | null;
 		retryFallback?: RetryFallbackRole;
 		readOnly?: boolean;
 		outputSchema?: unknown;
@@ -3797,8 +3854,25 @@ export class SessionManager {
 			const entry = branch[index];
 			if (entry.type !== "model_change") continue;
 			const role = entry.role ?? "default";
-			if (options?.skipEphemeral && role === EPHEMERAL_MODEL_CHANGE_ROLE) continue;
+			if (options?.skipEphemeral && (role === EPHEMERAL_MODEL_CHANGE_ROLE || role === PREWALK_MODEL_CHANGE_ROLE)) {
+				continue;
+			}
 			return role;
+		}
+		return undefined;
+	}
+
+	/**
+	 * The newest model change on the current branch when it selected a model for
+	 * this session only (`temporary`, or a prewalk handoff); undefined when the
+	 * newest change assigned a role, was a retry fallback hop, or none was recorded.
+	 */
+	getSessionLocalModelChange(): ModelChangeEntry | undefined {
+		const branch = this.getBranch();
+		for (let index = branch.length - 1; index >= 0; index--) {
+			const entry = branch[index];
+			if (entry.type !== "model_change") continue;
+			return entry.role === "temporary" || entry.role === PREWALK_MODEL_CHANGE_ROLE ? entry : undefined;
 		}
 		return undefined;
 	}
@@ -3851,15 +3925,20 @@ export class SessionManager {
 	 */
 	buildSessionContext(options?: BuildSessionContextOptions): SessionContext {
 		return buildSessionContext(this.#entries, this.#index.leafId(), this.#index.entriesById(), {
-			resolveFrameData: data => lazyImageDataSync(this.#blobs, data),
+			resolveFrameData: data => this.resolveFrameData(data),
 			...options,
 		});
 	}
 
 	/** Prompt blocks for a snapcompact archive, budgeted and resolved as {@link buildSessionContext} attaches them. */
 	snapcompactHistoryBlocks(archive: snapcompact.Archive): (TextContent | ImageContent)[] {
-		const resolveFrameData = (data: string) => lazyImageDataSync(this.#blobs, data);
+		const resolveFrameData = (data: string) => this.resolveFrameData(data);
 		return snapcompact.historyBlocks(archive, snapcompactHistoryBlockOptions(archive, { resolveFrameData }));
+	}
+
+	/** A snapcompact frame's payload, read from the blob store when persistence externalized it. */
+	resolveFrameData(data: string): snapcompact.LazyFrameData | undefined {
+		return lazyImageDataSync(this.#blobs, data);
 	}
 
 	/** Strip stale OpenAI Responses replay metadata from loaded assistant entries. */
@@ -4590,8 +4669,10 @@ export class SessionManager {
 	}
 
 	/**
-	 * Picker-facing project list: pinned sessions first, untitled empties
-	 * dropped. Titled empties stay — a title is user intent worth resuming.
+	 * Picker-facing project listing in recency order (the picker floats pins),
+	 * untitled empties dropped. Titled empties stay — a title is user intent worth resuming.
+	 * Arrives in two passes: rows for history.db-indexed titles first, the full
+	 * scan in `complete` (see {@link listSessionsForPicker}).
 	 * By default includes the same folder in the repository's other git worktrees,
 	 * so a session `/wt` moved stays reachable from the checkout it left.
 	 * The directory scope limits the picker to its own session bucket.
@@ -4601,19 +4682,18 @@ export class SessionManager {
 		sessionDir?: string,
 		storage: SessionStorage = new FileSessionStorage(),
 		worktreeScope: "directory" | "repo" = "repo",
-	): Promise<SessionInfo[]> {
+	): Promise<PickerListing> {
 		const dir = sessionDir ?? SessionManager.getDefaultSessionDir(cwd, undefined, storage);
 		const [pinned, siblingDirs] = await Promise.all([
 			loadPinnedSessionIds(),
 			worktreeScope === "repo" ? worktreeSessionDirs(cwd, dir) : [],
 		]);
-		return sortPinnedFirst(filterSessionsForPicker(await listSessions(dir, storage, siblingDirs), pinned), pinned);
+		return listSessionsForPicker(dir, storage, pinned, siblingDirs);
 	}
 
-	/** Picker-facing cross-project list, same empty-session rule as {@link listForPicker}. */
-	static async listAllForPicker(storage: SessionStorage = new FileSessionStorage()): Promise<SessionInfo[]> {
-		const pinned = await loadPinnedSessionIds();
-		return sortPinnedFirst(filterSessionsForPicker(await listAllSessions(storage), pinned), pinned);
+	/** Picker-facing cross-project listing, same rules and passes as {@link listForPicker}. */
+	static async listAllForPicker(storage: SessionStorage = new FileSessionStorage()): Promise<PickerListing> {
+		return listAllSessionsForPicker(storage, await loadPinnedSessionIds());
 	}
 }
 
@@ -4630,9 +4710,13 @@ export interface PersistedSessionInit {
 	systemPrompt: string[];
 	task: string;
 	tools: string[];
+	mountedTools?: string[];
 	agent?: string;
 	modelRole?: string;
 	resolvedModel?: string;
+	perCallModel?: boolean;
+	perCallModelIdentity?: string;
+	perCallThinkingLevel?: ConfiguredThinkingLevel | null;
 	retryFallback?: RetryFallbackRole;
 	readOnly?: boolean;
 	outputSchema?: unknown;
@@ -4658,9 +4742,13 @@ export function extractSessionInit(entries: readonly FileEntry[]): PersistedSess
 			systemPrompt: typeof entry.systemPrompt === "string" ? [entry.systemPrompt] : entry.systemPrompt,
 			task: entry.task,
 			tools: entry.tools,
+			mountedTools: entry.mountedTools,
 			agent: entry.agent,
 			modelRole: entry.modelRole,
 			resolvedModel: entry.resolvedModel,
+			...(entry.perCallModel ? { perCallModel: true } : undefined),
+			perCallModelIdentity: entry.perCallModelIdentity,
+			perCallThinkingLevel: entry.perCallThinkingLevel,
 			retryFallback: entry.retryFallback,
 			readOnly: entry.readOnly,
 			outputSchema: entry.outputSchema,

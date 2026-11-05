@@ -18,7 +18,7 @@ import type {
 	ThinkingConfig,
 } from "@oh-my-pi/pi-ai/types";
 import type { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildDiscoveredModel, buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildDiscoveredModel, buildModel, nextBuildPriceChange } from "@oh-my-pi/pi-catalog/build";
 import { collapseBuiltVariants } from "@oh-my-pi/pi-catalog/compat/collapse";
 import {
 	clampCodexContextWindow,
@@ -26,7 +26,7 @@ import {
 	resolveMaxContextWindow,
 } from "@oh-my-pi/pi-catalog/compat/context-window";
 import { applyCatalogMetrics, CatalogMetricsIndex } from "@oh-my-pi/pi-catalog/identity/metrics";
-import { getModelCacheWriteStats, readModelCache } from "@oh-my-pi/pi-catalog/model-cache";
+import { getModelCacheWriteStats, readModelCache, retainModelCacheConnection } from "@oh-my-pi/pi-catalog/model-cache";
 import {
 	createModelManager,
 	fingerprintStaticModels,
@@ -175,6 +175,31 @@ const ADDITIVE_MODELS_DEV_CATALOG_PROVIDER_ID_LOOKUP: Readonly<Record<string, tr
 		).map(providerId => [providerId, true as const]),
 	),
 );
+
+function advertisedReasoningCacheSuffix(providerConfig: DiscoveryProviderConfig): string {
+	return providerConfig.discovery.advertisedReasoning === false ? "advertised-off-context-v6" : "context-v6";
+}
+
+/** Resolve the cache namespace for a configured provider discovery contract. */
+export function resolveConfiguredDiscoveryCacheProviderId(providerConfig: DiscoveryProviderConfig): string {
+	if (providerConfig.discovery.type === "ollama") {
+		return resolveOllamaModelCacheProviderId(providerConfig.provider, providerConfig.baseUrl);
+	}
+	// context-v6 separates rows predating advertised reasoning aliases; the bare
+	// path is distinct because gateways can expose different rosters at /models.
+	if (providerConfig.discovery.type === "openai-models-list") {
+		return providerConfig.discovery.injectV1 === false
+			? `${providerConfig.provider}:openai-models-list-bare-${advertisedReasoningCacheSuffix(providerConfig)}`
+			: `${providerConfig.provider}:openai-models-list-${advertisedReasoningCacheSuffix(providerConfig)}`;
+	}
+	// Proxy mode's advertised ladder is also part of cache identity.
+	if (providerConfig.discovery.type === "proxy") {
+		return `${providerConfig.provider}:proxy-v2-${advertisedReasoningCacheSuffix(providerConfig)}`;
+	}
+	// Keep in step with the catalog package's litellm rich cache generation.
+	if (providerConfig.discovery.type === "litellm") return `${providerConfig.provider}:litellm-rich-v7`;
+	return providerConfig.provider;
+}
 
 /**
  * Bedrock provider-scoped fields to spread onto a model spec, dropping keys
@@ -340,6 +365,25 @@ export class ModelRegistry {
 	#implicitProviderEndpointEnv: Map<string, string> = new Map();
 	#customModelOverlays: CustomModelOverlay[] = [];
 	#providerOverrides: Map<string, ProviderOverride> = new Map();
+	/**
+	 * Last `mergeDiscoveredModel` result per discovered row. Every refresh
+	 * re-resolves each built-in provider, and offline (or unchanged online)
+	 * passes hand back the same bundled/cached row objects against the same
+	 * references, so re-running the full model build for thousands of rows is
+	 * pure repetition. A changed reference or provider override misses, and so
+	 * does reaching the next dated price card the build would select. Held per
+	 * registry (not tagged onto the rows): bundled rows outlive every registry,
+	 * so their merges must be collected with the registry.
+	 */
+	#discoveredMergeMemo = new WeakMap<
+		Model<Api>,
+		{
+			reference: Model<Api> | undefined;
+			override: ProviderOverride | undefined;
+			merged: Model<Api>;
+			validUntil: number;
+		}
+	>();
 	#modelOverrides: Map<string, Map<string, ModelOverride>> = new Map();
 	// `provider/id:kind` of modelOverrides kinds already reported as unserved, so
 	// every rebuild does not log the same ignored override again.
@@ -636,6 +680,11 @@ export class ModelRegistry {
 				this.#markInitialRefreshSettled();
 			});
 		this.#backgroundRefresh = refreshPromise;
+	}
+
+	/** Whether background discovery started by {@link refreshInBackground} is still running and may add models. */
+	isBackgroundRefreshPending(): boolean {
+		return this.#backgroundRefresh !== undefined;
 	}
 
 	/**
@@ -1362,6 +1411,7 @@ export class ModelRegistry {
 	} {
 		const modelsByProvider = new Map<string, Model<Api>[]>();
 		const authoritativeFreshProviders = new Set<string>();
+		using _cacheConnection = retainModelCacheConnection(this.#cacheDbPath);
 		for (const providerId of providerIds) {
 			const cacheProviderId = this.#resolveStartupModelCacheProviderId(providerId);
 			const cache = readModelCache<Api>(cacheProviderId, 24 * 60 * 60 * 1000, Date.now, this.#cacheDbPath);
@@ -1401,8 +1451,13 @@ export class ModelRegistry {
 				omittedHeaderIds.size > 0 || sharedCatalogProvider
 					? (getBundledModels(providerId as Parameters<typeof getBundledModels>[0]) as Model<Api>[])
 					: undefined;
+			// Every shared-catalog manager layers the catalog additively
+			// (`#collectBuiltInModelManagerOptions`), authoritative or not.
 			const bundledFingerprint = bundledModels
-				? fingerprintStaticModels(bundledModels, sharedCatalogProvider && !additiveSharedCatalogProvider)
+				? fingerprintStaticModels(bundledModels, {
+						authoritative: sharedCatalogProvider && !additiveSharedCatalogProvider,
+						additive: sharedCatalogProvider,
+					})
 				: undefined;
 			// A matching cache may contain provider-endpoint overrides. Strip
 			// same-id rows only across a bundled-catalog upgrade, where the
@@ -1464,8 +1519,7 @@ export class ModelRegistry {
 						cache.staticFingerprint.startsWith(`${bundledFingerprint}:drop:`));
 				const cachedSnapshotMatchesBundled =
 					bundledModels !== undefined &&
-					fingerprintStaticModels(cache.models, !additiveSharedCatalogProvider) ===
-						fingerprintStaticModels(bundledModels, !additiveSharedCatalogProvider);
+					fingerprintStaticModels(cache.models) === fingerprintStaticModels(bundledModels);
 				const cacheContributed = additiveSharedCatalogProvider
 					? cachedModels.some(model => bundledById?.has(model.id) !== true)
 					: !(cacheMatchesBundledFingerprint && cachedSnapshotMatchesBundled);
@@ -1531,8 +1585,9 @@ export class ModelRegistry {
 
 	#loadCachedDiscoverableModels(): Model<Api>[] {
 		const cachedModels: Model<Api>[] = [];
+		using _cacheConnection = retainModelCacheConnection(this.#cacheDbPath);
 		for (const providerConfig of this.#discoverableProviders) {
-			const cacheProviderId = this.#configuredDiscoveryCacheProviderId(providerConfig);
+			const cacheProviderId = resolveConfiguredDiscoveryCacheProviderId(providerConfig);
 			const cache = readModelCache<Api>(cacheProviderId, 24 * 60 * 60 * 1000, Date.now, this.#cacheDbPath);
 			if (!cache) {
 				this.#providerDiscoveryStates.set(providerConfig.provider, {
@@ -1900,6 +1955,9 @@ export class ModelRegistry {
 		strategy: ModelRefreshStrategy,
 		providerFilter?: ReadonlySet<string>,
 	): Promise<void> {
+		// One cache connection for the whole pass: every provider manager reads
+		// (and may write) its row, which would otherwise reopen the database each time.
+		using _cacheConnection = retainModelCacheConnection(this.#cacheDbPath);
 		const disabledProviders = getDisabledProviderIdsFromSettings(this.#settings);
 		const selectedDiscoverableProviders = (
 			providerFilter
@@ -1944,7 +2002,7 @@ export class ModelRegistry {
 		const referenceModels = this.#composeDiscoveryReferenceModels(touchedProviders);
 		const discoveredModels = this.#applyHardcodedModelPolicies(
 			discovered.map(model =>
-				mergeDiscoveredModel(
+				this.#mergeDiscoveredModelMemoized(
 					model,
 					resolveProviderModelReference(model.provider, model.id, referenceModels),
 					this.#providerOverrides.get(model.provider),
@@ -1997,6 +2055,23 @@ export class ModelRegistry {
 		this.#models = this.#finalizeModels(this.#applyRuntimeModelModifiers(this.#unprojectedModels));
 	}
 
+	#mergeDiscoveredModelMemoized(
+		model: Model<Api>,
+		reference: Model<Api> | undefined,
+		override: ProviderOverride | undefined,
+	): Model<Api> {
+		const now = Date.now();
+		const memo = this.#discoveredMergeMemo.get(model);
+		if (memo && memo.reference === reference && memo.override === override && now < memo.validUntil) {
+			return memo.merged;
+		}
+		const merged = mergeDiscoveredModel(model, reference, override);
+		// Measured before the build: a card falling due mid-build expires the memo at once.
+		const validUntil = nextBuildPriceChange(model.cost, now);
+		this.#discoveredMergeMemo.set(model, { reference, override, merged, validUntil });
+		return merged;
+	}
+
 	/**
 	 * Share a configured provider's discovery request between concurrent full
 	 * and provider-scoped refreshes using the same cache/network strategy.
@@ -2023,56 +2098,6 @@ export class ModelRegistry {
 		return discovery;
 	}
 
-	/**
-	 * Namespace suffix for the `discovery.advertisedReasoning` opt-out. Rows built
-	 * under one mode must never satisfy the other's cache read: under the
-	 * `offline` strategy nothing else refetches them.
-	 */
-	advertisedReasoningCacheSuffix(providerConfig: DiscoveryProviderConfig): string {
-		return providerConfig.discovery.advertisedReasoning === false ? "advertised-off-context-v5" : "context-v5";
-	}
-
-	#configuredDiscoveryCacheProviderId(providerConfig: DiscoveryProviderConfig): string {
-		if (providerConfig.discovery.type === "ollama") {
-			return resolveOllamaModelCacheProviderId(providerConfig.provider, providerConfig.baseUrl);
-		}
-		if (providerConfig.discovery.type === "openai-models-list") {
-			// context-v3 invalidates rows cached before server-advertised input
-			// modalities were parsed from `/v1/models`; warm v2 rows pinned
-			// vision-capable ids at `input: ["text"]` until a forced refresh.
-			// context-v4 invalidates rows cached before
-			// `top_provider.max_completion_tokens` was read; warm v3 rows kept
-			// the bundled reference's larger output limit and the provider
-			// rejected every request.
-			// context-v5 invalidates rows cached before a row's advertised
-			// reasoning ladder outranked the bundled reference; warm v4 rows kept
-			// `reasoning: false` (ids absent from the catalog) or an inherited
-			// `omitReasoningEffort`, so no effort dial appeared until a refresh.
-			// `injectV1: false` additionally splits off its own namespace: rows
-			// cached from the `/v1`-injected URL can hold a different (smaller)
-			// model set and must never satisfy a bare provider's cache read.
-			return providerConfig.discovery.injectV1 === false
-				? `${providerConfig.provider}:openai-models-list-bare-${this.advertisedReasoningCacheSuffix(providerConfig)}`
-				: `${providerConfig.provider}:openai-models-list-${this.advertisedReasoningCacheSuffix(providerConfig)}`;
-		}
-		if (providerConfig.discovery.type === "proxy") {
-			// proxy-v2 invalidates rows cached before a proxy row's advertised
-			// reasoning ladder was read; warm v1 rows (stored under the bare
-			// provider id) pinned gateway ids at `reasoning: false`. The opt-out
-			// gets its own namespace for the same reason it does above: under the
-			// `offline` strategy nothing else would refetch the other mode's rows.
-			return `${providerConfig.provider}:proxy-v2-${this.advertisedReasoningCacheSuffix(providerConfig)}`;
-		}
-		if (providerConfig.discovery.type === "litellm") {
-			// rich-v6 invalidates rows written before `mode: decisions` groups moved
-			// to the Decisions runner; rich-v5 before discovery filtered known
-			// non-conversational modes. Keep this in lockstep with the catalog
-			// package's `litellm:rich-vN` namespace whenever mapping behavior changes.
-			return `${providerConfig.provider}:litellm-rich-v6`;
-		}
-		return providerConfig.provider;
-	}
-
 	#isDiscoveryCacheOlderThanModelsConfig(cacheUpdatedAt: number): boolean {
 		const configMtime = this.#modelsConfigFile.getMtimeMs();
 		return configMtime !== null && cacheUpdatedAt < Math.floor(configMtime);
@@ -2082,7 +2107,7 @@ export class ModelRegistry {
 		providerConfig: DiscoveryProviderConfig,
 		strategy: ModelRefreshStrategy,
 	): Promise<ConfiguredModelDiscoveryResult> {
-		const cacheProviderId = this.#configuredDiscoveryCacheProviderId(providerConfig);
+		const cacheProviderId = resolveConfiguredDiscoveryCacheProviderId(providerConfig);
 		const cached = readModelCache<Api>(cacheProviderId, 24 * 60 * 60 * 1000, Date.now, this.#cacheDbPath);
 		const cacheOlderThanConfig = cached !== null && this.#isDiscoveryCacheOlderThanModelsConfig(cached.updatedAt);
 		const bypassFreshCache = providerConfig.discovery.type === "llama.cpp" && strategy === "online-if-uncached";
@@ -2121,10 +2146,13 @@ export class ModelRegistry {
 				const resolvedHeaders = await resolveConfigHeaders(providerConfig.headers);
 				if (this.#noDiscoveryProviders.has(providerId)) return null;
 				const requestConfig = { ...providerConfig, headers: resolvedHeaders };
-				const models = this.#applyProviderModelOverrides(
-					providerId,
-					await discoverModelsByProviderType(requestConfig, this.#discoveryContext()),
-				);
+				const discovered = await discoverModelsByProviderType(requestConfig, this.#discoveryContext());
+				// A config reload gives discovery a new object identity. Discard the old
+				// response before ModelManager can persist it under the replacement policy.
+				if (!this.#discoverableProviders.includes(providerConfig) || this.#noDiscoveryProviders.has(providerId)) {
+					return null;
+				}
+				const models = this.#applyProviderModelOverrides(providerId, discovered);
 				this.#lastDiscoveryWarnings.delete(providerId);
 				return models.map(toModelSpec);
 			} catch (error) {
@@ -2155,7 +2183,9 @@ export class ModelRegistry {
 			fetchDynamicModels,
 		});
 		const result = await manager.refresh(effectiveStrategy);
-		if (this.#noDiscoveryProviders.has(providerId)) return { models: [], replaceRuntimeModels: false };
+		if (!this.#discoverableProviders.includes(providerConfig) || this.#noDiscoveryProviders.has(providerId)) {
+			return { models: [], replaceRuntimeModels: false };
+		}
 		const status = discoveryError
 			? result.models.length > 0
 				? "cached"
@@ -3123,6 +3153,15 @@ export class ModelRegistry {
 				provider => requested.has(provider.toLowerCase()) && isProviderAvailable(provider),
 			),
 		);
+		// Reuse the same provider snapshot as find()/getProviderModels(). The
+		// availability gate above stays live, while catalog invalidation remains
+		// owned by refresh, discovery and runtime provider registration. Whole-
+		// catalog modifiers can inspect live credentials, so keep reprojecting
+		// those rather than extending the lifetime of their output.
+		if (availableProviders.size === 1 && this.#runtimeModelModifiers.size === 0) {
+			const models = this.#modelsForProviderLookup(availableProviders.values().next().value!);
+			return kind === "all" ? models.slice() : models.filter(model => modelKind(model) === kind);
+		}
 		const models = this.#composeStaticModels(availableProviders);
 		return kind === "all" ? models : models.filter(model => modelKind(model) === kind);
 	}

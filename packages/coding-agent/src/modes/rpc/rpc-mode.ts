@@ -55,10 +55,12 @@ import { reconnectMcpManagerServer } from "../../mcp/oauth-reauth";
 import type { RestoredQueuedMessage } from "../../session/agent-session-types";
 import { CACHE_WARMING_MODES } from "../../session/cache-warmer";
 import { findMostRecentNonEmptySession, findRecentSessionContinuation } from "../../session/session-listing";
+import { probeSessionLeases } from "../../session/session-storage";
 import { SKILL_PROMPT_MESSAGE_TYPE, USER_INTERRUPT_LABEL } from "../../session/messages";
 import { executeAcpBuiltinSlashCommand } from "../../slash-commands/acp-builtins";
 import { buildAvailableSlashCommands } from "../../slash-commands/available-commands";
 import { listLogoutAccounts, logoutCredential } from "../../slash-commands/helpers/logout";
+import { cfgSttEnabled } from "../../stt/settings";
 import { defaultLoadModeForToolName } from "../../tools/essential-tools";
 import { USER_TODO_EDIT_CUSTOM_TYPE } from "../../tools/todo";
 import type { EventBus } from "../../utils/event-bus";
@@ -78,6 +80,7 @@ import { claimRpcInput, readRpcInputFrames } from "./rpc-input";
 import { pageRpcMessages, RPC_MESSAGES_PAGE_BUSY_ERROR, RpcMessagesPageError } from "./rpc-messages";
 import { RpcBtwController } from "./rpc-btw";
 import { RpcGoalController } from "./rpc-goal";
+import { RpcDictationBridge, type RpcDictationControllerFactory } from "./rpc-dictation";
 import { RpcLiveBridge, type RpcLiveSessionFactory } from "./rpc-live";
 import { RpcOutputWriter } from "./rpc-output";
 import {
@@ -87,7 +90,8 @@ import {
 	watchAndReportPromptResult,
 } from "./rpc-prompt-results";
 import { RpcSessionEventForwarder } from "./rpc-session-events";
-import { isRpcSessionSettled, RpcSessionSettleWatcher, watchedScheduledTurnProbe } from "./rpc-session-settle";
+import { isSessionSettled } from "../../session/session-settle";
+import { RpcSessionSettleWatcher, watchedScheduledTurnProbe } from "./rpc-session-settle";
 import { RpcSubagentRegistry, readRpcSubagentTranscript, resolveOwnedLiveSubagent } from "./rpc-subagents";
 import type {
 	RpcAbortAndRestoreQueueResult,
@@ -430,6 +434,7 @@ const BACKGROUND_COMMANDS: ReadonlySet<string> = new Set<RpcCommand["type"]>([
 	"bash",
 	"predict_word",
 	"live_start",
+	"live_connect",
 	"btw_cancel",
 	"abort_branch_summary",
 ]);
@@ -448,14 +453,14 @@ const BACKGROUND_COMMANDS: ReadonlySet<string> = new Set<RpcCommand["type"]>([
  * while a shell command runs, or `abort` (and `steer`/`follow_up`/`get_state`)
  * while a `prompt` or `steer_subagent` is still admitting. `predict_word` is
  * backgrounded too, so a cold prediction engine never stalls the command queue
- * behind a keystroke. `live_start` responds only once the realtime session is
- * connected and recording, so it is backgrounded and `live_stop` can cancel it.
+ * behind a keystroke. `live_start`, `live_connect` and `dictation_start` respond only once
+ * connected or recording, so they are backgrounded and their stop commands can cancel them.
  * Response correlation is preserved via each command's `id`; ordering across
  * concurrent commands is not guaranteed and clients MUST match on `id`.
  *
  * @returns `undefined` when the frame was routed to a side-channel handler
  *   (extension UI response, host tool/URI frames) or dispatched in the
- *   background (`bash`, `predict_word`, `live_start`, `prompt`, `steer`, `follow_up`, `steer_subagent`). Otherwise a promise that
+ *   background (`bash`, `predict_word`, `live_start`, `live_connect`, `dictation_start`, `prompt`, `steer`, `follow_up`, `steer_subagent`). Otherwise a promise that
  *   resolves once the response for the command has been emitted via `output`.
  *   Errors from `handleCommand` on a command dispatched inline propagate; the
  *   caller is expected to wrap them.
@@ -482,6 +487,7 @@ export function dispatchRpcInputFrame(parsed: unknown, deps: RpcInputFrameDeps):
 		BACKGROUND_COMMANDS.has(command.type) ||
 		command.type === "prompt" ||
 		command.type === "steer" ||
+		command.type === "dictation_start" ||
 		command.type === "follow_up" ||
 		command.type === "steer_subagent"
 	) {
@@ -1370,6 +1376,8 @@ export interface RpcModeOptions {
 	input?: ReadableStream<Uint8Array>;
 	/** Builds `live_start` sessions; defaults to the real {@link LiveSessionController}. */
 	createLiveSession?: RpcLiveSessionFactory;
+	/** Builds the native speech controller; tests may substitute the capture boundary. */
+	createDictationController?: RpcDictationControllerFactory;
 	/** The session's MCP manager, so `/mcp` builtins resolve and reconnect live servers. */
 	mcpManager?: MCPManager;
 }
@@ -1379,7 +1387,14 @@ export interface RpcModeOptions {
  * Listens for JSON commands on stdin, outputs events and responses on stdout.
  */
 export async function runRpcMode(session: AgentSession, options: RpcModeOptions = {}): Promise<never> {
-	const { setToolUIContext, headless = false, subagentEventBus, input = claimRpcInput(), createLiveSession } = options;
+	const {
+		setToolUIContext,
+		headless = false,
+		subagentEventBus,
+		input = claimRpcInput(),
+		createLiveSession,
+		createDictationController,
+	} = options;
 	// Signal to RPC clients that the server is ready to accept commands
 	// Suppress terminal notifications: they write \x07 (BEL) or OSC sequences directly to
 	// process.stdout with no newline, which the reader merges with the next JSON line and
@@ -1393,8 +1408,11 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	// stdout froze the whole worker, stdin reader included. An fd write stream
 	// writes from the threadpool and reports backpressure, letting the writer spool.
 	const stdout = process.platform === "win32" ? fs.createWriteStream("", { fd: 1, autoClose: false }) : process.stdout;
+	// The writer can fail before the bridge is constructed.
+	let dictationBridge: RpcDictationBridge | undefined = undefined;
 	const outputWriter = new RpcOutputWriter(stdout, failure => {
 		logger.error("RPC output delivery failed", { error: String(failure) });
+		dictationBridge?.dispose();
 		void session.dispose().finally(() => process.exit(1));
 	});
 	outputWriter.write(
@@ -1451,6 +1469,42 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	const hostUriBridge = new RpcHostUriBridge(output);
 	// Live frames go straight to `output`, so `set_event_filter` (session events only) never drops them.
 	const liveBridge = new RpcLiveBridge(session, output, createLiveSession);
+	let lastDictationError: { message: string } | undefined;
+	const sessionDictationBridge = new RpcDictationBridge(
+		session,
+		frame => {
+			output(frame);
+			if (frame.type === "dictation_end" && frame.error) lastDictationError = { message: frame.error };
+		},
+		createDictationController,
+	);
+	dictationBridge = sessionDictationBridge;
+	const stopDictationForSessionChange = async (): Promise<void> => {
+		const previousError = lastDictationError;
+		try {
+			await sessionDictationBridge.stop();
+		} catch (cause) {
+			// Only a reported transcription failure after cleanup may leave the change proceeding.
+			if (
+				sessionDictationBridge.active ||
+				!lastDictationError ||
+				lastDictationError === previousError ||
+				!(cause instanceof Error) ||
+				cause.message !== lastDictationError.message
+			)
+				throw cause;
+			logger.warn("Dictation failed while changing sessions", { error: String(cause) });
+		}
+	};
+	let sessionChangesInProgress = 0;
+	const withSessionChange = async <T>(change: () => Promise<T>): Promise<T> => {
+		sessionChangesInProgress++;
+		try {
+			return await change();
+		} finally {
+			sessionChangesInProgress--;
+		}
+	};
 	const subagentRegistry = subagentEventBus ? new RpcSubagentRegistry(subagentEventBus, output) : undefined;
 
 	// Shutdown request flag (wrapped in object to allow mutation with const)
@@ -1512,6 +1566,14 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		onTerminalInput(): () => void {
 			// Raw terminal input not supported in RPC mode
 			return () => {};
+		}
+
+		rerenderMessage(): void {
+			// No transcript is drawn in RPC mode
+		}
+
+		getLinkClicksAvailable(): boolean {
+			return false;
 		}
 
 		notify(message: string, type?: "info" | "warning" | "error"): void {
@@ -1687,29 +1749,31 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	await initializeExtensions(session, {
 		mode: "rpc",
 		// Extension-initiated session changes get the same goal quiesce/reattach as the commands below.
-		wrapSessionChange: async <T extends { cancelled: boolean }>(
+		wrapSessionChange: <T extends { cancelled: boolean }>(
 			change: () => Promise<T>,
 			{ detachesRun }: { detachesRun: boolean },
-		): Promise<T> => {
-			await btw.close();
-			await goalController.beginSessionChange();
-			let result: T | undefined;
-			try {
-				result = await change();
-				return result;
-			} finally {
-				// Reattaches only if the session actually changed, then re-checks settlement.
-				// A change that throws may already have detached the run: count it as detached.
-				await goalController.endSessionChange({ detachedRun: detachesRun && result?.cancelled !== true });
-				if (result && !result.cancelled) {
-					// As for the host's new/switch commands: a detached run never yields, so
-					// close the prompts it was answering. Branch and navigation leave a live
-					// run streaming to its normal yield.
-					if (detachesRun) promptResults.abortOpen();
-					void settleWatcher.check();
+		): Promise<T> =>
+			withSessionChange(async () => {
+				await stopDictationForSessionChange();
+				await btw.close();
+				await goalController.beginSessionChange();
+				let result: T | undefined;
+				try {
+					result = await change();
+					return result;
+				} finally {
+					// Reattaches only if the session actually changed, then re-checks settlement.
+					// A change that throws may already have detached the run: count it as detached.
+					await goalController.endSessionChange({ detachedRun: detachesRun && result?.cancelled !== true });
+					if (result && !result.cancelled) {
+						// As for the host's new/switch commands: a detached run never yields, so
+						// close the prompts it was answering. Branch and navigation leave a live
+						// run streaming to its normal yield.
+						if (detachesRun) promptResults.abortOpen();
+						void settleWatcher.check();
+					}
 				}
-			}
-		},
+			}),
 		reportSendError: (action, err) => {
 			output(error(undefined, action, err.message));
 		},
@@ -1718,6 +1782,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		},
 		onShutdown: () => {
 			shutdownState.requested = true;
+			dictationBridge.dispose();
 		},
 		trackAgentInvokingMessage: task => {
 			extensionUserMessageTracker.trackAgentMessageTask(task);
@@ -1765,6 +1830,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 				output({ type: "notice", level: "error", message, source: "btw-history" });
 			});
 			// Close the realtime call (microphone, socket) before the session it delegates into.
+			dictationBridge.dispose();
 			await liveBridge.stop();
 			await session.dispose();
 		} catch (error) {
@@ -1945,7 +2011,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	};
 
 	// Handle a single command
-	const handleCommand = async (command: RpcCommand): Promise<RpcResponse> => {
+	const handleCommandImpl = async (command: RpcCommand): Promise<RpcResponse> => {
 		const id = command.id;
 
 		switch (command.type) {
@@ -2060,6 +2126,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 				const requestedModel =
 					command.type === "switch_session" ? await resolveRequestedRpcModel(session, command) : undefined;
 				// Validation first: a refused change must not cancel the running side question.
+				await stopDictationForSessionChange();
 				await btw.close();
 				await goalController.beginSessionChange();
 				let result: RpcSessionChangeResult | undefined;
@@ -2152,6 +2219,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 
 			case "open_session": {
 				const requestedModel = await resolveRequestedRpcModel(session, command);
+				await stopDictationForSessionChange();
 				const fileBeforeOpen = session.sessionFile;
 				await btw.close();
 				await goalController.beginSessionChange();
@@ -2199,7 +2267,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 					queuedMessageCount: session.queuedMessageCount,
 					hasPendingAsyncWork: session.hasPendingAsyncWork(),
 					// A scheduled goal continuation will start a turn: not settled.
-					isSettled: isRpcSessionSettled(session, goalTurnScheduled),
+					isSettled: isSessionSettled(session, goalTurnScheduled),
 					queuedMessages: {
 						steering: [...queuedMessages.steering],
 						followUp: [...queuedMessages.followUp],
@@ -2302,15 +2370,24 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 				return success(id, "set_host_tools", { toolNames: tools.map(tool => tool.name) });
 			}
 
-			case "live_start": {
+			case "live_start":
+			case "live_connect": {
+				const sdpOffer = command.type === "live_connect" ? command.sdpOffer : undefined;
+				// The frame is untyped input: without an offer, live_connect would open the host microphone.
+				if (command.type === "live_connect" && (typeof sdpOffer !== "string" || !sdpOffer.trim())) {
+					return error(id, command.type, "live_connect requires a non-empty sdpOffer");
+				}
+				if (dictationBridge.active) return error(id, command.type, "End dictation before starting live voice");
+				if (sessionChangesInProgress > 0 || shutdownState.requested)
+					return error(id, command.type, "Session is changing or shutting down");
 				try {
 					return success(
 						id,
-						"live_start",
-						await liveBridge.start({ voice: command.voice, instructions: command.instructions }),
+						command.type,
+						await liveBridge.start({ voice: command.voice, instructions: command.instructions, sdpOffer }),
 					);
 				} catch (err) {
-					return error(id, "live_start", err instanceof Error ? err.message : String(err));
+					return error(id, command.type, err instanceof Error ? err.message : String(err));
 				}
 			}
 
@@ -2325,6 +2402,20 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 				} catch (err) {
 					return error(id, "live_mute", err instanceof Error ? err.message : String(err));
 				}
+			}
+
+			case "dictation_start": {
+				if (liveBridge.active) return error(id, "dictation_start", "End live voice before starting dictation");
+				if (sessionChangesInProgress > 0 || shutdownState.requested)
+					return error(id, "dictation_start", "Session is changing or shutting down");
+				if (!cfgSttEnabled.get(session.settings))
+					return error(id, "dictation_start", "Speech-to-text is disabled. Enable it in settings: stt.enabled");
+				await dictationBridge.start(command.captureId);
+				return success(id, "dictation_start");
+			}
+
+			case "dictation_stop": {
+				return success(id, "dictation_stop", await dictationBridge.stop());
 			}
 
 			case "set_host_uri_schemes": {
@@ -2555,6 +2646,14 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 			case "get_session_stats": {
 				const stats = session.getSessionStats();
 				return success(id, "get_session_stats", stats);
+			}
+
+			case "get_session_lease": {
+				const { sessionIds } = command;
+				if (!Array.isArray(sessionIds) || !sessionIds.every(sessionId => typeof sessionId === "string")) {
+					return error(id, "get_session_lease", "sessionIds must be an array of strings");
+				}
+				return success(id, "get_session_lease", probeSessionLeases(sessionIds));
 			}
 
 			case "export_html": {
@@ -2796,6 +2895,11 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		}
 	};
 
+	const handleCommand = async (command: RpcCommand): Promise<RpcResponse> => {
+		if (!Object.hasOwn(SESSION_CHANGE_TYPES, command.type)) return handleCommandImpl(command);
+		return withSessionChange(() => handleCommandImpl(command));
+	};
+
 	// Deferred shutdown (pi.shutdown() from an extension) must not kill the
 	// process while a background-dispatched bash still owes the client its
 	// response frame. The coordinator drains tracked tasks before exiting and
@@ -2844,6 +2948,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	pendingExtensionRequests.rejectAll("RPC client disconnected before extension UI response completed");
 	hostToolBridge.close("RPC client disconnected before host tool execution completed");
 	hostUriBridge.clear("RPC client disconnected before host URI request completed");
+	dictationBridge.dispose();
 	await liveBridge.stop();
 	await inputDispatcher.drain();
 	// A backgrounded builtin (e.g. a /mcp reauth browser wait) must not park

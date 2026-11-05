@@ -1,6 +1,6 @@
 {
 	"name": "@earendil-works/pi-schema",
-	"version": "1.4.0",
+	"version": "1.5.0",
 	"description": "JSON Schema validation without eval: drafts 2020-12 and 7, compiled into plain closures",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -49,7 +49,7 @@
 	},
 	"devDependencies": {
 		"@cfworker/json-schema": "4.1.1",
-		"@oh-my-pi/omptype": "18.13.3",
+		"@oh-my-pi/omptype": "catalog:",
 		"ajv": "8.20.0",
 		"ajv-formats": "3.0.1",
 		"ata-validator": "1.61.3",

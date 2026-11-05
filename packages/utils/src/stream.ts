@@ -11,15 +11,8 @@ const CR = 0x0d;
 // so one oversized frame does not pin its peak buffer for the stream's life.
 const CONCAT_SINK_RETAIN_BYTES = 1024 * 1024;
 
-/**
- * Split a byte stream on LF boundaries.
- *
- * Every yielded line owns its bytes and remains unchanged after the generator
- * advances or drains. Line terminators are excluded.
- */
-export async function* readLines(stream: ReadableStream<Uint8Array>, signal?: AbortSignal): AsyncGenerator<Uint8Array> {
+async function* splitLines(source: AsyncIterable<Uint8Array>, signal?: AbortSignal): AsyncGenerator<Uint8Array> {
 	const buffer = new ConcatSink();
-	const source = abortableSource(stream, signal);
 	try {
 		for await (const chunk of source) {
 			for (const line of buffer.appendAndFlushLines(chunk)) {
@@ -38,6 +31,21 @@ export async function* readLines(stream: ReadableStream<Uint8Array>, signal?: Ab
 		if (signal?.aborted) return;
 		throw err;
 	}
+}
+
+/**
+ * Split a Web byte stream on LF boundaries.
+ *
+ * Every yielded line owns its bytes and remains unchanged after the generator
+ * advances or drains. Line terminators are excluded.
+ */
+export async function* readLines(stream: ReadableStream<Uint8Array>, signal?: AbortSignal): AsyncGenerator<Uint8Array> {
+	yield* splitLines(abortableSource(stream, signal), signal);
+}
+
+/** Split an async byte source such as a Node Readable on LF boundaries. */
+export async function* readLinesFromIterable(source: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
+	yield* splitLines(source);
 }
 
 export async function* readJsonl<T>(stream: ReadableStream<Uint8Array>, signal?: AbortSignal): AsyncGenerator<T> {

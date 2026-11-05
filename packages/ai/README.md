@@ -434,6 +434,7 @@ for (const block of response.content) {
 }
 ```
 
+
 ## Thinking/Reasoning
 
 Many models support thinking/reasoning capabilities where they can show their internal thought process. You can check if a model supports reasoning via the `reasoning` property. If you pass reasoning options to a non-reasoning model, they are silently ignored.

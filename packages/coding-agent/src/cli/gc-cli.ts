@@ -19,8 +19,10 @@ import {
 	getStatsDbPath,
 	getTerminalSessionsDir,
 	hashPath,
+	isPidAlive,
 	normalizePathForComparison,
 	readLines,
+	readLinesFromIterable,
 	type FileLockHandle,
 } from "@oh-my-pi/pi-utils";
 import { Settings } from "../config/settings";
@@ -382,22 +384,15 @@ async function readTextIfPresent(file: string): Promise<string> {
 }
 
 async function scanSessionLinesIfPresent(file: string, onLine: (line: Uint8Array) => void): Promise<void> {
-	// readLines buffers at most the largest record, including malformed records.
-	const scan = async (stream: ReadableStream<Uint8Array>): Promise<void> => {
-		for await (const line of readLines(stream)) onLine(line);
+	// readLinesFromIterable buffers at most the largest record, including malformed records.
+	const scan = async (stream: AsyncIterable<Uint8Array>): Promise<void> => {
+		for await (const line of readLinesFromIterable(stream)) onLine(line);
 	};
 	try {
 		const stream = Bun.file(file).stream();
 		if (file.endsWith(COMPRESSED_SESSION_SUFFIX)) {
-			const gunzip = createGunzip();
-			await pipeline(stream, gunzip, async (source: NodeJS.ReadableStream) => {
-				// Match the native stream's byte budget, not one arbitrary chunk or
-				// a default queue that counts each potentially large chunk as size 1.
-				await scan(
-					Readable.toWeb(source, {
-						strategy: new ByteLengthQueuingStrategy({ highWaterMark: gunzip.readableHighWaterMark }),
-					}),
-				);
+			await pipeline(Readable.from(stream, { objectMode: false }), createGunzip(), async source => {
+				await scan(source);
 			});
 		} else {
 			await scan(stream);
@@ -2106,17 +2101,6 @@ function gcLockPid(lockText: string): number | undefined {
 	return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
 }
 
-function processExists(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (error) {
-		const code = codeOf(error);
-		if (code === "ESRCH" || code === "EINVAL") return false;
-		return true;
-	}
-}
-
 function gcLockStatSnapshot(stat: {
 	dev: number;
 	ino: number;
@@ -2170,7 +2154,7 @@ async function gcLockSnapshotStillCurrent(lockPath: string, snapshot: GcLockSnap
 
 function shouldBreakGcLock(snapshot: GcLockSnapshot): boolean {
 	const pid = gcLockPid(snapshot.text);
-	if (pid) return !processExists(pid);
+	if (pid) return !isPidAlive(pid);
 
 	const createdAtMs = Date.parse(snapshot.text.split(/\r?\n/, 2)[1] ?? "");
 	const ageFromMs = Number.isFinite(createdAtMs) ? createdAtMs : snapshot.mtimeMs;
