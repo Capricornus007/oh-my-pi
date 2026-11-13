@@ -3,8 +3,12 @@ name: OMP Nix
 # Nightly, on-demand, and release runs only. Releases push their `v*` tag
 # atomically with main (scripts/release.ts), so the tag push is the release
 # trigger; branch pushes and pull requests never run this workflow.
+# FORK (Capricornus007) 改動：加 push branches:[main] —— workflow_dispatch 被
+# fork 限制擋住（HTTP 422），用 push 觸發立即驗證 nix 構建；branches 與 tags
+# 是並集語義，release 的 tag push 觸發不受影響。
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   schedule:
     - cron: "17 3 * * *"
