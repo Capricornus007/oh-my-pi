@@ -111,9 +111,16 @@ stdenv.mkDerivation {
   strictDeps = true;
   # Nix builders cannot reliably hardlink cache files into node_modules
   # (and Darwin's clonefile backend also rejects store permissions).
+  # --frozen-lockfile: the sandbox has no network, and bunfig.toml sets
+  # minimumReleaseAge=259200, which makes bun fetch registry manifests to
+  # verify publish dates even for exact-pinned, lockfile-resolved packages
+  # (run 43234609004: DNSResolveFailed on @types/react/react/react-dom/diff).
+  # The lockfile already pins every version with an integrity hash, so
+  # freezing it is both safe and required for offline install.
   bunInstallFlags = [
     "--linker=isolated"
     "--backend=copyfile"
+    "--frozen-lockfile"
   ];
   dontConfigure = true;
   dontRunLifecycleScripts = true;
